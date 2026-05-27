@@ -44,6 +44,10 @@ class ChatOrchestrator:
             await send_message(
                 {"type": "skill_call", "skill": intent, "status": "done"}
             )
+            # Stream the skill result text back to client
+            await send_message(
+                {"type": "llm_stream", "delta": response_text}
+            )
         else:
             # Build conversation history (last 20 messages, before saving current)
             msgs_result = await db.execute(
