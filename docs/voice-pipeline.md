@@ -257,14 +257,13 @@ await send_message({
 
 ```dart
 case 'tts_audio':
-    // 解码 base64 → Uint8List → 播放
-    final audioBase64 = msg.data['audio'] as String;
-    final audioBytes = base64Decode(audioBase64);
-    _ttsPlayer.play(audioBytes);
+    final audioBase64 = msg.data['audio'] as String?;
+    if (audioBase64 != null) {
+      final bytes = base64Decode(audioBase64);
+      _tts.play(Uint8List.fromList(bytes));
+    }
     break;
 ```
-
-当前代码中 `tts_audio` 分支是空的（`break;` 直接跳过）。需要集成 `TtsPlayerService`：
 
 ### Step 15: 音频播放
 
@@ -326,14 +325,9 @@ Future<void> play(Uint8List audioBytes) async {
 
 | 步骤 | 状态 | 说明 |
 |------|:--:|------|
-| 1-2. 录音 + 发送 | ⚠️ 已实现但未集成 | `AudioRecorderService` 已写好，`VoiceRecordButton` 的回调未对接 |
+| 1-2. 录音 + 发送 | ✅ 已集成 | `VoiceRecordButton` 内部调用 `AudioRecorderService`，录音停止后 base64 编码通过 `onAudioReady` → `ChatProvider.sendVoice()` → `WsService.sendVoice()` 发送 |
 | 3-6. ASR 识别 | ✅ 已联调 | DashScope SDK 调用正常，识别文本正确回传 |
 | 7-10. LLM 对话 | ✅ 已联调 | 流式输出正常，意图分类正常 |
 | 11-12. TTS 合成 | ✅ 已联调 | DashScope SDK 调用正常，169KB 音频测试通过 |
-| 13-14. 音频播放 | ⚠️ 已实现但未集成 | `TtsPlayerService` 已写好，`ChatProvider` 中 `tts_audio` case 为空白 |
+| 13-14. 音频播放 | ✅ 已集成 | `ChatProvider._onWsMessage()` 收到 `tts_audio` 后解码 base64 调用 `TtsPlayerService.play()` 播放 |
 | 端侧 ASR 兜底 | ⏳ 预留 | `asr_local_service.dart` 占位，后续集成 whisper.cpp |
-
-### 待补全的集成点
-
-1. **录音按钮对接** — `VoiceRecordButton` 需要在 `onRecordingChanged` 回调中调用 `AudioRecorderService`，停止后将音频 base64 传给 `WsService.sendVoice()`
-2. **TTS 播放对接** — `ChatProvider._onWsMessage()` 的 `tts_audio` 分支需要调用 `TtsPlayerService.play()` 播放收到的音频
