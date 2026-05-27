@@ -14,8 +14,7 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com/v1"
     qwen_api_key: str = ""
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    asr_api_url: str = "https://dashscope.aliyuncs.com/api/v1/services/audio/asr/asr"
-    tts_api_url: str = "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/tts"
+    dashscope_api_url: str = "https://dashscope.aliyuncs.com/api/v1"
     cosyvoice_endpoint: str = ""
 
     model_config = {"env_file": ".env"}

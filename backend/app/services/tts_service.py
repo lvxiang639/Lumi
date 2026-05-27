@@ -1,32 +1,34 @@
 import httpx
+import dashscope
 from app.config import settings
+
+dashscope.base_http_api_url = settings.dashscope_api_url
 
 
 class TTSService:
-    def __init__(self):
-        self.api_key = settings.qwen_api_key
-        self.tts_url = settings.tts_api_url
-
     async def synthesize_flash(
-        self, text: str, voice: str = "female-1"
+        self, text: str, voice: str = "Cherry", language: str = "Chinese"
     ) -> bytes:
-        """Use Qwen3-TTS-Flash for fast synthesis."""
-        headers = {"Authorization": f"Bearer {self.api_key}"}
-        data = {
-            "model": "qwen3-tts-flash",
-            "input": {"text": text},
-            "parameters": {"voice": voice},
-        }
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(self.tts_url, json=data, headers=headers)
-            resp.raise_for_status()
-            result = resp.json()
-            audio_url = result.get("output", {}).get("audio_url", "")
-            if audio_url:
-                async with httpx.AsyncClient() as audio_client:
-                    audio_resp = await audio_client.get(audio_url)
-                    return audio_resp.content
+        """Use Qwen3-TTS-Flash via DashScope SDK."""
+        response = dashscope.MultiModalConversation.call(
+            model="qwen3-tts-flash",
+            api_key=settings.qwen_api_key,
+            text=text,
+            voice=voice,
+            language_type=language,
+            stream=False,
+        )
+        if response.status_code != 200:
             return b""
+
+        audio_url = response.output.get("audio", {}).get("url", "")
+        if not audio_url:
+            return b""
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(audio_url)
+            resp.raise_for_status()
+            return resp.content
 
     async def synthesize_cosyvoice(
         self, text: str, cosyvoice_id: str
