@@ -1,17 +1,52 @@
 import 'package:flutter/foundation.dart';
+import '../models/user.dart';
+import '../services/auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
-  bool _isAuthenticated = false;
+  final AuthService _auth = AuthService();
+  User? _user;
+  bool _loading = false;
+  String? _error;
 
-  bool get isAuthenticated => _isAuthenticated;
+  User? get user => _user;
+  bool get isAuthenticated => _user != null;
+  bool get loading => _loading;
+  String? get error => _error;
 
-  void login() {
-    _isAuthenticated = true;
-    notifyListeners();
+  Future<void> checkAuth() async {
+    if (await _auth.isLoggedIn()) {
+      _loading = true;
+      notifyListeners();
+      try {
+        _user = await _auth.getProfile();
+      } catch (_) {
+        await _auth.logout();
+      }
+      _loading = false;
+      notifyListeners();
+    }
   }
 
-  void logout() {
-    _isAuthenticated = false;
+  Future<bool> login(String phone) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final result = await _auth.login(phone);
+      _user = await _auth.getProfile();
+      return result.isNewUser;
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> logout() async {
+    await _auth.logout();
+    _user = null;
     notifyListeners();
   }
 }

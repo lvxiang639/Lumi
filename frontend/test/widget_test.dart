@@ -6,6 +6,6 @@ void main() {
   testWidgets('App renders login screen', (WidgetTester tester) async {
     await tester.pumpWidget(const LingxiApp());
 
-    expect(find.text('Login'), findsOneWidget);
+    expect(find.text('登录 / 注册'), findsOneWidget);
   });
 }
