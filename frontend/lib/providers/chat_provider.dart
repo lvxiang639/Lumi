@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/message.dart';
 import '../services/ws_service.dart';
+import '../services/tts_player_service.dart';
 
 class ChatProvider extends ChangeNotifier {
   final WsService _ws = WsService();
+  final TtsPlayerService _tts = TtsPlayerService();
   final List<Message> _messages = [];
   String _streamingText = "";
   bool _isProcessing = false;
@@ -24,9 +27,7 @@ class ChatProvider extends ChangeNotifier {
   void sendText(String text) {
     _messages.add(Message(
       id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-      role: 'user',
-      type: 'text',
-      content: text,
+      role: 'user', type: 'text', content: text,
       createdAt: DateTime.now(),
     ));
     _isProcessing = true;
@@ -35,15 +36,20 @@ class ChatProvider extends ChangeNotifier {
     _ws.sendText(text);
   }
 
+  void sendVoice(String base64Audio) {
+    _isProcessing = true;
+    _streamingText = "";
+    notifyListeners();
+    _ws.sendVoice(base64Audio);
+  }
+
   void _onWsMessage(WsMessage msg) {
     switch (msg.type) {
       case 'asr_result':
         final text = msg.data['text'] as String;
         _messages.add(Message(
           id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-          role: 'user',
-          type: 'text',
-          content: text,
+          role: 'user', type: 'text', content: text,
           createdAt: DateTime.now(),
         ));
         break;
@@ -54,14 +60,17 @@ class ChatProvider extends ChangeNotifier {
         currentSkill = msg.data['skill'] as String?;
         break;
       case 'tts_audio':
+        final audioBase64 = msg.data['audio'] as String?;
+        if (audioBase64 != null) {
+          final bytes = base64Decode(audioBase64);
+          _tts.play(Uint8List.fromList(bytes));
+        }
         break;
       case 'done':
         if (_streamingText.isNotEmpty) {
           _messages.add(Message(
             id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
-            role: 'assistant',
-            type: 'text',
-            content: _streamingText,
+            role: 'assistant', type: 'text', content: _streamingText,
             createdAt: DateTime.now(),
           ));
           _streamingText = "";
@@ -86,6 +95,7 @@ class ChatProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _tts.dispose();
     _ws.dispose();
     super.dispose();
   }

@@ -74,7 +74,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   padding: const EdgeInsets.all(8),
                   child: Row(
                     children: [
-                      const VoiceRecordButton(),
+                      VoiceRecordButton(
+                        onAudioReady: (base64) {
+                          context.read<ChatProvider>().sendVoice(base64);
+                        },
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
