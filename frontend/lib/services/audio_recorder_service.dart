@@ -9,9 +9,9 @@ class AudioRecorderService {
 
   Future<void> start() async {
     final dir = await getTemporaryDirectory();
-    _currentPath = '${dir.path}/lingxi_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    _currentPath = '${dir.path}/lingxi_voice_${DateTime.now().millisecondsSinceEpoch}.wav';
     await _recorder.start(
-      const RecordConfig(encoder: AudioEncoder.aacLc),
+      const RecordConfig(encoder: AudioEncoder.wav),
       path: _currentPath!,
     );
   }

@@ -3,35 +3,41 @@
 ## 环境要求
 
 - Python 3.12+
-- Docker Desktop（运行 PostgreSQL、Redis、MinIO）
+- Docker Desktop（运行 PostgreSQL、Redis、MinIO、SearXNG）
 - Flutter 3.22+（移动端开发）
 
 ## 快速启动
 
-### 1. 启动基础服务（PostgreSQL / Redis / MinIO）
+### 1. 启动基础服务
 
 ```bash
 # 确认 Docker 已启动，然后：
 cd backend
 
-# 启动数据库和缓存服务
-docker compose up -d db redis minio
+# 启动所有基础服务（数据库 / 缓存 / 文件存储 / 搜索引擎）
+docker compose up -d db redis minio searxng
 
 # 检查服务状态
-docker ps | grep -E "postgres|redis|minio"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "postgres|redis|minio|searxng"
 ```
 
-MinIO 控制台：http://localhost:9001 （账号密码：minioadmin / minioadmin）
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| FastAPI 后端 | 8000 | API + WebSocket |
+| PostgreSQL | 5432 | 数据库 |
+| Redis | 6379 | 缓存 |
+| MinIO API | 9000 | 文件存储 |
+| MinIO Console | 9001 | MinIO 管理界面 |
+| SearXNG | 8080 | 元搜索引擎（搜索技能依赖） |
 
 ### 2. 配置环境变量
 
 ```bash
 cd backend
 
-# 创建 .env 文件（已配置好，重新配置可编辑）
 cat > .env << 'EOF'
-DEEPSEEK_API_KEY=sk-c4a189a549e6460898bfc2b3198ad812
-QWEN_API_KEY=sk-0060a0b228914a95a2f3dc316dc3095a
+DEEPSEEK_API_KEY=sk-xxx
+QWEN_API_KEY=sk-xxx
 JWT_SECRET=lingxi-dev-jwt-secret-2026
 DATABASE_URL=postgresql+asyncpg://lingxi:lingxi@localhost:5432/lingxi
 EOF
@@ -68,7 +74,7 @@ nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > /tmp/lingxi.log
 curl http://localhost:8000/health
 # → {"status":"ok"}
 
-# 登录测试
+# 登录测试（自动注册新用户）
 curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"phone":"13800138000"}'
@@ -95,7 +101,7 @@ asyncio.run(test())
 "
 ```
 
-### 6. 启动 Flutter 前端（可选）
+### 6. 启动 Flutter 前端
 
 ```bash
 cd frontend
@@ -106,34 +112,30 @@ flutter pub get
 # 代码检查
 flutter analyze
 
-# 首次运行需先添加 macOS 平台支持（已添加可跳过）
-flutter create --platforms macos .
-
 # macOS 桌面运行
-flutter run -d macos \
-  --dart-define=API_BASE_URL=http://localhost:8000 \
-  --dart-define=WS_BASE_URL=ws://localhost:8000
-
-# Android 模拟器运行（默认地址无需额外参数）
-flutter run -d android
+flutter run -d macos
 
 # iOS 模拟器运行
-flutter run -d ios \
-  --dart-define=API_BASE_URL=http://localhost:8000 \
-  --dart-define=WS_BASE_URL=ws://localhost:8000
+flutter run -d ios
+
+# Android 模拟器运行（需指定地址，因为 10.0.2.2 是模拟器访问宿主机的别名）
+flutter run -d android \
+  --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ```
 
-默认 API 地址 `http://10.0.2.2:8000` 仅适用于 Android 模拟器（`10.0.2.2` 是 Android 模拟器中宿主机 localhost 的别名）。macOS / iOS 真机或模拟器需用 `--dart-define` 显式指定 `localhost`。
+**默认 API 地址：** `http://localhost:8000`，适用于 macOS 桌面和 iOS 模拟器（它们与宿主机共享网络栈）。Android 模拟器 / iOS 真机需用 `--dart-define` 覆盖：
+- Android 模拟器：`--dart-define=API_BASE_URL=http://10.0.2.2:8000`
+- iOS 真机：`--dart-define=API_BASE_URL=http://<Mac局域网IP>:8000`
 
 ## API 一览
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/auth/login` | 登录/注册 |
+| POST | `/api/auth/login` | 登录/注册（手机号，无密码） |
 | POST | `/api/auth/refresh` | 刷新 Token |
 | GET | `/api/auth/profile` | 获取个人信息 |
 | PUT | `/api/auth/profile` | 修改昵称/头像 |
-| POST | `/api/characters/init` | 初始化角色 |
+| POST | `/api/characters/init` | 初始化角色（新用户必须调用） |
 | GET | `/api/characters/config` | 角色配置 |
 | PUT | `/api/characters/config` | 修改角色名 |
 | GET | `/api/characters/outfits` | 已拥有服装 |
@@ -173,6 +175,56 @@ flutter run -d ios \
 {"type": "done", "conversation_id": "xxx"}
 ```
 
+## 技能系统
+
+对话时系统自动识别意图并调用对应技能，无需手动切换。
+
+| 技能 | 触发示例 | 功能 |
+|------|---------|------|
+| 天气 | "今天天气怎么样"、"上海天气" | LLM 提取城市 → wttr.in 查询 |
+| 搜索 | "搜索一下iPhone 17"、"查一下..." | SearXNG 元搜索引擎 → 返回 Top 5 结果 |
+| 日历 | "提醒我明天下午3点开会" | LLM 提取标题+时间 → 写入数据库 → 后台定时提醒 |
+| 记账 | "午餐花了50元"、"收了200红包" | LLM 提取金额+类别 → 写入数据库 |
+
+### 搜索使用说明
+
+搜索功能依赖 **SearXNG**（自部署的开源元搜索引擎），默认同时搜索 Google 和 Bing。
+
+```bash
+# 启动 SearXNG
+cd backend && docker compose up -d searxng
+
+# 验证 SearXNG 运行
+curl http://localhost:8080/search?q=test&format=json
+```
+
+在 App 对话中说"搜索"开头的语句即可触发，例如：
+- "帮我搜索一下今天天气"（注意：这会触发 search 技能而非 weather，取决于 LLM 意图分类）
+- "搜索 iPhone 17 最新消息"
+- "查一下附近的餐厅"
+
+## 日历提醒
+
+日历事件创建后，后台每 60 秒检查一次到期事件并自动标记为"已提醒"。日志中可见提醒记录：
+```bash
+tail -f /tmp/lingxi.log | grep NOTIFY
+```
+
+## 角色声音切换
+
+角色装备不同的 VoicePack 后，TTS 自动使用对应音色。数据库默认种子数据包含"默认女声"（Cherry 音色）。切换方式：
+```bash
+# 查看已拥有的声音
+curl http://localhost:8000/api/characters/voices \
+  -H "Authorization: Bearer <token>"
+
+# 切换到指定声音
+curl -X PUT http://localhost:8000/api/characters/equip \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"item_type":"voice_pack","item_id":"<voice_pack_id>"}'
+```
+
 ## 运行测试
 
 ```bash
@@ -186,16 +238,6 @@ cd frontend && flutter test
 cd frontend && flutter analyze
 ```
 
-## 开发端口
-
-| 服务 | 端口 |
-|------|------|
-| FastAPI 后端 | 8000 |
-| PostgreSQL | 5432 |
-| Redis | 6379 |
-| MinIO API | 9000 |
-| MinIO Console | 9001 |
-
 ## 常用日志查看
 
 ```bash
@@ -203,6 +245,6 @@ cd frontend && flutter analyze
 tail -f /tmp/lingxi.log
 
 # Docker 服务日志
-docker compose logs -f db
-docker compose logs -f redis
+docker compose -f backend/docker-compose.yml logs -f db
+docker compose -f backend/docker-compose.yml logs -f searxng
 ```

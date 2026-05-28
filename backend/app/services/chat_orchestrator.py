@@ -5,8 +5,9 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
-from app.models import Conversation, Message, MessageRole, MessageType
+from app.models import Conversation, Message, MessageRole, MessageType, Character
 from app.services.llm_service import llm_router
 from app.services.tts_service import tts_service
 from app.services.skill_registry import skill_registry
@@ -97,9 +98,17 @@ class ChatOrchestrator:
         conv.updated_at = datetime.now(timezone.utc)
         await db.commit()
 
-        # 5. Synthesize TTS
+        # 5. Synthesize TTS (with character voice pack)
         try:
-            audio_bytes = await tts_service.synthesize_flash(response_text)
+            voice = await self._get_character_voice(user_id, db)
+            if voice and voice.get("cosyvoice_endpoint"):
+                audio_bytes = await tts_service.synthesize_cosyvoice(
+                    response_text, voice["cosyvoice_id"]
+                )
+            else:
+                audio_bytes = await tts_service.synthesize_flash(
+                    response_text, voice=voice["voice"] if voice else "Cherry"
+                )
             if audio_bytes:
                 await send_message(
                     {
@@ -141,6 +150,35 @@ class ChatOrchestrator:
         await self.process_text(
             user_id, text, conversation_id, db, send_message
         )
+
+    async def _get_character_voice(
+        self, user_id: str, db: AsyncSession
+    ) -> dict | None:
+        """Look up the character's voice pack and return voice config."""
+        from app.config import settings
+
+        try:
+            user_uuid = uuid.UUID(user_id)
+            result = await db.execute(
+                select(Character)
+                .where(Character.user_id == user_uuid)
+                .options(selectinload(Character.voice_pack))
+            )
+            char = result.scalar_one_or_none()
+            if char and char.voice_pack:
+                vp = char.voice_pack
+                logger.info(
+                    "character voice: user=%s voice=%s cosyvoice_id=%s",
+                    user_id[:8], vp.name, vp.cosyvoice_id,
+                )
+                return {
+                    "voice": vp.cosyvoice_id,
+                    "cosyvoice_id": vp.cosyvoice_id,
+                    "cosyvoice_endpoint": settings.cosyvoice_endpoint or "",
+                }
+        except Exception:
+            logger.exception("failed to get character voice")
+        return None
 
     async def _get_or_create_conv(
         self,

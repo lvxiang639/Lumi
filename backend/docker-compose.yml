@@ -17,6 +17,7 @@ services:
       - db
       - redis
       - minio
+      - searxng
 
   db:
     image: postgres:16-alpine
@@ -46,6 +47,18 @@ services:
     volumes:
       - miniodata:/data
 
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - searxngdata:/etc/searxng
+      - ./searxng-settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - INSTANCE_NAME=lingxi-search
+
 volumes:
   pgdata:
   miniodata:
+  searxngdata:

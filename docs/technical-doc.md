@@ -6,12 +6,14 @@
 lingxi/
 ├── readme.md                          # 启动指南 & API 速查
 ├── docs/
+│   ├── technical-doc.md               # 本文档
+│   ├── voice-pipeline.md              # 语音对话全链路流程
 │   └── superpowers/
 │       ├── specs/                     # 设计文档
 │       └── plans/                     # 实现计划
 ├── backend/                           # Python FastAPI 后端
 │   ├── Dockerfile                     # 容器构建文件
-│   ├── docker-compose.yml             # 开发环境编排（DB/Redis/MinIO）
+│   ├── docker-compose.yml             # 开发环境编排（DB/Redis/MinIO/SearXNG）
 │   ├── requirements.txt               # Python 依赖
 │   ├── alembic.ini                    # 数据库迁移配置
 │   ├── alembic/                       # 迁移脚本
@@ -32,28 +34,28 @@ lingxi/
 | 文件 | 功能 |
 |------|------|
 | `Dockerfile` | 基于 Python 3.12-slim，安装依赖后通过 uvicorn 启动 |
-| `docker-compose.yml` | 编排 4 个服务：api(8000)、db(5432)、redis(6379)、minio(9000) |
-| `requirements.txt` | FastAPI + SQLAlchemy + Redis + MinIO + OpenAI SDK + JWT 等 |
+| `docker-compose.yml` | 编排 5 个服务：api(8000)、db(5432)、redis(6379)、minio(9000)、searxng(8080) |
+| `requirements.txt` | FastAPI + SQLAlchemy + Redis + MinIO + OpenAI SDK + DashScope + JWT 等 |
 | `alembic.ini` + `alembic/` | 异步数据库迁移配置，自动从模型生成 SQL |
 
 ### 2.2 app/ — 应用核心
 
 ```
 app/
-├── main.py           # 入口：FastAPI 实例、CORS、路由注册、启动事件
+├── main.py           # 入口：FastAPI 实例、CORS、路由注册、启动/关闭事件
 ├── config.py         # 配置中心：从 .env / 环境变量读取所有配置
 ├── database.py       # 异步 SQLAlchemy 引擎、Session 工厂、get_db 依赖
 ├── api/              # REST + WebSocket 路由层
 ├── models/           # 数据库模型（ORM）
 ├── schemas/          # Pydantic 请求/响应模型
-├── services/         # AI 服务 + 技能系统 + 对话编排
-└── core/             # 安全模块：JWT 签发/验证
+├── services/         # AI 服务 + 技能系统 + 对话编排 + 通知
+└── core/             # 安全 & 日志模块
 ```
 
 #### 2.2.1 config.py — 配置中心
 
 - 使用 `pydantic-settings` 自动加载 `.env` 文件
-- 管理：数据库连接串、Redis、MinIO、JWT 密钥、DeepSeek/Qwen API Key、ASR/TTS 端点
+- 管理：数据库连接串、Redis、MinIO、JWT 密钥、DeepSeek/Qwen API Key、DashScope 端点、CosyVoice 端点
 
 #### 2.2.2 database.py — 数据库层
 
@@ -61,7 +63,7 @@ app/
 - `Base` 声明式基类
 - `get_db()` — FastAPI 依赖注入，自动管理会话生命周期
 
-#### 2.2.3 api/ — 路由层（8 个模块）
+#### 2.2.3 api/ — 路由层（10 个模块）
 
 | 文件 | 路由前缀 | 职责 |
 |------|---------|------|
@@ -106,7 +108,7 @@ app/
 
 | 文件 | 类 | 功能 |
 |------|-----|------|
-| `asr_service.py` | `ASRService` | 调用 Qwen3-ASR-Flash 语音转文字 |
+| `asr_service.py` | `ASRService` | 调用 Qwen3-ASR-Flash（DashScope SDK）语音转文字 |
 | `llm_service.py` | `LLMRouter` | 多模型路由：闲聊→DeepSeek，工具调用→Qwen；流式输出 + 意图分类 |
 | `tts_service.py` | `TTSService` | 文字转语音：Qwen3-TTS-Flash（快速，97ms）+ CosyVoice（角色音色） |
 
@@ -115,28 +117,41 @@ app/
 | 文件 | 技能名 | 功能 |
 |------|--------|------|
 | `base.py` | — | 抽象基类 `BaseSkill` + `SkillResult` 数据类 |
-| `weather.py` | `weather` | 调用 wttr.in 获取天气信息 |
-| `search.py` | `search` | 对接 SearXNG 元搜索引擎 |
-| `calendar_skill.py` | `calendar` | 日历事件提取（预留 LLM 提取升级） |
-| `expense_skill.py` | `expense` | 记账金额/类别提取（预留 LLM 提取升级） |
+| `weather.py` | `weather` | **LLM 提取城市名** → 调用 wttr.in 获取天气 |
+| `search.py` | `search` | 对接 SearXNG 元搜索引擎，返回 Top 5 结果 |
+| `calendar_skill.py` | `calendar` | **LLM 提取标题+时间+重复规则** → 写入 CalendarEvent 表 |
+| `expense_skill.py` | `expense` | **LLM 提取金额+类别+备注** → 写入 ExpenseRecord 表 |
 | `skill_registry.py` | — | 技能注册表，按意图名称分发到对应技能 |
+
+每个技能通过 LLM 从用户自然语言中提取结构化数据。calendar_skill 和 expense_skill 会将结果直接持久化到数据库，并返回确认消息。
 
 **对话编排：**
 
 | 文件 | 功能 |
 |------|------|
-| `chat_orchestrator.py` | 核心调度：意图分类 → 技能分发/LLM 对话 → 消息存储 → TTS 合成 |
+| `chat_orchestrator.py` | 核心调度：意图分类 → 技能分发/LLM 对话 → 消息存储 → **角色音色 TTS** |
 
 处理流程：
 ```
-用户消息 → 意图分类(LLM) → 技能执行/流式 LLM → 消息持久化 → TTS → 返回客户端
+用户消息 → 意图分类(LLM) → 技能执行/流式 LLM → 消息持久化 → 查角色VoicePack → TTS → 返回客户端
 ```
 
-#### 2.2.7 core/ — 安全模块
+新增：TTS 合成前会查询 `Character.voice_pack` 获取已装备的声音包，将 `cosyvoice_id` 传给 TTS 服务，实现角色音色自动切换。
+
+**通知服务：**
+
+| 文件 | 功能 |
+|------|------|
+| `notification_service.py` | 后台 asyncio 任务，每 60 秒轮询 `calendar_events` 表，标记到期事件为 `notified=True` |
+
+通知服务在 `main.py` 的 `startup` 事件中启动，`shutdown` 事件中停止。
+
+#### 2.2.7 core/ — 基础模块
 
 | 文件 | 功能 |
 |------|------|
 | `security.py` | JWT 签发（create_access_token）、解码（decode_access_token）、bcrypt 密码哈希 |
+| `logging.py` | 统一日志格式配置（时间 | 级别 | 模块:行号 | 函数 | 消息） |
 
 ---
 
@@ -148,11 +163,11 @@ app/
 |------|------|
 | `main.dart` | App 入口，初始化 Flutter 绑定和本地通知插件 |
 | `app.dart` | 顶层 Widget：MultiProvider 注册所有 Provider + MaterialApp 配置 + 登录态路由 |
-| `config.dart` | 运行时配置：API 和 WebSocket 地址（`--dart-define` 注入） |
+| `config.dart` | 运行时配置：API 和 WebSocket 地址，默认 `localhost:8000`（`--dart-define` 可覆盖） |
 
 ### 3.2 models/ — 数据模型（8 个类）
 
-与后端 schemas 一一对应，每个类包含 `fromJson()` 工厂方法。需 `toJson()` 的类（CalendarEvent、ExpenseRecord）也实现序列化。文件：`user.dart`, `message.dart`, `conversation.dart`, `character_config.dart`, `outfit.dart`, `voice_pack.dart`, `calendar_event.dart`, `expense_record.dart`。
+与后端 schemas 一一对应，每个类包含 `fromJson()` 工厂方法。需 `toJson()` 的类（CalendarEvent、ExpenseRecord）也实现序列化。
 
 ### 3.3 services/ — API 与服务层（9 个模块）
 
@@ -165,7 +180,7 @@ app/
 | `expense_service.dart` | 记账：CRUD + 统计查询 |
 | `sync_service.dart` | 数据同步：批量上传事件和记账变更 |
 | `audio_recorder_service.dart` | 音频录制封装（record 插件） |
-| `asr_local_service.dart` | 本地语音识别预留（whisper.cpp FFI） |
+| `asr_local_service.dart` | 本地语音识别预留（whisper.cpp FFI，当前为占位） |
 | `tts_player_service.dart` | TTS 音频回放（audioplayers 插件） |
 
 ### 3.4 providers/ — 状态管理（5 个 ChangeNotifier）
@@ -217,13 +232,25 @@ Flutter App                            FastAPI Backend
     │                                        ├── 意图分类 (LLM)
     │                                        ├── 技能/LLM 聊天
     │   ◄── {"type":"llm_stream", "delta":""} 流式输出
-    │                                        ├── TTS 合成
+    │                                        ├── 查角色VoicePack → TTS
     │   ◄── {"type":"tts_audio", "audio":""}│
     │                                        ├── 保存 Message 到 DB
     │   ◄── {"type":"done", "conv_id":"x"}   │
 ```
 
-### 4.2 日历/记账流程（REST + 本地优先）
+### 4.2 技能执行流程
+
+```
+用户输入 → classify_intent(DeepSeek)
+    │
+    ├── "weather"  → WeatherSkill  ──→ LLM提取城市 → wttr.in → 返回天气文本
+    ├── "search"   → SearchSkill   ──→ SearXNG API → 返回搜索摘要
+    ├── "calendar" → CalendarSkill ──→ LLM提取时间+标题 → 写入CalendarEvent → 返回确认
+    ├── "expense"  → ExpenseSkill  ──→ LLM提取金额+类别 → 写入ExpenseRecord → 返回确认
+    └── "chat"     → LLM 流式对话（带20条历史上下文）
+```
+
+### 4.3 日历/记账流程（REST + 本地优先）
 
 ```
 Flutter App                      FastAPI              PostgreSQL
@@ -240,22 +267,37 @@ Flutter App                      FastAPI              PostgreSQL
 
 ---
 
-## 五、模型路由策略
+## 五、通知系统
 
-| 场景 | ASR | LLM | TTS |
-|------|-----|-----|-----|
-| 正常网络 | Qwen3-ASR-Flash（高精度） | DeepSeek（闲聊）/ Qwen（工具调用） | Qwen3-TTS-Flash（97ms） |
-| 离线/弱网 | 端侧 Whisper | 不可用 | 不可用 |
-| 角色声音 | — | — | CosyVoice（定制音色） |
+后台 asyncio 任务（`notification_service.py`），App 启动时自动运行：
+
+```
+每60秒 → SELECT unnotified events WHERE time <= now()
+       → 标记 notified = True
+       → 日志记录 "NOTIFY: user=xxx title=xxx"
+```
+
+不含推送通知（后续可接入 APNs/FCM）。
 
 ---
 
-## 六、扩展点
+## 六、模型路由策略
+
+| 场景 | ASR | LLM | TTS |
+|------|-----|-----|-----|
+| 正常网络 | Qwen3-ASR-Flash（高精度） | DeepSeek（闲聊/意图分类/提取）/ Qwen（工具调用） | Qwen3-TTS-Flash（97ms，默认 Cherry） |
+| 离线/弱网 | 端侧 Whisper（预留） | 不可用 | 不可用 |
+| 角色声音 | — | — | 查 Character.voice_pack.cosyvoice_id，传递给 TTS |
+
+---
+
+## 七、扩展点
 
 | 位置 | 扩展方式 |
 |------|---------|
-| 新技能 | 实现 `BaseSkill`，在 `skill_registry.py` 注册 |
+| 新技能 | 实现 `BaseSkill`，在 `skill_registry.py` 注册，在 `llm_service.classify_intent()` 添加标签 |
 | 新 LLM | 在 `llm_service.py` 添加 Client 实例 |
 | 新服装/声音 | 插入 `outfits` / `voice_packs` 表记录 |
 | 离线 ASR | 在 `asr_local_service.dart` 集成 whisper.cpp |
 | Live2D 渲染 | 替换 `live2d_view.dart` 占位符为 Cubism SDK |
+| 推送通知 | 在 `notification_service.py` 接入 APNs/FCM |

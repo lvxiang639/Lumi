@@ -25,7 +25,10 @@
 │                process_text() ──▶ LLMRouter ──▶ DeepSeek / Qwen               │
 │                      │                                                         │
 │                      ▼                                                         │
-│                TTSService ──▶ DashScope Qwen3-TTS ──▶ 下载 WAV 音频           │
+│                查 Character.voice_pack ──▶ TTSService                         │
+│                      │                         │                               │
+│                      │                         ├── Qwen3-TTS-Flash (默认)      │
+│                      │                         └── CosyVoice (角色定制音色)    │
 │                      │                                                         │
 │                      ▼                                                         │
 │                base64 编码 ──▶ WebSocket 返回客户端                            │
@@ -152,10 +155,17 @@ intent = await llm_router.classify_intent(text)
 ```python
 skill = skill_registry.get(intent)
 result = await skill.execute(user_id, text, db)
-response_text = result.text  # 如："北京当前温度20度，Partly Cloudy"
+response_text = result.text
 ```
 
-已实现的技能：`weather`（wttr.in）、`search`（SearXNG）、`calendar`、`expense`。
+四种技能均已实现 LLM 结构化提取：
+
+| 技能 | 实现 |
+|------|------|
+| `weather` | LLM 提取城市 → wttr.in API 查询 → 返回天气文本 |
+| `search` | 转发到 SearXNG 元搜索引擎 → 返回 Top 5 结果摘要 |
+| `calendar` | LLM 提取标题+时间+重复规则 → 写入 `calendar_events` 表 → 返回确认 |
+| `expense` | LLM 提取金额+类别+备注 → 写入 `expense_records` 表 → 返回确认 |
 
 ### Step 8b: LLM 流式对话（闲聊意图）
 
@@ -198,30 +208,48 @@ Flutter 端 `ChatProvider._onWsMessage()` 收到 `llm_stream` 后追加到 `_str
 
 ## 四、服务端：语音合成（TTS）
 
-### Step 11: 调用 DashScope TTS
+### Step 11: 查找角色声音包（新增）
+
+**文件：** `backend/app/services/chat_orchestrator.py:_get_character_voice()`
+
+```python
+char_result = await db.execute(
+    select(Character).where(Character.user_id == user_uuid)
+)
+char = char_result.scalar_one_or_none()
+if char and char.voice_pack:
+    voice = char.voice_pack.cosyvoice_id
+```
+
+在 TTS 合成前，查询角色已装备的声音包，获取 `cosyvoice_id`。如果 CosyVoice 端点已配置则走定制音色，否则将 `cosyvoice_id` 传给 Qwen3-TTS-Flash 作为 voice 参数。未装备声音包则使用默认音色 `"Cherry"`。
+
+### Step 12: 调用 TTS
 
 **文件：** `backend/app/services/tts_service.py`
 
+两条路径：
+
+**默认路径 — Qwen3-TTS-Flash：**
 ```python
 response = dashscope.MultiModalConversation.call(
     model="qwen3-tts-flash",
     api_key=settings.qwen_api_key,
-    text=response_text,        # LLM 生成的完整回复文本
-    voice="Cherry",            # 音色，可通过角色声音包切换
+    text=response_text,
+    voice=voice,  # 来自角色声音包的 cosyvoice_id，或默认 "Cherry"
     language_type="Chinese",
     stream=False,
 )
-# 获取音频下载 URL
-audio_url = response.output["audio"]["url"]
-# 下载 WAV 字节
-audio_bytes = await httpx_client.get(audio_url)
 ```
 
-- 模型：`qwen3-tts-flash`（首包延迟 97ms，17 种预设音色）
-- 声音包系统通过 `voice` 参数切换不同角色音色
-- 高级场景走 CosyVoice 实现声音克隆
+**角色定制路径 — CosyVoice（需配置 cosyvoice_endpoint）：**
+```python
+resp = await client.post(
+    f"{settings.cosyvoice_endpoint}/synthesize",
+    json={"text": text, "voice_id": cosyvoice_id},
+)
+```
 
-### Step 12: 返回音频给 App
+### Step 13: 返回音频给 App
 
 ```python
 await send_message({
@@ -231,17 +259,7 @@ await send_message({
 })
 ```
 
-将 WAV 字节进行 base64 编码，封装为 JSON 返回：
-
-```json
-{
-  "type": "tts_audio",
-  "audio": "UklGRiRA...",
-  "text": "今天北京天气晴朗，温度20度"
-}
-```
-
-### Step 13: 对话结束信号
+### Step 14: 对话结束信号
 
 ```json
 {"type": "done", "conversation_id": "c5a3ff06-096f-4cf3-b3ab-e42528206d9a"}
@@ -251,7 +269,7 @@ await send_message({
 
 ## 五、App 端：播放音频
 
-### Step 14: 接收 TTS 消息
+### Step 15: 接收 TTS 消息
 
 **文件：** `frontend/lib/providers/chat_provider.dart`
 
@@ -265,7 +283,7 @@ case 'tts_audio':
     break;
 ```
 
-### Step 15: 音频播放
+### Step 16: 音频播放
 
 **文件：** `frontend/lib/services/tts_player_service.dart`
 
@@ -300,22 +318,26 @@ Future<void> play(Uint8List audioBytes) async {
        │                                 │ 4. 意图分类 (DeepSeek) ────►│
        │                                 │   ◄── "weather" ────────────│
        │                                 │                              │
-       │                                 │ 5. 技能执行 (wttr.in)        │
+       │                                 │ 5. LLM 提取城市 ────────────►│
+       │                                 │   ◄── "上海" ───────────────│
+       │                                 │ 6. wttr.in 查询              │
        │                                 │                              │
        │ ◄── {"type":"skill_call",       │                              │
        │     "skill":"weather"}          │                              │
        │ ◄── {"type":"llm_stream",       │                              │
-       │     "delta":"北京当前..."}       │                              │
-       │                                 │ 6. TTS API call              │
-       │                                 │    (qwen3-tts-flash) ───────►│
+       │     "delta":"上海当前20度..."}   │                              │
+       │                                 │ 7. 查角色 VoicePack          │
+       │                                 │ 8. TTS API call              │
+       │                                 │    (qwen3-tts-flash,         │
+       │                                 │     voice=角色音色) ────────►│
        │                                 │   ◄── 音频 URL ─────────────│
-       │                                 │ 7. 下载 WAV 音频             │
+       │                                 │ 9. 下载 WAV 音频             │
        │                                 │                              │
        │ ◄── {"type":"tts_audio",        │                              │
        │     "audio":"base64..."}        │                              │
        │ ◄── {"type":"done"}             │                              │
        │                                 │                              │
-       │ 8. 解码 base64 → 扬声器播放     │                              │
+       │ 10. 解码 base64 → 扬声器播放    │                              │
        │                                 │                              │
 ```
 
@@ -325,9 +347,13 @@ Future<void> play(Uint8List audioBytes) async {
 
 | 步骤 | 状态 | 说明 |
 |------|:--:|------|
-| 1-2. 录音 + 发送 | ✅ 已集成 | `VoiceRecordButton` 内部调用 `AudioRecorderService`，录音停止后 base64 编码通过 `onAudioReady` → `ChatProvider.sendVoice()` → `WsService.sendVoice()` 发送 |
-| 3-6. ASR 识别 | ✅ 已联调 | DashScope SDK 调用正常，识别文本正确回传 |
-| 7-10. LLM 对话 | ✅ 已联调 | 流式输出正常，意图分类正常 |
-| 11-12. TTS 合成 | ✅ 已联调 | DashScope SDK 调用正常，169KB 音频测试通过 |
-| 13-14. 音频播放 | ✅ 已集成 | `ChatProvider._onWsMessage()` 收到 `tts_audio` 后解码 base64 调用 `TtsPlayerService.play()` 播放 |
+| 1-2. 录音 + 发送 | ✅ 已集成 | `VoiceRecordButton` → `AudioRecorderService` → base64 → WsService |
+| 3-6. ASR 识别 | ✅ 已联调 | DashScope SDK，qwen3-asr-flash |
+| 7. 意图分类 | ✅ 已联调 | DeepSeek，五分类（chat/search/weather/calendar/expense） |
+| 8a. 技能执行 | ✅ 已实现 | 四种技能均含 LLM 结构化提取 + 数据库写入（calendar/expense） |
+| 8b. LLM 流式对话 | ✅ 已联调 | DeepSeek 流式，20 条历史上下文 |
+| 11. 角色音色切换 | ✅ 已实现 | 查 Character.voice_pack → cosyvoice_id → TTS |
+| 12-13. TTS 合成 | ✅ 已联调 | Qwen3-TTS-Flash（默认/CosyVoice 角色定制） |
+| 14-16. 音频播放 | ✅ 已集成 | base64 解码 → BytesSource → audioplayers 播放 |
+| 日历提醒通知 | ✅ 已实现 | 后台每 60s 轮询，标记到期事件 |
 | 端侧 ASR 兜底 | ⏳ 预留 | `asr_local_service.dart` 占位，后续集成 whisper.cpp |

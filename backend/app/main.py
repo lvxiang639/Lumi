@@ -36,6 +36,14 @@ app.include_router(ws_router)
 async def startup():
     from app.api.seed import seed_defaults
     await seed_defaults()
+    from app.services.notification_service import notification_service
+    notification_service.start()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    from app.services.notification_service import notification_service
+    await notification_service.stop()
 
 
 @app.get("/health")

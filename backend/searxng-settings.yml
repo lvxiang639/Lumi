@@ -1,0 +1,20 @@
+# SearXNG settings — enables Baidu in addition to defaults
+use_default_settings: true
+
+search:
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "lingxi-dev-searxng-secret-change-in-production"
+  bind_address: "0.0.0.0"
+  image_proxy: true
+
+engines:
+  # Keep default engines enabled by use_default_settings: true
+  # Explicitly enable Baidu
+  - name: baidu
+    engine: baidu
+    shortcut: bd
+    disabled: false

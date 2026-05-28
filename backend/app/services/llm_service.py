@@ -15,7 +15,7 @@ class LLMRouter:
         self, messages: list[dict], force_model: str | None = None
     ) -> str:
         client = self.qwen if force_model == "qwen" else self.deepseek
-        model = "qwen-plus" if force_model == "qwen" else "deepseek-chat"
+        model = "qwen-plus" if force_model == "qwen" else "deepseek-v4-flash"
         response = await client.chat.completions.create(
             model=model,
             messages=messages,
@@ -27,7 +27,7 @@ class LLMRouter:
         self, messages: list[dict], force_model: str | None = None
     ):
         client = self.qwen if force_model == "qwen" else self.deepseek
-        model = "qwen-plus" if force_model == "qwen" else "deepseek-chat"
+        model = "qwen-plus" if force_model == "qwen" else "deepseek-v4-flash"
         stream = await client.chat.completions.create(
             model=model,
             messages=messages,
@@ -50,7 +50,7 @@ class LLMRouter:
 用户输入: {text}
 标签:"""
         response = await self.deepseek.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-flash",
             messages=[{"role": "user", "content": prompt}],
             stream=False,
             max_tokens=10,
