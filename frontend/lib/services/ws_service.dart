@@ -14,6 +14,7 @@ class WsMessage {
 
 class WsService {
   WebSocketChannel? _channel;
+  StreamSubscription? _subscription;
   WsState _state = WsState.disconnected;
   final _controller = StreamController<WsMessage>.broadcast();
   String? conversationId;
@@ -29,7 +30,7 @@ class WsService {
       Uri.parse('${AppConfig.wsBaseUrl}/ws/chat?token=$token'),
     );
     _state = WsState.connected;
-    _channel!.stream.listen(
+    _subscription = _channel!.stream.listen(
       (data) {
         final json = jsonDecode(data as String) as Map<String, dynamic>;
         _controller.add(WsMessage(json['type'] as String, json));
@@ -60,13 +61,16 @@ class WsService {
   }
 
   Future<void> disconnect() async {
+    _subscription?.cancel();
+    _subscription = null;
     await _channel?.sink.close();
     _state = WsState.disconnected;
     conversationId = null;
   }
 
   void dispose() {
-    disconnect();
+    _subscription?.cancel();
+    _channel?.sink.close();
     _controller.close();
   }
 }

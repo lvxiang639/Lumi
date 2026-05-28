@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+from typing import Literal
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 
@@ -12,9 +13,9 @@ class ExpenseItem(BaseModel):
 
 
 class CreateExpense(BaseModel):
-    amount: float
-    category: str = "其他"
-    remark: str = ""
+    amount: float = Field(..., description="正数=支出, 负数=收入")
+    category: Literal["餐饮", "交通", "购物", "娱乐", "住房", "医疗", "教育", "其他"] = "其他"
+    remark: str = Field("", max_length=500)
     recorded_at: datetime | None = None
 
 

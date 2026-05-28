@@ -1,5 +1,11 @@
+import logging
 from openai import AsyncOpenAI
 from app.config import settings
+
+logger = logging.getLogger("llm")
+
+DEEPSEEK_MODEL = settings.deepseek_model_name
+QWEN_MODEL = settings.qwen_model_name
 
 
 class LLMRouter:
@@ -15,28 +21,43 @@ class LLMRouter:
         self, messages: list[dict], force_model: str | None = None
     ) -> str:
         client = self.qwen if force_model == "qwen" else self.deepseek
-        model = "qwen-plus" if force_model == "qwen" else "deepseek-v4-flash"
-        response = await client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=False,
-        )
-        return response.choices[0].message.content or ""
+        model = QWEN_MODEL if force_model == "qwen" else DEEPSEEK_MODEL
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=False,
+            )
+            choices = response.choices
+            if not choices:
+                logger.warning("LLM returned empty choices, model=%s", model)
+                return ""
+            content = choices[0].message.content
+            return content or ""
+        except Exception:
+            logger.exception("LLM chat failed, model=%s", model)
+            return ""
 
     async def chat_stream(
         self, messages: list[dict], force_model: str | None = None
     ):
         client = self.qwen if force_model == "qwen" else self.deepseek
-        model = "qwen-plus" if force_model == "qwen" else "deepseek-v4-flash"
-        stream = await client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=True,
-        )
-        async for chunk in stream:
-            delta = chunk.choices[0].delta
-            if delta.content:
-                yield delta.content
+        model = QWEN_MODEL if force_model == "qwen" else DEEPSEEK_MODEL
+        try:
+            stream = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+            )
+            async for chunk in stream:
+                choices = chunk.choices
+                if not choices:
+                    continue
+                delta = choices[0].delta
+                if delta and delta.content:
+                    yield delta.content
+        except Exception:
+            logger.exception("LLM stream failed, model=%s", model)
 
     async def classify_intent(self, text: str) -> str:
         """Returns: chat, search, weather, calendar, expense"""
@@ -49,13 +70,25 @@ class LLMRouter:
 
 用户输入: {text}
 标签:"""
-        response = await self.deepseek.chat.completions.create(
-            model="deepseek-v4-flash",
-            messages=[{"role": "user", "content": prompt}],
-            stream=False,
-            max_tokens=10,
-        )
-        return response.choices[0].message.content.strip().lower()
+        try:
+            response = await self.deepseek.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                stream=False,
+                max_tokens=10,
+            )
+            choices = response.choices
+            if not choices:
+                logger.warning("classify_intent: empty choices")
+                return "chat"
+            content = choices[0].message.content
+            if not content:
+                logger.warning("classify_intent: null content")
+                return "chat"
+            return content.strip().lower()
+        except Exception:
+            logger.exception("classify_intent failed")
+            return "chat"
 
 
 llm_router = LLMRouter()

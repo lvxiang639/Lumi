@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import dashscope
 from app.config import settings
 
@@ -8,10 +9,11 @@ logger = logging.getLogger("asr")
 
 class ASRService:
     async def transcribe(self, audio_base64: str, audio_format: str = "wav") -> str:
-        logger.info("ASR transcribe start, audio_len=%d, format=%s", len(audio_base64), audio_format)
+        logger.info("ASR start, audio_len=%d, format=%s", len(audio_base64), audio_format)
         try:
-            response = dashscope.MultiModalConversation.call(
-                model="qwen3-asr-flash",
+            response = await asyncio.to_thread(
+                dashscope.MultiModalConversation.call,
+                model=settings.asr_model_name,
                 api_key=settings.qwen_api_key,
                 messages=[{
                     "role": "user",
@@ -21,8 +23,10 @@ class ASRService:
                 asr_options={"enable_itn": False},
             )
             if response.status_code != 200:
-                logger.error("ASR API error: status=%s, code=%s, msg=%s",
-                             response.status_code, response.code, response.message)
+                logger.error(
+                    "ASR API error: status=%s, code=%s, msg=%s",
+                    response.status_code, response.code, response.message,
+                )
                 return ""
             choices = response.output.get("choices", [])
             if not choices:

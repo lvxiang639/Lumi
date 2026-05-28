@@ -1,11 +1,11 @@
-import json
 import uuid
 import logging
 from datetime import datetime, timezone, timedelta
 
-from app.services.skills.base import BaseSkill, SkillResult
-from app.services.llm_service import llm_router
 from app.models import ExpenseRecord
+from app.services.skills.base import BaseSkill, SkillResult
+from app.services.skills.utils import parse_json
+from app.services.llm_service import llm_router
 
 logger = logging.getLogger("expense_skill")
 
@@ -20,7 +20,7 @@ EXTRACTION_PROMPT = """从用户输入中提取记账信息，以JSON格式返�
 用户输入: {user_input}
 JSON:"""
 
-CATEGORIES = ["餐饮", "交通", "购物", "娱乐", "住房", "医疗", "教育", "其他"]
+CATEGORIES = frozenset({"餐饮", "交通", "购物", "娱乐", "住房", "医疗", "教育", "其他"})
 BEIJING_TZ = timezone(timedelta(hours=8))
 
 
@@ -30,21 +30,33 @@ class ExpenseSkill(BaseSkill):
     async def execute(self, user_id: str, user_input: str, db) -> SkillResult:
         try:
             now = datetime.now(BEIJING_TZ)
-            system_msg = f"当前时间是{now.strftime('%Y-%m-%d %H:%M')}（北京时间）。如果用户没有指定消费时间，recorded_at设为null。"
+            system_msg = (
+                f"当前时间是{now.strftime('%Y-%m-%d %H:%M')}（北京时间）。"
+                f"如果用户没有指定消费时间，recorded_at设为null。"
+            )
 
             raw = await llm_router.chat([
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": EXTRACTION_PROMPT.format(user_input=user_input)},
             ])
 
-            data = self._parse_json(raw)
+            data = parse_json(raw)
             logger.info("extracted: %s", data)
 
             amount = data.get("amount")
             if amount is None:
-                return SkillResult(text='没能理解金额，可以说得更具体一点吗？比如"午餐花了50元"')
+                return SkillResult(
+                    text='没能理解金额，可以说得更具体一点吗？比如"午餐花了50元"'
+                )
 
-            amount = float(amount)
+            try:
+                amount = float(amount)
+            except (ValueError, TypeError):
+                return SkillResult(text="金额格式不正确，请重新说明")
+
+            if amount == 0:
+                return SkillResult(text="金额不能为零，请重新说明")
+
             category = data.get("category", "其他") or "其他"
             if category not in CATEGORIES:
                 category = "其他"
@@ -70,8 +82,7 @@ class ExpenseSkill(BaseSkill):
             await db.commit()
 
             direction = "收入" if amount < 0 else "支出"
-            abs_amount = abs(amount)
-            text = f"已记录：{direction} {category} {abs_amount:.2f}元"
+            text = f"已记录：{direction} {category} {abs(amount):.2f}元"
             if remark:
                 text += f"，备注：{remark}"
 
@@ -81,41 +92,12 @@ class ExpenseSkill(BaseSkill):
                 "category": category,
             })
 
+        except ValueError:
+            logger.exception("expense skill value error")
+            return SkillResult(text="数据格式不正确，请重新说明")
         except Exception:
             logger.exception("expense skill failed")
             return SkillResult(text="记账失败，请稍后再试")
-
-    def _parse_json(self, raw: str) -> dict:
-        raw = raw.strip()
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            pass
-        if "```" in raw:
-            lines = raw.split("\n")
-            inside = False
-            parts = []
-            for line in lines:
-                if "```" in line:
-                    if inside:
-                        break
-                    inside = True
-                    continue
-                if inside:
-                    parts.append(line)
-            if parts:
-                try:
-                    return json.loads("\n".join(parts))
-                except json.JSONDecodeError:
-                    pass
-        import re
-        match = re.search(r'\{[^{}]*\}', raw)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
-        return {}
 
 
 expense_skill = ExpenseSkill()

@@ -17,5 +17,8 @@ class SkillRegistry:
     def get(self, name: str) -> BaseSkill | None:
         return self._skills.get(name)
 
+    def has(self, name: str) -> bool:
+        return name in self._skills
+
 
 skill_registry = SkillRegistry()

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/message.dart';
@@ -8,6 +9,7 @@ class ChatProvider extends ChangeNotifier {
   final WsService _ws = WsService();
   final TtsPlayerService _tts = TtsPlayerService();
   final List<Message> _messages = [];
+  StreamSubscription<WsMessage>? _wsSubscription;
   String _streamingText = "";
   bool _isProcessing = false;
   String? currentSkill;
@@ -17,10 +19,11 @@ class ChatProvider extends ChangeNotifier {
   bool get isProcessing => _isProcessing;
 
   void startConversation({String? conversationId}) {
+    _wsSubscription?.cancel();
     _messages.clear();
     _streamingText = "";
     _ws.conversationId = conversationId;
-    _ws.messages.listen(_onWsMessage);
+    _wsSubscription = _ws.messages.listen(_onWsMessage);
     _ws.connect();
   }
 
@@ -37,6 +40,11 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void sendVoice(String base64Audio) {
+    _messages.add(Message(
+      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      role: 'user', type: 'voice', content: '[语音消息]',
+      createdAt: DateTime.now(),
+    ));
     _isProcessing = true;
     _streamingText = "";
     notifyListeners();
@@ -95,6 +103,7 @@ class ChatProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _wsSubscription?.cancel();
     _tts.dispose();
     _ws.dispose();
     super.dispose();

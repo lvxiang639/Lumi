@@ -36,6 +36,10 @@ class ApiClient {
     return _handleResponse(resp);
   }
 
+  void dispose() {
+    _client.close();
+  }
+
   Map<String, dynamic> _handleResponse(http.Response resp) {
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       if (resp.body.isEmpty) return {'status': 'ok'};

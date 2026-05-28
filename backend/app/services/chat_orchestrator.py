@@ -32,7 +32,7 @@ class ChatOrchestrator:
         logger.info("user=%s conv=%s intent=%s text=%s", user_id[:8], str(conv.id)[:8], intent, text[:60])
 
         # 3. Execute skill or chat
-        if intent != "chat" and intent in skill_registry._skills:
+        if intent != "chat" and skill_registry.has(intent):
             skill = skill_registry.get(intent)
             result = await skill.execute(user_id, text, db)
             response_text = result.text
@@ -45,6 +45,7 @@ class ChatOrchestrator:
                 content=text,
             )
             db.add(user_msg)
+            await db.flush()
 
             await send_message(
                 {"type": "skill_call", "skill": intent, "status": "done"}
@@ -72,6 +73,7 @@ class ChatOrchestrator:
                 content=text,
             )
             db.add(user_msg)
+            await db.flush()
 
             # Build LLM messages with current text appended
             llm_messages = [
@@ -118,7 +120,7 @@ class ChatOrchestrator:
                     }
                 )
         except Exception:
-            pass  # TTS failure is non-fatal
+            logger.exception("TTS synthesis failed")
 
         # 6. Done
         await send_message(
@@ -187,7 +189,11 @@ class ChatOrchestrator:
         db: AsyncSession,
         text: str,
     ) -> Conversation:
-        user_uuid = uuid.UUID(user_id)
+        try:
+            user_uuid = uuid.UUID(user_id)
+        except (ValueError, TypeError):
+            logger.warning("invalid user_id for conv creation: %s", user_id)
+            user_uuid = uuid.uuid4()
         if conv_id:
             try:
                 conv_uuid = uuid.UUID(conv_id)

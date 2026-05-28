@@ -1,7 +1,8 @@
-import json
 import logging
 import httpx
+from app.config import settings
 from app.services.skills.base import BaseSkill, SkillResult
+from app.services.skills.utils import parse_json
 from app.services.llm_service import llm_router
 
 logger = logging.getLogger("search_skill")
@@ -26,20 +27,21 @@ SUMMARIZE_PROMPT = """根据以下搜索结果，用1-2句话简洁回答用户�
 class SearchSkill(BaseSkill):
     name = "search"
 
-    def __init__(self, searxng_url: str = "http://searxng:8080"):
-        self.searxng_url = searxng_url
+    def __init__(self):
+        pass
 
     async def execute(self, user_id: str, user_input: str, db) -> SkillResult:
         try:
-            # Step 1: Extract pure search query via LLM
             query = await self._extract_query(user_input)
-            logger.info("search query extracted: %s -> %s", user_input[:60], query)
+            logger.info("search query: %s -> %s", user_input[:60], query)
 
-            # Step 2: Search via SearXNG
             async with httpx.AsyncClient() as client:
                 resp = await client.get(
-                    f"{self.searxng_url}/search",
-                    params={"q": query, "format": "json", "engines": "google,bing,baidu"},
+                    f"{settings.searxng_url}/search",
+                    params={
+                        "q": query, "format": "json",
+                        "engines": settings.searxng_engines,
+                    },
                     timeout=15,
                 )
                 resp.raise_for_status()
@@ -49,24 +51,20 @@ class SearchSkill(BaseSkill):
             if not results:
                 return SkillResult(text="没有找到相关信息")
 
-            # Step 3: Summarize results via LLM
             results_text = "\n".join(
-                f"{i+1}. {r['title']}: {r.get('content', r.get('snippet', ''))[:200]}"
+                f"{i+1}. {r.get('title', '')}: {r.get('content', r.get('snippet', ''))[:200]}"
                 for i, r in enumerate(results)
             )
             summary = await self._summarize(user_input, results_text)
             logger.info("search summary: %s", summary[:100] if summary else "(empty)")
 
-            if summary:
-                text = summary
-            else:
-                lines = [f"- {r['title']}" for r in results]
-                text = "搜索到以下结果:\n" + "\n".join(lines)
-
-            return SkillResult(
-                text=text,
-                data={"query": query, "results": results},
+            text = summary if summary else "搜索到以下结果:\n" + "\n".join(
+                f"- {r.get('title', '')}" for r in results
             )
+            return SkillResult(text=text, data={"query": query, "results": results})
+        except httpx.HTTPError:
+            logger.exception("search HTTP error")
+            return SkillResult(text="搜索服务暂时不可用，请稍后再试")
         except Exception:
             logger.exception("search skill failed")
             return SkillResult(text="暂时无法完成搜索，请稍后再试")
@@ -76,8 +74,8 @@ class SearchSkill(BaseSkill):
             raw = await llm_router.chat([
                 {"role": "user", "content": QUERY_PROMPT.format(user_input=user_input)},
             ])
-            data = self._parse_json(raw)
-            query = (data or {}).get("query", "").strip()
+            data = parse_json(raw)
+            query = data.get("query", "").strip()
             return query if query else user_input
         except Exception:
             return user_input
@@ -92,21 +90,6 @@ class SearchSkill(BaseSkill):
             return raw.strip()
         except Exception:
             return ""
-
-    def _parse_json(self, raw: str) -> dict | None:
-        raw = raw.strip()
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            pass
-        import re
-        match = re.search(r'\{[^{}]*\}', raw)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
-        return None
 
 
 search_skill = SearchSkill()

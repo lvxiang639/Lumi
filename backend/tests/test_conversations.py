@@ -22,7 +22,7 @@ async def test_delete_conversation_not_found(client):
         "/api/conversations/00000000-0000-0000-0000-000000000000",
         headers=headers,
     )
-    assert resp.status_code == 200  # delete is idempotent (no rows matched = ok)
+    assert resp.status_code == 404  # not found — conversation doesn't exist
 
 
 @pytest.mark.asyncio

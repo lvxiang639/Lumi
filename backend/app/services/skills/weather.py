@@ -1,7 +1,8 @@
-import json
 import logging
 import httpx
+from app.config import settings
 from app.services.skills.base import BaseSkill, SkillResult
+from app.services.skills.utils import parse_json
 from app.services.llm_service import llm_router
 
 logger = logging.getLogger("weather_skill")
@@ -12,8 +13,6 @@ CITY_PROMPT = """从用户输入中提取城市名称，以JSON格式返回。�
 
 用户输入: {user_input}
 JSON:"""
-
-DEFAULT_CITY = "Beijing"
 
 
 class WeatherSkill(BaseSkill):
@@ -26,18 +25,24 @@ class WeatherSkill(BaseSkill):
 
             async with httpx.AsyncClient() as client:
                 resp = await client.get(
-                    f"https://wttr.in/{city}?format=j1",
+                    f"{settings.weather_api_url}/{city}?format=j1",
                     timeout=10,
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                current = data["current_condition"][0]
-                temp = current["temp_C"]
-                desc = current["weatherDesc"][0]["value"]
+                current_cond = data.get("current_condition")
+                if not current_cond:
+                    return SkillResult(text=f"未找到{city}的天气信息")
+                current = current_cond[0]
+                temp = current.get("temp_C", "?")
+                desc_list = current.get("weatherDesc", [])
+                desc = desc_list[0].get("value", "") if desc_list else ""
                 humidity = current.get("humidity", "")
                 feels_like = current.get("FeelsLikeC", "")
 
-                display_name = data.get("nearest_area", [{}])[0].get("areaName", [{}])[0].get("value", city)
+                nearest = data.get("nearest_area", [{}])
+                area_names = nearest[0].get("areaName", [{}]) if nearest else [{}]
+                display_name = area_names[0].get("value", city) if area_names else city
                 text = f"{display_name}当前温度{temp}度，{desc}"
                 if humidity:
                     text += f"，湿度{humidity}%"
@@ -48,6 +53,9 @@ class WeatherSkill(BaseSkill):
                     text=text,
                     data={"city": display_name, "temp": temp, "desc": desc, "humidity": humidity},
                 )
+        except httpx.HTTPError:
+            logger.exception("weather HTTP error")
+            return SkillResult(text="获取天气信息失败，请稍后再试")
         except Exception:
             logger.exception("weather skill failed")
             return SkillResult(text="暂时无法获取天气信息，请稍后再试")
@@ -57,28 +65,13 @@ class WeatherSkill(BaseSkill):
             raw = await llm_router.chat([
                 {"role": "user", "content": CITY_PROMPT.format(user_input=user_input)},
             ])
-            data = self._parse_json(raw)
+            data = parse_json(raw)
             city = data.get("city") if data else None
             if city and isinstance(city, str) and city.strip():
                 return city.strip()
         except Exception:
             logger.exception("city extraction failed")
-        return DEFAULT_CITY
-
-    def _parse_json(self, raw: str) -> dict | None:
-        raw = raw.strip()
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            pass
-        import re
-        match = re.search(r'\{[^{}]*\}', raw)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
-        return None
+        return "Beijing"
 
 
 weather_skill = WeatherSkill()

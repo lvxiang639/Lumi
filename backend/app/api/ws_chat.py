@@ -57,9 +57,9 @@ async def websocket_chat(ws: WebSocket):
                                 "message": f"Unknown type: {msg_type}",
                             }
                         )
-                except Exception as e:
+                except Exception:
                     logger.exception("Error processing message: user=%s, type=%s", user_id[:8], msg_type)
-                    await send_message({"type": "error", "message": str(e)})
+                    await send_message({"type": "error", "message": "处理消息时出错，请重试"})
 
         except WebSocketDisconnect:
             logger.info("WS disconnected: user=%s", user_id[:8])

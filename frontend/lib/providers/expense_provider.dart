@@ -7,18 +7,23 @@ class ExpenseProvider extends ChangeNotifier {
   List<ExpenseRecord> _records = [];
   Map<String, dynamic>? _stats;
   bool _loading = false;
+  String? _error;
 
   List<ExpenseRecord> get records => List.unmodifiable(_records);
   Map<String, dynamic>? get stats => _stats;
   bool get loading => _loading;
+  String? get error => _error;
 
   Future<void> load({String? category, String? month}) async {
     _loading = true;
     notifyListeners();
+    _error = null;
     try {
       _records = await _service.getExpenses(category: category, month: month);
       _stats = await _service.getStats();
-    } catch (_) {}
+    } catch (e) {
+      _error = e.toString();
+    }
     _loading = false;
     notifyListeners();
   }

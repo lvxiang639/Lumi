@@ -6,14 +6,21 @@ class CalendarProvider extends ChangeNotifier {
   final CalendarService _service = CalendarService();
   List<CalendarEvent> _events = [];
   bool _loading = false;
+  String? _error;
 
   List<CalendarEvent> get events => List.unmodifiable(_events);
   bool get loading => _loading;
+  String? get error => _error;
 
   Future<void> loadEvents() async {
     _loading = true;
+    _error = null;
     notifyListeners();
-    _events = await _service.getEvents();
+    try {
+      _events = await _service.getEvents();
+    } catch (e) {
+      _error = e.toString();
+    }
     _loading = false;
     notifyListeners();
   }

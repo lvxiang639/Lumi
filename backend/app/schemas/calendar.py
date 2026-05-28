@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+from typing import Literal
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 
@@ -13,12 +14,12 @@ class CalendarEventItem(BaseModel):
 
 
 class CreateCalendarEvent(BaseModel):
-    title: str
+    title: str = Field(max_length=200)
     time: datetime
-    repeat_rule: str = "none"
+    repeat_rule: Literal["none", "daily", "weekly", "monthly", "yearly"] = "none"
 
 
 class UpdateCalendarEvent(BaseModel):
-    title: str | None = None
+    title: str | None = Field(None, max_length=200)
     time: datetime | None = None
-    repeat_rule: str | None = None
+    repeat_rule: Literal["none", "daily", "weekly", "monthly", "yearly"] | None = None

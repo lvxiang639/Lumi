@@ -152,8 +152,10 @@ async def equip_item(
                UserInventory.item_type == item_type)
         .values(equipped=False)
     )
+    await db.flush()
 
-    # equip the target
+    # refresh inv to get post-unequip state, then mark equipped
+    await db.refresh(inv)
     inv.equipped = True
 
     # update Character table

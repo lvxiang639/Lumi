@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.models import User
 from app.schemas.auth import LoginRequest, LoginResponse, RefreshResponse, UserProfile, UpdateProfileRequest
@@ -17,9 +18,17 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     if user is None:
         user = User(phone=req.phone, nickname=f"用户{req.phone[-4:]}")
         db.add(user)
-        await db.commit()
-        await db.refresh(user)
-        is_new = True
+        try:
+            await db.commit()
+            await db.refresh(user)
+            is_new = True
+        except IntegrityError:
+            await db.rollback()
+            # Race: another request created this user, re-query
+            result = await db.execute(select(User).where(User.phone == req.phone))
+            user = result.scalar_one_or_none()
+            if user is None:
+                raise HTTPException(500, "Registration failed")
     token = create_access_token({"sub": str(user.id)})
     return LoginResponse(access_token=token, is_new_user=is_new)
 

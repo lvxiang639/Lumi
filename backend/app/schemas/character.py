@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+from typing import Literal
+from pydantic import BaseModel, Field
 
 
 class CharacterConfig(BaseModel):
@@ -12,15 +13,15 @@ class CharacterConfig(BaseModel):
 
 
 class InitCharacterRequest(BaseModel):
-    name: str
+    name: str = Field(max_length=50)
 
 
 class UpdateCharacterRequest(BaseModel):
-    name: str | None = None
+    name: str | None = Field(None, max_length=50)
 
 
 class EquipRequest(BaseModel):
-    item_type: str  # "outfit" or "voice_pack"
+    item_type: Literal["outfit", "voice_pack"]
     item_id: str
 
 

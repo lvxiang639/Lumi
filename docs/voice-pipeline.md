@@ -1,87 +1,72 @@
 # 语音对话全链路流程
 
-本文档描述灵犀 App 中用户说一句话，到虚拟角色用语音回复的完整技术流程。
-
----
-
 ## 整体架构
 
 ```
-┌── Flutter App（客户端）────────────────────────────────────────────────────────┐
-│                                                                                │
-│   [麦克风] ──▶ AudioRecorderService ──▶ base64 ──▶ WsService.sendVoice()      │
-│                                                         │                      │
-│                                                         │ WebSocket            │
-│   [扬声器] ◀── TtsPlayerService ◀── Uint8List ◀── ChatProvider._onWsMessage() │
-│                                                                                │
-└────────────────────────────────────────────────────────────────────────────────┘
-                           │                              ▲
-                           ▼                              │
-┌── FastAPI（服务端）────────────────────────────────────────────────────────── │
-│                                                                                │
-│   ws_chat.py ──▶ process_voice() ──▶ ASRService ──▶ DashScope Qwen3-ASR      │
-│                      │                                                         │
-│                      ▼                                                         │
-│                process_text() ──▶ LLMRouter ──▶ DeepSeek / Qwen               │
-│                      │                                                         │
-│                      ▼                                                         │
-│                查 Character.voice_pack ──▶ TTSService                         │
-│                      │                         │                               │
-│                      │                         ├── Qwen3-TTS-Flash (默认)      │
-│                      │                         └── CosyVoice (角色定制音色)    │
-│                      │                                                         │
-│                      ▼                                                         │
-│                base64 编码 ──▶ WebSocket 返回客户端                            │
-│                                                                                │
-└────────────────────────────────────────────────────────────────────────────────┘
+┌── Flutter App（客户端）─────────────────────────────────────────────────────┐
+│                                                                             │
+│  [麦克风] → AudioRecorderService(wav) → base64 → WsService.sendVoice()     │
+│                                                     │                       │
+│                                                     │ WebSocket             │
+│  [扬声器] ← TtsPlayerService ← bytes ← ChatProvider._onWsMessage()         │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                          │                            ▲
+                          ▼                            │
+┌── FastAPI（服务端）─────────────────────────────────────────────────────────┐
+│                                                                             │
+│  ws_chat.py → process_voice() → ASRService → DashScope qwen3-asr-flash    │
+│                     │                                                       │
+│                     ▼                                                       │
+│               process_text() → LLMRouter → deepseek-v4-flash / qwen-plus  │
+│                     │                                                       │
+│                     ▼                                                       │
+│               查 Character.voice_pack (selectinload) → TTSService          │
+│                     │                                    │                  │
+│                     │                                    ├── qwen3-tts-flash│
+│                     │                                    └── CosyVoice      │
+│                     ▼                                                       │
+│               base64 → WebSocket → 客户端                                   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 一、App 端：录音与发送
+## 一、客户端：录音与发送
 
 ### Step 1: 用户按下麦克风按钮
 
 **文件：** `frontend/lib/widgets/voice_record_button.dart`
 
-点击按钮触发 `_toggleRecording()`，状态切换（红/蓝），通过回调 `onRecordingChanged` 通知父组件录音开始/停止。
+点击切换录音状态（红/蓝），通过 `onAudioReady` 回调传递 base64 音频数据。
 
 ### Step 2: 录音采集
 
 **文件：** `frontend/lib/services/audio_recorder_service.dart`
 
 ```dart
-final stream = await _recorder.startStream(
+await _recorder.start(
   const RecordConfig(encoder: AudioEncoder.wav),
+  path: _currentPath!,
 );
 ```
 
-- 使用 Flutter `record` 插件调用系统麦克风
-- 编码格式：**WAV**（16kHz 采样率，单声道）
-- 输出：`Stream<Uint8List>` 原始音频字节流
+- 使用 Flutter `record` 插件
+- 编码格式：**WAV**（与后端 ASR 服务期望一致）
+- **不支持 Web 平台**，需用 `flutter run -d macos` 或 `-d ios`
 
 ### Step 3: Base64 编码 + WebSocket 发送
 
-**文件：** `frontend/lib/services/ws_service.dart`
-
 ```dart
-void sendVoice(String base64Audio) {
-  _channel?.sink.add(jsonEncode({
-    'type': 'voice',
-    'audio': base64Audio,
-    'conversation_id': conversationId,
-  }));
-}
+final bytes = await file.readAsBytes();
+final base64 = base64Encode(bytes);
+widget.onAudioReady!(base64);
 ```
 
-录音停止后，音频字节通过 Dart 的 `base64Encode()` 转为 base64 字符串，封装为 JSON 通过 WebSocket 发送：
-
+发送 JSON：
 ```json
-{
-  "type": "voice",
-  "audio": "UklGRiRAAABXQVZFZm10...",
-  "conversation_id": "c5a3ff06-..."
-}
+{"type": "voice", "audio": "<base64 wav>", "conversation_id": "xxx"}
 ```
 
 ---
@@ -92,65 +77,50 @@ void sendVoice(String base64Audio) {
 
 **文件：** `backend/app/api/ws_chat.py`
 
-```python
-elif msg_type == "voice":
-    await chat_orchestrator.process_voice(
-        user_id, data["audio"], data.get("conversation_id"), db, send_message
-    )
-```
+`type: "voice"` → `chat_orchestrator.process_voice()`
 
-根据 `type: "voice"` 路由到 `process_voice()`。
+### Step 5: DashScope ASR
 
-### Step 5: 调用 DashScope ASR
-
-**文件：** `backend/app/services/chat_orchestrator.py` → `backend/app/services/asr_service.py`
+**文件：** `backend/app/services/asr_service.py`
 
 ```python
-# orchestrator 调用
-text = await asr_service.transcribe(audio_base64)
-
-# ASRService 实现
 response = dashscope.MultiModalConversation.call(
     model="qwen3-asr-flash",
-    api_key=settings.qwen_api_key,
     messages=[{
         "role": "user",
         "content": [{"audio": f"data:audio/wav;base64,{audio_base64}"}],
     }],
     result_format="message",
 )
-# 提取识别文本
 text = response.output["choices"][0]["message"]["content"][0]["text"]
 ```
 
 - 使用阿里云百炼 **DashScope SDK**
-- 模型：`qwen3-asr-flash`（中文错误率 3.97%，支持方言和多语言）
-- 音频格式：`data:audio/wav;base64,<base64>` 数据 URI
+- 模型：`qwen3-asr-flash`（中文错误率 3.97%）
+- 音频格式：`data:audio/wav;base64,...`
 
-### Step 6: 返回识别结果给 App
+### Step 6: 返回识别结果
 
 ```json
 {"type": "asr_result", "text": "今天天气怎么样"}
 ```
 
-`ChatProvider._onWsMessage()` 收到 `asr_result` 后，在消息列表中添加一条用户消息（内容为识别出的文本），UI 即时显示。
-
 ---
 
-## 三、服务端：对话处理（LLM）
+## 三、服务端：对话处理
 
 ### Step 7: 意图分类
 
-**文件：** `backend/app/services/llm_service.py`
+**文件：** `backend/app/services/llm_service.py:classify_intent()`
 
 ```python
 intent = await llm_router.classify_intent(text)
 # 返回: chat | search | weather | calendar | expense
 ```
 
-用 DeepSeek 分析用户输入意图，决定走技能插件还是通用对话。
+模型：`deepseek-v4-flash`，`max_tokens=10`。
 
-### Step 8a: 技能执行（非闲聊意图）
+### Step 8a: 技能执行
 
 ```python
 skill = skill_registry.get(intent)
@@ -158,18 +128,9 @@ result = await skill.execute(user_id, text, db)
 response_text = result.text
 ```
 
-四种技能均已实现 LLM 结构化提取：
+四种技能均含 LLM 结构化提取（JSON prompt 使用 `{{ }}` 转义避免 `str.format()` 冲突）。
 
-| 技能 | 实现 |
-|------|------|
-| `weather` | LLM 提取城市 → wttr.in API 查询 → 返回天气文本 |
-| `search` | 转发到 SearXNG 元搜索引擎 → 返回 Top 5 结果摘要 |
-| `calendar` | LLM 提取标题+时间+重复规则 → 写入 `calendar_events` 表 → 返回确认 |
-| `expense` | LLM 提取金额+类别+备注 → 写入 `expense_records` 表 → 返回确认 |
-
-### Step 8b: LLM 流式对话（闲聊意图）
-
-**文件：** `backend/app/services/llm_service.py`
+### Step 8b: LLM 流式对话
 
 ```python
 async for delta in llm_router.chat_stream(llm_messages):
@@ -178,182 +139,124 @@ async for delta in llm_router.chat_stream(llm_messages):
 ```
 
 - 取最近 20 条历史消息作为上下文
-- 默认使用 **DeepSeek** 模型，可通过 `force_model="qwen"` 切换到 Qwen
-- 使用 OpenAI 兼容的流式 API，逐 token 返回
+- 模型：`deepseek-v4-flash`
+- OpenAI 兼容流式 API，逐 token 推送
 
-### Step 9: 持久化消息
+### Step 9: 持久化
 
 ```python
-# 保存用户消息和助手回复到 PostgreSQL
 assistant_msg = Message(conv_id=conv.id, role=MessageRole.assistant, ...)
 db.add(assistant_msg)
 conv.updated_at = datetime.now(timezone.utc)
 await db.commit()
 ```
 
-### Step 10: 流式文本推送到 App
-
-服务端逐 token 推送：
-
-```json
-{"type": "llm_stream", "delta": "今天"}
-{"type": "llm_stream", "delta": "北京"}
-{"type": "llm_stream", "delta": "天气"}
-...
-```
-
-Flutter 端 `ChatProvider._onWsMessage()` 收到 `llm_stream` 后追加到 `_streamingText`，`ChatBubble` widget 实时渲染打字效果。
-
 ---
 
 ## 四、服务端：语音合成（TTS）
 
-### Step 11: 查找角色声音包（新增）
+### Step 10: 查找角色声音包
 
 **文件：** `backend/app/services/chat_orchestrator.py:_get_character_voice()`
 
 ```python
-char_result = await db.execute(
-    select(Character).where(Character.user_id == user_uuid)
+result = await db.execute(
+    select(Character)
+    .where(Character.user_id == user_uuid)
+    .options(selectinload(Character.voice_pack))  # 预加载，避免 MissingGreenlet
 )
-char = char_result.scalar_one_or_none()
+char = result.scalar_one_or_none()
 if char and char.voice_pack:
     voice = char.voice_pack.cosyvoice_id
 ```
 
-在 TTS 合成前，查询角色已装备的声音包，获取 `cosyvoice_id`。如果 CosyVoice 端点已配置则走定制音色，否则将 `cosyvoice_id` 传给 Qwen3-TTS-Flash 作为 voice 参数。未装备声音包则使用默认音色 `"Cherry"`。
+关键：使用 `selectinload` 预加载关联对象，否则 SQLAlchemy async 模式下 lazy load 会报 `MissingGreenlet`。
 
-### Step 12: 调用 TTS
+### Step 11: TTS 调用
 
 **文件：** `backend/app/services/tts_service.py`
 
-两条路径：
-
-**默认路径 — Qwen3-TTS-Flash：**
 ```python
-response = dashscope.MultiModalConversation.call(
-    model="qwen3-tts-flash",
-    api_key=settings.qwen_api_key,
-    text=response_text,
-    voice=voice,  # 来自角色声音包的 cosyvoice_id，或默认 "Cherry"
-    language_type="Chinese",
-    stream=False,
+# 默认路径 — qwen3-tts-flash
+audio_bytes = await tts_service.synthesize_flash(
+    response_text, voice=voice  # 来自 VoicePack.cosyvoice_id 或默认 "Cherry"
+)
+
+# 角色定制路径 — CosyVoice（需配置 cosyvoice_endpoint）
+audio_bytes = await tts_service.synthesize_cosyvoice(
+    response_text, cosyvoice_id
 )
 ```
 
-**角色定制路径 — CosyVoice（需配置 cosyvoice_endpoint）：**
-```python
-resp = await client.post(
-    f"{settings.cosyvoice_endpoint}/synthesize",
-    json={"text": text, "voice_id": cosyvoice_id},
-)
-```
-
-### Step 13: 返回音频给 App
-
-```python
-await send_message({
-    "type": "tts_audio",
-    "audio": base64.b64encode(audio_bytes).decode(),
-    "text": response_text,
-})
-```
-
-### Step 14: 对话结束信号
+### Step 12: 返回音频 + 结束信号
 
 ```json
-{"type": "done", "conversation_id": "c5a3ff06-096f-4cf3-b3ab-e42528206d9a"}
+{"type": "tts_audio", "audio": "<base64>", "text": "语音文本"}
+{"type": "done", "conversation_id": "xxx"}
 ```
 
 ---
 
-## 五、App 端：播放音频
+## 五、客户端：播放音频
 
-### Step 15: 接收 TTS 消息
+### Step 13: 接收并播放
 
-**文件：** `frontend/lib/providers/chat_provider.dart`
+**文件：** `frontend/lib/providers/chat_provider.dart` + `frontend/lib/services/tts_player_service.dart`
 
 ```dart
 case 'tts_audio':
-    final audioBase64 = msg.data['audio'] as String?;
-    if (audioBase64 != null) {
-      final bytes = base64Decode(audioBase64);
-      _tts.play(Uint8List.fromList(bytes));
-    }
-    break;
+    final bytes = base64Decode(msg.data['audio']);
+    _tts.play(Uint8List.fromList(bytes));
 ```
 
-### Step 16: 音频播放
-
-**文件：** `frontend/lib/services/tts_player_service.dart`
-
-```dart
-Future<void> play(Uint8List audioBytes) async {
-    await _player.play(BytesSource(audioBytes));
-}
-```
-
-- 使用 Flutter `audioplayers` 插件
-- `BytesSource` 直接从内存播放，无需写入临时文件
-- 系统自动通过扬声器/耳机输出
+`BytesSource` 直接从内存播放，无需临时文件。
 
 ---
 
 ## 完整时序图
 
 ```
-  Flutter App                     FastAPI Backend                DashScope / LLM
-  ──────┬────                      ──────┬────                    ──────┬────
-       │                                 │                              │
-       │ 1. 麦克风录音 WAV                │                              │
-       │                                 │                              │
-       │ 2. WS: {"type":"voice",         │                              │
-       │    "audio":"base64..."} ───────►│                              │
-       │                                 │ 3. ASR API call              │
-       │                                 │    (qwen3-asr-flash) ───────►│
-       │                                 │   ◄── 识别结果文本 ──────────│
-       │                                 │                              │
-       │ ◄── {"type":"asr_result",       │                              │
-       │     "text":"今天天气怎样"}       │                              │
-       │                                 │ 4. 意图分类 (DeepSeek) ────►│
-       │                                 │   ◄── "weather" ────────────│
-       │                                 │                              │
-       │                                 │ 5. LLM 提取城市 ────────────►│
-       │                                 │   ◄── "上海" ───────────────│
-       │                                 │ 6. wttr.in 查询              │
-       │                                 │                              │
-       │ ◄── {"type":"skill_call",       │                              │
-       │     "skill":"weather"}          │                              │
-       │ ◄── {"type":"llm_stream",       │                              │
-       │     "delta":"上海当前20度..."}   │                              │
-       │                                 │ 7. 查角色 VoicePack          │
-       │                                 │ 8. TTS API call              │
-       │                                 │    (qwen3-tts-flash,         │
-       │                                 │     voice=角色音色) ────────►│
-       │                                 │   ◄── 音频 URL ─────────────│
-       │                                 │ 9. 下载 WAV 音频             │
-       │                                 │                              │
-       │ ◄── {"type":"tts_audio",        │                              │
-       │     "audio":"base64..."}        │                              │
-       │ ◄── {"type":"done"}             │                              │
-       │                                 │                              │
-       │ 10. 解码 base64 → 扬声器播放    │                              │
-       │                                 │                              │
+  Flutter App               FastAPI Backend              DashScope / LLM
+  ──────┬──                      ──────┬──                  ──────┬──
+       │                               │                          │
+       │ 1. 麦克风录音 WAV              │                          │
+       │ 2. WS: {"type":"voice",       │                          │
+       │    "audio":"base64..."} ─────►│                          │
+       │                               │ 3. ASR (qwen3-asr-flash)►│
+       │                               │   ◄── 识别文本 ──────────│
+       │ ◄── {"type":"asr_result"}     │                          │
+       │                               │ 4. 意图分类 (deepseek) ─►│
+       │                               │   ◄── "weather" ────────│
+       │                               │ 5. LLM 提取城市 ────────►│
+       │                               │   ◄── "上海" ───────────│
+       │                               │ 6. wttr.in 查询          │
+       │ ◄── {"type":"skill_call"}     │                          │
+       │ ◄── {"type":"llm_stream"}     │                          │
+       │                               │ 7. 查 Character.voice    │
+       │                               │    (selectinload 预加载)  │
+       │                               │ 8. TTS (qwen3-tts-flash)►│
+       │                               │   ◄── 音频 URL ─────────│
+       │                               │ 9. 下载 WAV              │
+       │ ◄── {"type":"tts_audio"}      │                          │
+       │ ◄── {"type":"done"}           │                          │
+       │                               │                          │
+       │ 10. base64 解码 → 扬声器播放  │                          │
 ```
 
 ---
 
-## 当前实现状态
+## 实现状态
 
 | 步骤 | 状态 | 说明 |
 |------|:--:|------|
-| 1-2. 录音 + 发送 | ✅ 已集成 | `VoiceRecordButton` → `AudioRecorderService` → base64 → WsService |
-| 3-6. ASR 识别 | ✅ 已联调 | DashScope SDK，qwen3-asr-flash |
-| 7. 意图分类 | ✅ 已联调 | DeepSeek，五分类（chat/search/weather/calendar/expense） |
-| 8a. 技能执行 | ✅ 已实现 | 四种技能均含 LLM 结构化提取 + 数据库写入（calendar/expense） |
-| 8b. LLM 流式对话 | ✅ 已联调 | DeepSeek 流式，20 条历史上下文 |
-| 11. 角色音色切换 | ✅ 已实现 | 查 Character.voice_pack → cosyvoice_id → TTS |
-| 12-13. TTS 合成 | ✅ 已联调 | Qwen3-TTS-Flash（默认/CosyVoice 角色定制） |
-| 14-16. 音频播放 | ✅ 已集成 | base64 解码 → BytesSource → audioplayers 播放 |
-| 日历提醒通知 | ✅ 已实现 | 后台每 60s 轮询，标记到期事件 |
-| 端侧 ASR 兜底 | ⏳ 预留 | `asr_local_service.dart` 占位，后续集成 whisper.cpp |
+| 1-2. 录音 + 发送 | ✅ | WAV 格式（`AudioEncoder.wav`），Web 平台不支持 |
+| 3-6. ASR 识别 | ✅ | DashScope SDK，qwen3-asr-flash |
+| 7. 意图分类 | ✅ | deepseek-v4-flash，五分类 |
+| 8a. 技能执行 | ✅ | 四种技能含 LLM 结构化提取 + DB 写入 |
+| 8b. LLM 流式对话 | ✅ | deepseek-v4-flash 流式，20 条历史上下文 |
+| 10. 角色音色切换 | ✅ | selectinload 预加载 VoicePack，避免 MissingGreenlet |
+| 11-12. TTS 合成 | ✅ | qwen3-tts-flash 默认 / CosyVoice 角色定制 |
+| 13. 音频播放 | ✅ | base64 解码 → BytesSource → audioplayers |
+| 日历提醒通知 | ✅ | 后台每 60s 轮询，标记到期事件 |
+| 搜索 | ✅ | LLM 提取词 → SearXNG(Google+Bing+百度) → LLM 总结 |
+| 端侧 ASR | ⏳ | `asr_local_service.dart` 占位，后续集成 whisper.cpp |

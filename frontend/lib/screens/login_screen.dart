@@ -24,7 +24,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     final phone = _phoneController.text.trim();
-    if (phone.length != 11) {
+    final phoneRE = RegExp(r'^1[3-9]\d{9}$');
+    if (!phoneRE.hasMatch(phone)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请输入正确的手机号')),
       );
@@ -66,6 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
             onPressed: () async {
               final name = nameController.text.trim();
               if (name.isEmpty) return;
+              nameController.dispose();
               await context.read<CharacterProvider>().initCharacter(name);
               if (ctx.mounted) Navigator.of(ctx).pop();
             },
@@ -74,6 +76,12 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
   }
 
   @override

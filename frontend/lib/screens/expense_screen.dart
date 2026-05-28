@@ -50,7 +50,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                             child: Text(record.category, style: const TextStyle(fontSize: 12)),
                           ),
                           title: Text(record.remark.isEmpty ? record.category : record.remark),
-                          subtitle: Text(record.recordedAt.toString().substring(0, 16)),
+                          subtitle: Text(_formatDateTime(record.recordedAt)),
                           trailing: Text(
                             '${isExpense ? "-" : "+"}¥${record.amount.abs().toStringAsFixed(2)}',
                             style: TextStyle(
@@ -67,4 +67,9 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       },
     );
   }
+}
+
+String _formatDateTime(DateTime dt) {
+  final s = dt.toString();
+  return s.length >= 16 ? s.substring(0, 16) : s;
 }
