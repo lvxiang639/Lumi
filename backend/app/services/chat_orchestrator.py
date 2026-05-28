@@ -1,3 +1,4 @@
+import logging
 import uuid
 import base64
 from datetime import datetime, timezone
@@ -9,6 +10,8 @@ from app.models import Conversation, Message, MessageRole, MessageType
 from app.services.llm_service import llm_router
 from app.services.tts_service import tts_service
 from app.services.skill_registry import skill_registry
+
+logger = logging.getLogger("orchestrator")
 
 
 class ChatOrchestrator:
@@ -25,6 +28,7 @@ class ChatOrchestrator:
 
         # 2. Classify intent
         intent = await llm_router.classify_intent(text)
+        logger.info("user=%s conv=%s intent=%s text=%s", user_id[:8], str(conv.id)[:8], intent, text[:60])
 
         # 3. Execute skill or chat
         if intent != "chat" and intent in skill_registry._skills:
@@ -123,10 +127,13 @@ class ChatOrchestrator:
         from app.services.asr_service import asr_service
 
         # 1. ASR
+        logger.info("process_voice start, user=%s audio_len=%d", user_id[:8], len(audio_base64))
         text = await asr_service.transcribe(audio_base64)
         await send_message({"type": "asr_result", "text": text})
+        logger.info("ASR completed: text=%s", text[:80] if text else "(empty)")
 
         if not text.strip():
+            logger.warning("Empty ASR result for user=%s", user_id[:8])
             await send_message({"type": "done"})
             return
 

@@ -2,6 +2,8 @@ from pydantic import BaseModel
 
 
 class ShopOutfitItem(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     id: str
     name: str
     model_file: str

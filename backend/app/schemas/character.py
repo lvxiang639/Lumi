@@ -25,6 +25,8 @@ class EquipRequest(BaseModel):
 
 
 class OutfitItem(BaseModel):
+    model_config = {"protected_namespaces": ()}
+
     id: str
     name: str
     model_file: str

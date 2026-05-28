@@ -30,7 +30,14 @@ class _VoiceRecordButtonState extends State<VoiceRecordButton> {
       }
     } else {
       final hasPermission = await _recorder.hasPermission();
-      if (!hasPermission) return;
+      if (!hasPermission) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('需要麦克风权限才能录音')),
+          );
+        }
+        return;
+      }
       await _recorder.start();
       _recording = true;
       if (mounted) setState(() {});

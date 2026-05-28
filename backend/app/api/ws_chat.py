@@ -1,4 +1,5 @@
 import json
+import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -6,6 +7,7 @@ from app.database import async_session
 from app.core.security import decode_access_token
 from app.services.chat_orchestrator import chat_orchestrator
 
+logger = logging.getLogger("ws")
 router = APIRouter()
 
 
@@ -19,6 +21,7 @@ async def websocket_chat(ws: WebSocket):
 
     user_id = payload["sub"]
     await ws.accept()
+    logger.info("WS connected: user=%s", user_id[:8])
 
     async def send_message(msg: dict):
         await ws.send_text(json.dumps(msg, ensure_ascii=False))
@@ -55,7 +58,8 @@ async def websocket_chat(ws: WebSocket):
                             }
                         )
                 except Exception as e:
+                    logger.exception("Error processing message: user=%s, type=%s", user_id[:8], msg_type)
                     await send_message({"type": "error", "message": str(e)})
 
         except WebSocketDisconnect:
-            pass
+            logger.info("WS disconnected: user=%s", user_id[:8])

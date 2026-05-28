@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.logging import setup_logging
 from app.api.auth import router as auth_router
+
+setup_logging()
 from app.api.characters import router as character_router
 from app.api.conversations import router as conversation_router
 from app.api.shop import router as shop_router

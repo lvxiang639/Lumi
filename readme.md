@@ -106,9 +106,24 @@ flutter pub get
 # 代码检查
 flutter analyze
 
-# 在模拟器上运行
-flutter run
+# 首次运行需先添加 macOS 平台支持（已添加可跳过）
+flutter create --platforms macos .
+
+# macOS 桌面运行
+flutter run -d macos \
+  --dart-define=API_BASE_URL=http://localhost:8000 \
+  --dart-define=WS_BASE_URL=ws://localhost:8000
+
+# Android 模拟器运行（默认地址无需额外参数）
+flutter run -d android
+
+# iOS 模拟器运行
+flutter run -d ios \
+  --dart-define=API_BASE_URL=http://localhost:8000 \
+  --dart-define=WS_BASE_URL=ws://localhost:8000
 ```
+
+默认 API 地址 `http://10.0.2.2:8000` 仅适用于 Android 模拟器（`10.0.2.2` 是 Android 模拟器中宿主机 localhost 的别名）。macOS / iOS 真机或模拟器需用 `--dart-define` 显式指定 `localhost`。
 
 ## API 一览
 
