@@ -2,6 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models import Character, UserInventory, ItemType, Outfit, VoicePack, User
 from app.api.deps import get_current_user
@@ -29,7 +30,11 @@ async def init_character(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    existing = await db.execute(select(Character).where(Character.user_id == current_user.id))
+    existing = await db.execute(
+        select(Character)
+        .options(selectinload(Character.outfit), selectinload(Character.voice_pack))
+        .where(Character.user_id == current_user.id)
+    )
     if existing.scalar_one_or_none():
         raise HTTPException(400, "Character already initialized")
 
@@ -60,7 +65,11 @@ async def get_character_config(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Character).where(Character.user_id == current_user.id))
+    result = await db.execute(
+        select(Character)
+        .options(selectinload(Character.outfit), selectinload(Character.voice_pack))
+        .where(Character.user_id == current_user.id)
+    )
     char = result.scalar_one_or_none()
     if not char:
         raise HTTPException(404, "Character not initialized")
@@ -73,7 +82,11 @@ async def update_character(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Character).where(Character.user_id == current_user.id))
+    result = await db.execute(
+        select(Character)
+        .options(selectinload(Character.outfit), selectinload(Character.voice_pack))
+        .where(Character.user_id == current_user.id)
+    )
     char = result.scalar_one_or_none()
     if not char:
         raise HTTPException(404, "Character not initialized")

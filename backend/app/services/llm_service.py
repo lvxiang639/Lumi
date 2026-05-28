@@ -76,6 +76,7 @@ class LLMRouter:
                 messages=[{"role": "user", "content": prompt}],
                 stream=False,
                 max_tokens=10,
+                temperature=0,
             )
             choices = response.choices
             if not choices:
