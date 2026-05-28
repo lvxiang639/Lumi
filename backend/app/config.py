@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     dashscope_api_url: str = "https://dashscope.aliyuncs.com/api/v1"
     cosyvoice_endpoint: str = ""
-    deepseek_model_name: str = "deepseek-v4-flash"
+    deepseek_model_name: str = "deepseek-chat"
     qwen_model_name: str = "qwen-plus"
     asr_model_name: str = "qwen3-asr-flash"
     tts_model_name: str = "qwen3-tts-flash"
