@@ -29,7 +29,7 @@ async def list_events(
         .order_by(desc(CalendarEvent.time))
     )
     events = result.scalars().all()
-    return [_event_to_item(e) for e in events]
+    return {"items": [_event_to_item(e) for e in events]}
 
 
 @router.post("", status_code=201)

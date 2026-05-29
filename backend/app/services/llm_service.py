@@ -20,8 +20,12 @@ class LLMRouter:
     async def chat(
         self, messages: list[dict], force_model: str | None = None
     ) -> str:
-        client = self.qwen if force_model == "qwen" else self.deepseek
-        model = QWEN_MODEL if force_model == "qwen" else DEEPSEEK_MODEL
+        if force_model == "qwen":
+            client = self.qwen
+            model = QWEN_MODEL
+        else:
+            client = self.deepseek
+            model = force_model or DEEPSEEK_MODEL
         try:
             response = await client.chat.completions.create(
                 model=model,
@@ -41,8 +45,12 @@ class LLMRouter:
     async def chat_stream(
         self, messages: list[dict], force_model: str | None = None
     ):
-        client = self.qwen if force_model == "qwen" else self.deepseek
-        model = QWEN_MODEL if force_model == "qwen" else DEEPSEEK_MODEL
+        if force_model == "qwen":
+            client = self.qwen
+            model = QWEN_MODEL
+        else:
+            client = self.deepseek
+            model = force_model or DEEPSEEK_MODEL
         try:
             stream = await client.chat.completions.create(
                 model=model,

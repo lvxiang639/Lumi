@@ -27,26 +27,14 @@ SUMMARIZE_PROMPT = """根据以下搜索结果，用1-2句话简洁回答用户�
 class SearchSkill(BaseSkill):
     name = "search"
 
-    def __init__(self):
-        pass
-
     async def execute(self, user_id: str, user_input: str, db) -> SkillResult:
         try:
             query = await self._extract_query(user_input)
             logger.info("search query: %s -> %s", user_input[:60], query)
 
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(
-                    f"{settings.searxng_url}/search",
-                    params={
-                        "q": query, "format": "json",
-                        "engines": settings.searxng_engines,
-                    },
-                    timeout=15,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                results = data.get("results", [])[:5]
+            results = await self._search_searxng(query)
+            if not results:
+                results = await self._search_duckduckgo(query)
 
             if not results:
                 return SkillResult(text="没有找到相关信息")
@@ -62,12 +50,44 @@ class SearchSkill(BaseSkill):
                 f"- {r.get('title', '')}" for r in results
             )
             return SkillResult(text=text, data={"query": query, "results": results})
-        except httpx.HTTPError:
-            logger.exception("search HTTP error")
-            return SkillResult(text="搜索服务暂时不可用，请稍后再试")
         except Exception:
             logger.exception("search skill failed")
             return SkillResult(text="暂时无法完成搜索，请稍后再试")
+
+    async def _search_searxng(self, query: str) -> list[dict]:
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    f"{settings.searxng_url}/search",
+                    params={
+                        "q": query, "format": "json",
+                        "engines": settings.searxng_engines,
+                    },
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                return data.get("results", [])[:5]
+        except Exception:
+            logger.exception("searxng search failed")
+            return []
+
+    async def _search_duckduckgo(self, query: str) -> list[dict]:
+        try:
+            from duckduckgo_search import DDGS
+
+            loop = __import__("asyncio").get_running_loop()
+            results = await loop.run_in_executor(
+                None, lambda: list(DDGS().text(query, max_results=5))
+            )
+            return [
+                {"title": r.get("title", ""), "snippet": r.get("body", ""),
+                 "content": r.get("body", ""), "url": r.get("href", "")}
+                for r in results
+            ]
+        except Exception:
+            logger.exception("duckduckgo search failed")
+            return []
 
     async def _extract_query(self, user_input: str) -> str:
         try:

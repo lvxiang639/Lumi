@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models import Conversation, Message, MessageRole, MessageType, Character
+from app.config import settings
 from app.services.llm_service import llm_router
 from app.services.tts_service import tts_service
 from app.services.skill_registry import skill_registry
@@ -83,7 +84,9 @@ class ChatOrchestrator:
 
             # Stream LLM response
             full_response = ""
-            async for delta in llm_router.chat_stream(llm_messages):
+            async for delta in llm_router.chat_stream(
+                llm_messages, force_model=settings.chat_model_name
+            ):
                 full_response += delta
                 await send_message({"type": "llm_stream", "delta": delta})
 

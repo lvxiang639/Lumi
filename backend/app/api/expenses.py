@@ -22,14 +22,14 @@ def _expense_to_item(e: ExpenseRecord) -> ExpenseItem:
 async def list_expenses(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> list[ExpenseItem]:
+):
     result = await db.execute(
         select(ExpenseRecord)
         .where(ExpenseRecord.user_id == current_user.id)
         .order_by(desc(ExpenseRecord.recorded_at))
     )
     expenses = result.scalars().all()
-    return [_expense_to_item(e) for e in expenses]
+    return {"items": [_expense_to_item(e) for e in expenses]}
 
 
 @router.post("", status_code=201)
