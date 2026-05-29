@@ -22,7 +22,7 @@ def _event_to_item(e: CalendarEvent) -> CalendarEventItem:
 async def list_events(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> list[CalendarEventItem]:
+):
     result = await db.execute(
         select(CalendarEvent)
         .where(CalendarEvent.user_id == current_user.id)
