@@ -84,6 +84,7 @@ class TtsPlayerService {
     _isPlaying = false;
     _buffer.clear();
     _posSub?.cancel();
+    _progressController.add(0.0);
     _progressController.close();
     _player.dispose();
   }
