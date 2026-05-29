@@ -15,11 +15,11 @@ QUERY_PROMPT = """从用户输入中提取纯搜索关键词，去掉口语化�
 用户输入: {user_input}
 JSON:"""
 
-LLM_SEARCH_PROMPT = """请搜索并提供关于以下问题的信息，尽可能详细和准确：
+LLM_SEARCH_PROMPT = """当前时间：{current_time}。请根据你的知识回答以下问题，尽可能详细和准确：
 
 {query}
 
-请直接提供答案，不需要说"根据搜索结果"之类的开头。"""
+请直接提供答案，不需要说"根据搜索结果"之类的开头。注意当前时间，不要使用过时的信息。"""
 
 SUMMARIZE_PROMPT = """根据以下多来源信息，用1-2句话简洁回答用户的问题。综合各来源的关键信息，优先采用API搜索结果。如果信息有冲突，以API搜索结果为准。
 
@@ -82,8 +82,12 @@ class SearchSkill(BaseSkill):
 
     async def _ask_llm(self, query: str) -> str:
         try:
+            from datetime import datetime, timezone, timedelta
+            now = datetime.now(timezone(timedelta(hours=8)))
             return await llm_router.chat([
-                {"role": "user", "content": LLM_SEARCH_PROMPT.format(query=query)},
+                {"role": "user", "content": LLM_SEARCH_PROMPT.format(
+                    query=query, current_time=now.strftime("%Y-%m-%d %H:%M")),
+                },
             ])
         except Exception:
             logger.exception("llm search failed")

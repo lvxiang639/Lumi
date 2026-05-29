@@ -15,11 +15,11 @@ CITY_PROMPT = """从用户输入中提取城市名称，以JSON格式返回。�
 用户输入: {user_input}
 JSON:"""
 
-LLM_WEATHER_PROMPT = """请查询并提供以下城市的当前天气信息，包括温度、天气状况、湿度等：
+LLM_WEATHER_PROMPT = """当前时间：{current_time}。请根据你的知识提供以下城市的天气概况，包括典型温度、天气状况、湿度等：
 
 {city}
 
-请直接提供天气数据，格式清晰。"""
+请直接提供天气数据，格式清晰。如果无法提供实时数据，请说明这是气候概况。"""
 
 SUMMARIZE_PROMPT = """根据以下多来源信息，简洁地报告天气。综合API数据和大模型信息，以API数据为准。1-2句话即可。
 
@@ -99,8 +99,12 @@ class WeatherSkill(BaseSkill):
 
     async def _ask_llm(self, city: str) -> str:
         try:
+            from datetime import datetime, timezone, timedelta
+            now = datetime.now(timezone(timedelta(hours=8)))
             return await llm_router.chat([
-                {"role": "user", "content": LLM_WEATHER_PROMPT.format(city=city)},
+                {"role": "user", "content": LLM_WEATHER_PROMPT.format(
+                    city=city, current_time=now.strftime("%Y-%m-%d %H:%M")),
+                },
             ])
         except Exception:
             logger.exception("llm weather failed")
