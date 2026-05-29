@@ -2,13 +2,9 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// Layered character view with smooth, natural-feeling animation.
+/// Character view with smooth animation, backdrop, and programmatic mouth sync.
 ///
-/// Drives body breathing, mouth sync, eye blink, head sway, and state
-/// transitions via multiple animation controllers — no external editor needed.
-///
-/// To upgrade to layered PNGs later, replace [Image.asset] with a [Stack] of
-/// separately-animated images (head, body, mouth, eyes, etc.).
+/// Works with a single transparent PNG — no layered images needed.
 class CharacterView extends StatefulWidget {
   final double mouthOpen; // 0.0–1.0 from TTS energy envelope
   final String animState; // idle | talking | dancing
@@ -25,55 +21,50 @@ class CharacterView extends StatefulWidget {
 
 class _CharacterViewState extends State<CharacterView>
     with TickerProviderStateMixin {
-  // ---- animation controllers ----
   late final AnimationController _breathCtrl;
   late final AnimationController _headCtrl;
   late final AnimationController _bounceCtrl;
   late final AnimationController _blinkCtrl;
+  late final AnimationController _particleCtrl;
 
-  // ---- animated values (smooth lerps) ----
   double _mouthValue = 0.0;
   double _bounceEnergy = 0.0;
-
-  // ---- blink timer ----
   Timer? _blinkTimer;
 
   @override
   void initState() {
     super.initState();
 
-    // Slow breathing — always running
     _breathCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3800),
     )..repeat(reverse: true);
 
-    // Gentle head tilt (randomised phase feels organic)
     _headCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2700),
     )..repeat(reverse: true);
 
-    // Quick bounce for talking / dancing
     _bounceCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
 
-    // Blink — 150 ms close + reopen
     _blinkCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
 
+    _particleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 6),
+    )..repeat();
+
     _scheduleBlink();
   }
 
-  // ---- blink scheduler ----
-
   void _scheduleBlink() {
     _blinkTimer?.cancel();
-    // Blink every 2.5–5.5 seconds
     final delay = 2500 + math.Random().nextInt(3000);
     _blinkTimer = Timer(Duration(milliseconds: delay), () {
       if (!mounted) return;
@@ -84,14 +75,10 @@ class _CharacterViewState extends State<CharacterView>
     });
   }
 
-  // ---- react to TTS mouth-open changes ----
-
   @override
   void didUpdateWidget(CharacterView old) {
     super.didUpdateWidget(old);
-    if (old.animState != widget.animState) {
-      _onStateChanged();
-    }
+    if (old.animState != widget.animState) _onStateChanged();
   }
 
   void _onStateChanged() {
@@ -111,18 +98,15 @@ class _CharacterViewState extends State<CharacterView>
     _headCtrl.dispose();
     _bounceCtrl.dispose();
     _blinkCtrl.dispose();
+    _particleCtrl.dispose();
     super.dispose();
   }
 
-  // ---- build ----
-
   @override
   Widget build(BuildContext context) {
-    // Smooth-lerp mouth toward target (reactive, no controller needed)
+    final theme = Theme.of(context);
     final targetMouth = widget.mouthOpen.clamp(0.0, 1.0);
     _mouthValue += (targetMouth - _mouthValue) * 0.35;
-
-    // Energy follows mouth for talking, higher for dancing
     final energyTarget =
         widget.animState == 'dancing' ? 1.0 : targetMouth;
     _bounceEnergy += (energyTarget - _bounceEnergy) * 0.25;
@@ -133,63 +117,138 @@ class _CharacterViewState extends State<CharacterView>
         _headCtrl,
         _bounceCtrl,
         _blinkCtrl,
+        _particleCtrl,
       ]),
       builder: (context, _) {
-        final breath = _breathCtrl.value; // 0→1→0…
+        final breath = _breathCtrl.value;
         final head = _headCtrl.value;
         final bounce = _bounceCtrl.isAnimating ? _bounceCtrl.value : 0.0;
         final blink = _blinkCtrl.value;
+        final particle = _particleCtrl.value;
 
-        // ---- compute transforms ----
-
-        // Breath: smooth float up/down (sin curve)
+        // --- transforms ---
         final breathCurve = math.sin(breath * math.pi);
-        final floatY = breathCurve * 10 * (1.0 + _bounceEnergy * 0.5);
-
-        // Head tilt: gentle left-right, more active when talking
+        final floatY =
+            breathCurve * 10 * (1.0 + _bounceEnergy * 0.5);
         final tiltCurve = math.sin(head * 2 * math.pi);
-        final tilt = tiltCurve * 0.04 * (1.0 + _bounceEnergy);
-
-        // Bounce: quick up-down for talking rhythm
+        final tilt = tiltCurve * 0.03 * (1.0 + _bounceEnergy);
         final bounceCurve = math.sin(bounce * 2 * math.pi);
-        final bounceY = bounceCurve * 4 * _bounceEnergy;
+        final bounceY = bounceCurve * 3 * _bounceEnergy;
+        final mouthScale = _mouthValue;
 
-        // Mouth: subtle overall scale pulse (augment with mouthOpen)
-        final mouthScale =
-            1.0 + _mouthValue * 0.03 + _bounceEnergy * 0.01;
-
-        // Blink: compress vertically during blink
         final blinkScaleY = blink < 0.5
-            ? 1.0 - blink * 0.12 // closing
-            : 0.94 + (blink - 0.5) * 0.12; // reopening
+            ? 1.0 - blink * 0.12
+            : 0.94 + (blink - 0.5) * 0.12;
 
-        // Dancing: extra horizontal sway
         final danceSway = widget.animState == 'dancing'
-            ? math.sin(bounce * 3 * math.pi) * 0.08
+            ? math.sin(bounce * 3 * math.pi) * 0.06
             : 0.0;
 
-        return Transform.translate(
-          offset: Offset(danceSway * 30, -floatY - bounceY * 6),
-          child: Transform.rotate(
-            angle: tilt + danceSway,
-            child: Transform.scale(
-              scale: mouthScale,
-              alignment: Alignment.center,
-              child: Transform(
-                transform: Matrix4.identity()
-                  ..setEntry(1, 1, blinkScaleY),
-                alignment: const Alignment(0, -0.5),
-                child: Image.asset(
-                  'assets/character.png',
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) =>
-                      const SizedBox.shrink(),
+        return SizedBox.expand(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // ---- backdrop glow ----
+              Positioned(
+                bottom: 20,
+                child: Transform.scale(
+                  scale: 1.0 + breathCurve * 0.04,
+                  child: Container(
+                    width: 200,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle, // Will be ellipse due to w≠h
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.primary
+                              .withValues(alpha: 0.15),
+                          blurRadius: 50,
+                          spreadRadius: 10,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+
+              // ---- floating particles ----
+              ..._buildParticles(particle),
+
+              // ---- character image ----
+              Transform.translate(
+                offset: Offset(danceSway * 20, -floatY - bounceY * 4),
+                child: Transform.rotate(
+                  angle: tilt + danceSway,
+                  child: Transform(
+                    transform: Matrix4.identity()
+                      ..setEntry(1, 1, blinkScaleY),
+                    alignment: const Alignment(0, -0.4),
+                    child: Image.asset(
+                      'assets/character.png',
+                      height: 320,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) =>
+                          const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ---- mouth indicator (talking glow) ----
+              if (widget.animState == 'talking')
+                Positioned(
+                  bottom: 95,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 100),
+                    opacity: mouthScale * 0.6,
+                    child: Container(
+                      width: 40 + mouthScale * 20,
+                      height: 8 + mouthScale * 6,
+                      decoration: BoxDecoration(
+                        color:
+                            theme.colorScheme.primary.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },
+    );
+  }
+
+  List<Widget> _buildParticles(double t) {
+    // 3 subtle floating dots that orbit around the character
+    return [
+      _particle(t * 1.0, 0, -120, 6),
+      _particle(t * 1.0 + 2.1, math.pi * 0.66, -80, 4),
+      _particle(t * 1.0 + 4.2, math.pi * 1.33, -100, 5),
+    ];
+  }
+
+  Widget _particle(double t, double phase, double yBase, double size) {
+    final x = math.sin(t + phase) * 60;
+    final y = yBase + math.cos(t + phase) * 15;
+    final opacity = 0.15 + 0.1 * math.sin(t * 3 + phase);
+
+    return Positioned(
+      bottom: 50,
+      child: Transform.translate(
+        offset: Offset(x, y),
+        child: Opacity(
+          opacity: opacity,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white70,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
