@@ -5,7 +5,7 @@ class CalendarService {
   final ApiClient _api = ApiClient();
 
   Future<List<CalendarEvent>> getEvents() async {
-    final data = await _api.get('/api/calendar/events');
+    final data = await _api.get('/api/calendar');
     final items = data['items'] as List? ?? [];
     return items
         .map((j) => CalendarEvent.fromJson(j as Map<String, dynamic>))
