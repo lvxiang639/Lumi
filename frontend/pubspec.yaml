@@ -25,6 +25,7 @@ dependencies:
   device_calendar: ^4.3.0
   permission_handler: ^11.3.0
   uuid: ^4.5.0
+  rive: ^0.14.7
 
 dev_dependencies:
   flutter_test:
@@ -34,3 +35,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/

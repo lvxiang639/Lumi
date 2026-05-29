@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
@@ -8,13 +9,23 @@ class TtsPlayerService {
   bool _isPlaying = false;
   VoidCallback? onPlaybackDone;
   final List<Uint8List> _buffer = [];
+  StreamSubscription<Duration>? _posSub;
+  Duration _duration = Duration.zero;
+
+  final StreamController<double> _progressController =
+      StreamController<double>.broadcast();
 
   bool get isPlaying => _isPlaying;
+  Stream<double> get playbackProgress => _progressController.stream;
 
   TtsPlayerService() {
     _player.onPlayerComplete.listen((_) {
       _isPlaying = false;
+      _progressController.add(0.0);
       onPlaybackDone?.call();
+    });
+    _player.onDurationChanged.listen((d) {
+      _duration = d;
     });
   }
 
@@ -42,11 +53,19 @@ class TtsPlayerService {
       await file.parent.create(recursive: true);
       await file.writeAsBytes(audioBytes);
       await _player.stop();
+      _posSub?.cancel();
       _isPlaying = true;
       onPlaybackDone?.call();
       await _player.play(DeviceFileSource(file.path));
+      _posSub = _player.onPositionChanged.listen((pos) {
+        if (_duration.inMilliseconds > 0) {
+          _progressController.add(
+              pos.inMilliseconds / _duration.inMilliseconds);
+        }
+      });
     } catch (e) {
       _isPlaying = false;
+      _progressController.add(0.0);
       onPlaybackDone?.call();
       debugPrint('TTS play error: $e');
     }
@@ -55,6 +74,8 @@ class TtsPlayerService {
   Future<void> stop() async {
     _isPlaying = false;
     _buffer.clear();
+    _posSub?.cancel();
+    _progressController.add(0.0);
     onPlaybackDone?.call();
     await _player.stop();
   }
@@ -62,6 +83,9 @@ class TtsPlayerService {
   void dispose() {
     _isPlaying = false;
     _buffer.clear();
+    _posSub?.cancel();
+    _progressController.add(0.0);
+    _progressController.close();
     _player.dispose();
   }
 }
