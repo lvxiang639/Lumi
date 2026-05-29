@@ -17,466 +17,456 @@ class CharacterView extends StatefulWidget {
 
 class _CharacterViewState extends State<CharacterView>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  double _danceAngle = 0.0;
-  bool _isDancing = false;
+  late final AnimationController _ctrl;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
-    _controller.addListener(_onAnimTick);
-  }
-
-  void _onAnimTick() {
-    if (_isDancing) {
-      setState(() => _danceAngle += 0.05);
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant CharacterView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.animState == 'dancing' && !_isDancing) {
-      _isDancing = true;
-      _danceAngle = 0.0;
-    } else if (widget.animState != 'dancing' && _isDancing) {
-      _isDancing = false;
-      _danceAngle = 0.0;
-    }
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_onAnimTick);
-    _controller.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        return CustomPaint(
-          size: Size.infinite,
-          painter: _GirlPainter(
-            mouthOpen: widget.mouthOpen,
-            animState: widget.animState,
-            animValue: _controller.value,
-            danceAngle: _danceAngle,
-            isDancing: _isDancing,
-          ),
-        );
-      },
+      animation: _ctrl,
+      builder: (_, __) => CustomPaint(
+        size: Size.infinite,
+        painter: _MusePainter(
+          mouthOpen: widget.mouthOpen,
+          animState: widget.animState,
+          t: _ctrl.value,
+        ),
+      ),
     );
   }
 }
 
-class _GirlPainter extends CustomPainter {
+// ── Color palette ──
+const _skinBase = Color(0xFFFFF3E6);
+const _skinShd = Color(0xFFFADDC8);
+const _hairBase = Color(0xFF3D2B1F);
+const _hairLight = Color(0xFF604030);
+const _hairGrad = Color(0xFF7B5540);
+const _eyeTop = Color(0xFF4A3F8F);
+const _eyeBot = Color(0xFF7B72C7);
+const _eyePup = Color(0xFF1A1040);
+const _dressTop = Color(0xFFFFF0F5);
+const _dressBot = Color(0xFFE8D5F0);
+const _dressTrim = Color(0xFFC9A0DC);
+const _ribbon = Color(0xFFFF8FAB);
+const _ribbonDark = Color(0xFFE0557A);
+const _blush = Color(0x30FF7093);
+const _mouth = Color(0xFFE87878);
+const _mouthIn = Color(0xFFA03040);
+
+class _MusePainter extends CustomPainter {
   final double mouthOpen;
   final String animState;
-  final double animValue;
-  final double danceAngle;
-  final bool isDancing;
+  final double t;
 
-  _GirlPainter({
-    required this.mouthOpen,
-    required this.animState,
-    required this.animValue,
-    required this.danceAngle,
-    required this.isDancing,
-  });
+  _MusePainter({required this.mouthOpen, required this.animState, required this.t});
 
-  // ── Color palette ──
-  static const skinColor = Color(0xFFFFF0E0);
-  static const skinShadow = Color(0xFFF5D5C0);
-  static const hairColor = Color(0xFF3D2B1F);
-  static const hairHighlight = Color(0xFF6B4C3B);
-  static const eyeColor = Color(0xFF5B6ABF);
-  static const eyeDark = Color(0xFF2C3A6E);
-  static const dressMain = Color(0xFFF8F0FF);
-  static const dressAccent = Color(0xFFBE9FDF);
-  static const dressTrim = Color(0xFF9B7EC4);
-  static const ribbonColor = Color(0xFFFF7EB3);
-  static const blushColor = Color(0x40FF6B8A);
-  static const mouthColor = Color(0xFFF08080);
+  bool get dancing => animState == 'dancing';
+  bool get talking => animState == 'talking';
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final baseY = size.height / 2 + 30;
-    final idleOffset = !isDancing ? math.sin(animValue * 2 * math.pi) * 6.0 : 0.0;
-    final cy = baseY + idleOffset;
+  void paint(Canvas c, Size s) {
+    final cx = s.width / 2;
+    final cy = s.height / 2 + 40;
+    final idle = !dancing ? math.sin(t * 2 * math.pi) * 5 : 0.0;
 
-    canvas.save();
-    canvas.translate(cx, cy);
+    c.save();
+    c.translate(cx, cy + idle);
 
-    if (isDancing) {
-      final s = 1.0 + math.sin(danceAngle * 3) * 0.1;
-      canvas.scale(s, s);
-      canvas.rotate(danceAngle);
+    if (dancing) {
+      c.scale(1.0 + math.sin(t * 6 * math.pi) * 0.08);
+      c.rotate(math.sin(t * 3 * math.pi) * 0.25);
     }
 
-    final isTalking = animState == 'talking';
+    _hairBack(c);
+    _legs(c);
+    _dressBack(c);
+    _body(c);
+    _arms(c);
+    _neck(c);
+    _head(c);
+    _face(c);
+    _eyes(c);
+    _brows(c);
+    _nose(c);
+    _drawMouth(c);
+    _drawBlush(c);
+    _hairFront(c);
+    _ribbon_(c);
+    _hairStrands(c);
 
-    _drawHairBack(canvas, isTalking);
-    _drawBody(canvas);
-    _drawArms(canvas, isTalking);
-    _drawNeck(canvas);
-    _drawFace(canvas);
-    _drawEyes(canvas, isTalking);
-    _drawEyebrows(canvas, isTalking);
-    _drawNose(canvas);
-    _drawMouth(canvas, isTalking);
-    _drawBlush(canvas);
-    _drawHairFront(canvas, isTalking);
-    _drawHairOrnament(canvas);
-
-    canvas.restore();
+    c.restore();
   }
 
-  // ── Neck ──
-  void _drawNeck(Canvas c) {
-    final p = Paint()..color = skinColor;
-    c.drawRect(Rect.fromLTWH(-8, -60, 16, 24), p);
-    // Shadow
-    final ps = Paint()..color = skinShadow;
-    c.drawRect(Rect.fromLTWH(-2, -60, 4, 24), ps);
+  // ── LEGS ──
+  void _legs(Canvas c) {
+    final p = Paint()..color = _skinBase;
+    final skirtY = 36.0; // shorter skirt, mid-thigh
+    if (dancing) {
+      c.drawRRect(RRect.fromLTRBR(-2, skirtY, 6, skirtY + 44, const Radius.circular(7)), p);
+      c.drawRRect(RRect.fromLTRBR(8, skirtY, 16, skirtY + 40, const Radius.circular(7)), p);
+    } else {
+      c.drawRRect(RRect.fromLTRBR(-10, skirtY, -2, skirtY + 50, const Radius.circular(8)), p);
+      c.drawRRect(RRect.fromLTRBR(2, skirtY, 10, skirtY + 50, const Radius.circular(8)), p);
+    }
+    // Knee-high socks
+    final sp = Paint()..color = const Color(0xFFFFFFFF);
+    if (!dancing) {
+      c.drawRRect(RRect.fromLTRBR(-10, skirtY + 28, -2, skirtY + 42, const Radius.circular(4)), sp);
+      c.drawRRect(RRect.fromLTRBR(2, skirtY + 28, 10, skirtY + 42, const Radius.circular(4)), sp);
+    }
+    // Sock trim
+    final st = Paint()..color = const Color(0xFFB0A0D0)..strokeWidth = 1.5;
+    if (!dancing) {
+      c.drawLine(Offset(-10, skirtY + 40), Offset(-2, skirtY + 40), st);
+      c.drawLine(Offset(2, skirtY + 40), Offset(10, skirtY + 40), st);
+    }
+    // Shoes
+    final sh = Paint()..color = const Color(0xFFCC8899);
+    if (dancing) {
+      c.drawOval(Rect.fromLTWH(-5, skirtY + 38, 14, 8), sh);
+      c.drawOval(Rect.fromLTWH(5, skirtY + 34, 14, 8), sh);
+    } else {
+      c.drawOval(Rect.fromLTWH(-12, skirtY + 44, 14, 8), sh);
+      c.drawOval(Rect.fromLTWH(-2, skirtY + 44, 14, 8), sh);
+    }
   }
 
-  // ── Face (oval, pointed chin) ──
-  void _drawFace(Canvas c) {
-    final facePath = Path()
-      ..moveTo(0, -110) // top center
-      ..cubicTo(30, -110, 52, -90, 48, -60) // right upper
-      ..cubicTo(44, -30, 28, -10, 0, -16) // right jaw to chin
-      ..cubicTo(-28, -10, -44, -30, -48, -60) // left jaw
-      ..cubicTo(-52, -90, -30, -110, 0, -110) // left upper
+  // ── DRESS BACK (short skirt) ──
+  void _dressBack(Canvas c) {
+    // Skirt - short, pleated style
+    final p = Paint()..color = _dressBot;
+    final path = Path()
+      ..moveTo(-22, 14)
+      ..cubicTo(-30, 28, -26, 38, -18, 38)
+      ..lineTo(18, 38)
+      ..cubicTo(26, 38, 30, 28, 22, 14)
       ..close();
-    final facePaint = Paint()..color = skinColor;
-    c.drawPath(facePath, facePaint);
+    c.drawPath(path, p);
+    // Skirt hem
+    c.drawPath(
+      Path()..moveTo(-20, 36)..quadraticBezierTo(0, 42, 20, 36),
+      Paint()..color = _dressTrim..style = PaintingStyle.stroke..strokeWidth = 1.5,
+    );
+    // Pleat lines
+    final fp = Paint()..color = _dressTrim..style = PaintingStyle.stroke..strokeWidth = 1;
+    c.drawLine(const Offset(-8, 18), const Offset(-9, 37), fp);
+    c.drawLine(const Offset(0, 16), const Offset(0, 38), fp);
+    c.drawLine(const Offset(8, 18), const Offset(9, 37), fp);
   }
 
-  // ── Body (elegant dress) ──
-  void _drawBody(Canvas c) {
+  // ── BODY ──
+  void _body(Canvas c) {
     // Torso
-    final torsoPath = Path()
-      ..moveTo(-14, -40)
-      ..quadraticBezierTo(-16, 10, -12, 50)
-      ..lineTo(12, 50)
-      ..quadraticBezierTo(16, 10, 14, -40)
+    final torso = Path()
+      ..moveTo(-14, -8)
+      ..quadraticBezierTo(-18, 10, -14, 28)
+      ..lineTo(14, 28)
+      ..quadraticBezierTo(18, 10, 14, -8)
       ..close();
-    final torsoPaint = Paint()..color = dressMain;
-    c.drawPath(torsoPath, torsoPaint);
+    c.drawPath(torso, Paint()..color = _dressTop);
+
+    // Neckline
+    final nl = Path()
+      ..moveTo(-12, -6)
+      ..quadraticBezierTo(0, 4, 12, -6);
+    c.drawPath(nl, Paint()..color = _dressTrim..style = PaintingStyle.stroke..strokeWidth = 1.8);
 
     // Waist bow
-    final bowP = Paint()..color = ribbonColor;
-    final bx = 0.0, by = 15.0;
-    c.drawOval(Rect.fromCenter(center: Offset(bx - 10, by), width: 14, height: 8), bowP);
-    c.drawOval(Rect.fromCenter(center: Offset(bx + 10, by), width: 14, height: 8), bowP);
-    c.drawCircle(Offset(bx, by), 4, bowP);
+    final bx = 0.0, by = 26.0;
+    c.drawOval(Rect.fromCenter(center: Offset(bx - 10, by - 1), width: 13, height: 7), Paint()..color = _ribbon);
+    c.drawOval(Rect.fromCenter(center: Offset(bx + 10, by - 1), width: 13, height: 7), Paint()..color = _ribbon);
+    c.drawCircle(Offset(bx, by), 3.5, Paint()..color = _ribbonDark);
     // Bow tails
-    final tailP = Paint()..color = ribbonColor..style = PaintingStyle.stroke..strokeWidth = 2.5;
-    c.drawLine(Offset(bx - 2, by + 2), Offset(bx - 8, by + 20), tailP);
-    c.drawLine(Offset(bx + 2, by + 2), Offset(bx + 8, by + 20), tailP);
-
-    // Skirt
-    final skirtPath = Path()
-      ..moveTo(-12, 50)
-      ..lineTo(12, 50)
-      ..cubicTo(24, 55, 32, 70, 28, 85)
-      ..quadraticBezierTo(0, 92, -28, 85)
-      ..cubicTo(-32, 70, -24, 55, -12, 50)
-      ..close();
-    final skirtPaint = Paint()..color = dressMain;
-    c.drawPath(skirtPath, skirtPaint);
-
-    // Skirt trim
-    final trimPaint = Paint()
-      ..color = dressAccent
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    final trimPath = Path()
-      ..moveTo(-14, 52)
-      ..quadraticBezierTo(0, 58, 14, 52);
-    c.drawPath(trimPath, trimPaint);
-
-    // Skirt bottom ruffle line
-    final rufflePath = Path()
-      ..moveTo(-26, 82)
-      ..quadraticBezierTo(0, 90, 26, 82);
-    c.drawPath(rufflePath, Paint()..color = dressTrim..style = PaintingStyle.stroke..strokeWidth = 1.5);
-
-    // Collar / neckline detail
-    final collarPath = Path()
-      ..moveTo(-10, -38)
-      ..quadraticBezierTo(0, -30, 10, -38);
-    c.drawPath(collarPath, Paint()..color = dressAccent..style = PaintingStyle.stroke..strokeWidth = 2);
-
-    // Small chest bow
-    c.drawCircle(const Offset(0, -32), 3, Paint()..color = ribbonColor);
+    c.drawLine(Offset(bx - 2, by + 3), Offset(bx - 8, by + 22), Paint()..color = _ribbonDark..strokeWidth = 2..strokeCap = StrokeCap.round);
+    c.drawLine(Offset(bx + 2, by + 3), Offset(bx + 8, by + 22), Paint()..color = _ribbonDark..strokeWidth = 2..strokeCap = StrokeCap.round);
   }
 
-  // ── Arms ──
-  void _drawArms(Canvas c, bool isTalking) {
-    final armP = Paint()..color = skinColor..strokeWidth = 8..strokeCap = StrokeCap.round;
-
-    if (isDancing) {
-      c.drawLine(const Offset(-10, -36), const Offset(-35, -55), armP);
-      c.drawLine(const Offset(10, -36), const Offset(35, -55), armP);
-    } else if (isTalking) {
-      final g = math.sin(animValue * 3 * math.pi) * 6;
-      c.drawLine(const Offset(-10, -36), Offset(-28 + g, -10), armP);
-      c.drawLine(const Offset(10, -36), Offset(28 - g, -10), armP);
+  // ── ARMS ──
+  void _arms(Canvas c) {
+    final ap = Paint()..color = _skinBase..strokeWidth = 7..strokeCap = StrokeCap.round;
+    if (dancing) {
+      c.drawLine(const Offset(-12, -4), Offset(-40, -30), ap);
+      c.drawLine(const Offset(12, -4), Offset(40, -30), ap);
+      c.drawCircle(const Offset(-40, -32), 4.5, Paint()..color = _skinBase);
+      c.drawCircle(const Offset(40, -32), 4.5, Paint()..color = _skinBase);
+    } else if (talking) {
+      final g = math.sin(t * 3.5 * math.pi) * 5;
+      c.drawLine(const Offset(-12, -4), Offset(-26 + g, -12), ap);
+      c.drawLine(const Offset(12, -4), Offset(26 - g, -12), ap);
     } else {
-      c.drawLine(const Offset(-10, -36), const Offset(-26, 4), armP);
-      c.drawLine(const Offset(10, -36), const Offset(26, 4), armP);
-    }
-
-    // Hands (simple circles)
-    if (isDancing) {
-      c.drawCircle(const Offset(-35, -58), 5, Paint()..color = skinColor);
-      c.drawCircle(const Offset(35, -58), 5, Paint()..color = skinColor);
+      c.drawLine(const Offset(-12, -4), const Offset(-22, 18), ap);
+      c.drawLine(const Offset(12, -4), const Offset(22, 18), ap);
     }
   }
 
-  // ── Hair (back layer) ──
-  void _drawHairBack(Canvas c, bool isTalking) {
-    final hp = Paint()..color = hairColor;
-
-    // Main back hair
-    final backPath = Path()
-      ..moveTo(-46, -100)
-      ..cubicTo(-54, -80, -52, -40, -38, 20)
-      ..quadraticBezierTo(-20, 70, 0, 90)
-      ..quadraticBezierTo(20, 70, 38, 20)
-      ..cubicTo(52, -40, 54, -80, 46, -100)
-      ..close();
-    c.drawPath(backPath, hp);
-
-    // Hair sway in talking/dancing
-    double sway = 0;
-    if (isTalking) sway = math.sin(animValue * 2.5 * math.pi) * 4;
-    if (isDancing) sway = math.sin(danceAngle * 1.5) * 8;
-
-    // Side strands
-    final strandP = Paint()..color = hairHighlight..strokeWidth = 3..strokeCap = StrokeCap.round;
-    c.drawLine(Offset(-44, -60), Offset(-38 + sway, 10), strandP);
-    c.drawLine(Offset(44, -60), Offset(38 + sway, 10), strandP);
-    c.drawLine(Offset(-43, -58), Offset(-36 + sway * 0.7, 20), strandP);
-    c.drawLine(Offset(43, -58), Offset(36 + sway * 0.7, 20), strandP);
-
-    // Hair highlight streaks
-    final streakP = Paint()..color = hairHighlight.withAlpha(80)..strokeWidth = 2;
-    c.drawLine(Offset(-20, -95), Offset(-18 + sway, -20), streakP);
-    c.drawLine(Offset(20, -95), Offset(18 + sway, -20), streakP);
+  // ── NECK ──
+  void _neck(Canvas c) {
+    c.drawRect(Rect.fromLTWH(-6, -50, 12, 18), Paint()..color = _skinBase);
+    c.drawRect(Rect.fromLTWH(-2, -50, 4, 18), Paint()..color = _skinShd);
   }
 
-  // ── Hair (front layer + bangs) ──
-  void _drawHairFront(Canvas c, bool isTalking) {
-    final hp = Paint()..color = hairColor;
+  // ── HEAD ──
+  void _head(Canvas c) {
+    // Oval head with slight chin
+    final path = Path()
+      ..moveTo(0, -112)
+      ..cubicTo(28, -112, 48, -88, 44, -62)
+      ..cubicTo(40, -38, 24, -20, 0, -26)
+      ..cubicTo(-24, -20, -40, -38, -44, -62)
+      ..cubicTo(-48, -88, -28, -112, 0, -112);
+    c.drawPath(path, Paint()..color = _skinBase);
 
-    // Long bangs sweeping to the side
-    final bangsPath = Path()
-      ..moveTo(-44, -102)
-      ..cubicTo(-34, -78, -28, -56, -20, -50)
-      ..lineTo(-8, -50)
-      ..quadraticBezierTo(-2, -56, 10, -54)
-      ..cubicTo(24, -56, 34, -78, 44, -102)
-      ..cubicTo(30, -96, 10, -80, 0, -78)
-      ..cubicTo(-10, -80, -30, -96, -44, -102)
+    // Shadow under chin
+    final shd = Path()
+      ..moveTo(-16, -24)
+      ..quadraticBezierTo(0, -18, 16, -24)
+      ..lineTo(0, -30)
       ..close();
-    c.drawPath(bangsPath, hp);
-
-    // Side bangs framing face
-    final sideBangL = Path()
-      ..moveTo(-46, -100)
-      ..cubicTo(-50, -80, -46, -56, -34, -40)
-      ..lineTo(-28, -44)
-      ..cubicTo(-38, -54, -40, -74, -38, -96)
-      ..close();
-    c.drawPath(sideBangL, hp);
-
-    final sideBangR = Path()
-      ..moveTo(46, -100)
-      ..cubicTo(50, -80, 46, -56, 34, -40)
-      ..lineTo(28, -44)
-      ..cubicTo(38, -54, 40, -74, 38, -96)
-      ..close();
-    c.drawPath(sideBangR, hp);
-
-    // Ahoge (cowlick)
-    final ahogePath = Path()
-      ..moveTo(0, -108)
-      ..quadraticBezierTo(6, -115, 12, -110)
-      ..quadraticBezierTo(10, -114, 8, -108)
-      ..close();
-    c.drawPath(ahogePath, hp);
+    c.drawPath(shd, Paint()..color = _skinShd);
   }
 
-  // ── Hair ornament (flower clip) ──
-  void _drawHairOrnament(Canvas c) {
-    final cx = -36.0, cy = -88.0;
-    // Petals
-    final petalP = Paint()..color = ribbonColor;
-    for (var i = 0; i < 5; i++) {
-      final a = i * math.pi * 2 / 5 - math.pi / 2;
-      final px = cx + math.cos(a) * 6;
-      final py = cy + math.sin(a) * 6;
-      c.drawCircle(Offset(px, py), 4.5, petalP);
-    }
-    // Center
-    c.drawCircle(Offset(cx, cy), 3, Paint()..color = const Color(0xFFFFF176));
+  // ── FACE CONTOUR ──
+  void _face(Canvas c) {
+    // Subtle nose shadow
+    c.drawCircle(const Offset(0, -68), 2.5, Paint()..color = _skinShd);
   }
 
-  // ── Eyes (anime style, large and detailed) ──
-  void _drawEyes(Canvas c, bool isTalking) {
-    final blink = (animValue * 0.45) % 1.0;
-    final isBlink = blink > 0.93;
-    final blinkT = isBlink ? ((blink - 0.93) / 0.07).clamp(0.0, 1.0) : 0.0;
+  // ── EYES ──
+  void _eyes(Canvas c) {
+    final blink = (t * 0.4) % 1.0;
+    final blinking = blink > 0.93;
+    final bt = blinking ? ((blink - 0.93) / 0.07).clamp(0.0, 1.0) : 0.0;
 
     for (final side in [-1, 1]) {
-      final dx = 16.0 * side;
-      final dy = -76.0;
+      final dx = 15.0 * side;
+      final dy = -80.0;
+      final eyeH = blinking ? (20.0 * (1 - bt)).clamp(1.0, 20.0) : 20.0;
 
-      if (isBlink && blinkT > 0.8) {
-        // Closed eye line
-        final lp = Paint()
-          ..color = eyeDark
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.0
-          ..strokeCap = StrokeCap.round;
-        final lp2 = Path()
-          ..moveTo(dx - 14, dy)
-          ..quadraticBezierTo(dx, dy + 6, dx + 14, dy);
-        c.drawPath(lp2, lp);
-        // Eyelashes
-        for (var lx = dx - 10; lx <= dx + 10; lx += 6) {
-          c.drawLine(Offset(lx.toDouble(), dy), Offset(lx.toDouble(), dy + 4), lp);
+      if (blinking && bt > 0.85) {
+        // Closed eye
+        c.drawPath(
+          Path()..moveTo(dx - 12, dy)..quadraticBezierTo(dx, dy + 5, dx + 12, dy),
+          Paint()..color = _eyePup..style = PaintingStyle.stroke..strokeWidth = 2..strokeCap = StrokeCap.round,
+        );
+        // Lashes
+        for (var lx = dx - 9.0; lx <= dx + 9; lx += 5) {
+          c.drawLine(Offset(lx, dy), Offset(lx, dy + 4), Paint()..color = _eyePup..strokeWidth = 1.5);
         }
         continue;
       }
 
-      final h = isBlink ? 22.0 * (1 - blinkT) : 22.0;
-
       // Eye white
-      final whiteR = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(dx, dy), width: 26, height: h),
-        const Radius.circular(10),
+      c.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(dx, dy), width: 24, height: eyeH), const Radius.circular(10)),
+        Paint()..color = Colors.white,
       );
-      c.drawRRect(whiteR, Paint()..color = Colors.white);
 
-      // Upper lash line
-      final lashPath = Path()
-        ..moveTo(dx - 15, dy - 3)
-        ..quadraticBezierTo(dx, dy - h / 2 - 4, dx + 15, dy - 3);
-      c.drawPath(lashPath, Paint()
-        ..color = eyeDark
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round);
+      // Upper eyelid shadow
+      c.drawPath(
+        Path()..addOval(Rect.fromCenter(center: Offset(dx, dy - 2), width: 25, height: eyeH + 2)),
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: [Color(0x18FFFFFF), Color(0x00FFFFFF)],
+          ).createShader(Rect.fromCenter(center: Offset(dx, dy), width: 28, height: eyeH + 8)),
+      );
 
       // Iris
-      c.drawCircle(Offset(dx, dy + 1), 8, Paint()..color = eyeColor);
-
-      // Iris gradient (top darker)
-      c.drawCircle(Offset(dx, dy - 1), 6.5, Paint()..color = eyeColor.withAlpha(180));
-      c.drawCircle(Offset(dx, dy + 2), 5, Paint()..color = eyeColor.withAlpha(220));
-
+      c.drawCircle(Offset(dx, dy + 1), 7.5, Paint()..color = _eyeTop);
+      c.drawCircle(Offset(dx, dy - 1), 6, Paint()..color = _eyeBot);
       // Pupil
-      c.drawCircle(Offset(dx, dy + 1), 3.5, Paint()..color = eyeDark);
-
+      c.drawCircle(Offset(dx, dy + 1), 3.2, Paint()..color = _eyePup);
       // Highlights
-      c.drawCircle(Offset(dx - 3, dy - 4), 2.8, Paint()..color = Colors.white);
-      c.drawCircle(Offset(dx + 2, dy - 1), 1.5, Paint()..color = Colors.white);
+      c.drawCircle(Offset(dx - 2.5, dy - 3.5), 2.5, Paint()..color = Colors.white);
+      c.drawCircle(Offset(dx + 2, dy - 0.5), 1.2, Paint()..color = Colors.white);
+
+      // Upper lash line
+      c.drawPath(
+        Path()..moveTo(dx - 14, dy - 2)..quadraticBezierTo(dx, dy - eyeH / 2 - 4, dx + 14, dy - 2),
+        Paint()..color = _eyePup..style = PaintingStyle.stroke..strokeWidth = 2.5..strokeCap = StrokeCap.round,
+      );
+      // Lower lash
+      c.drawPath(
+        Path()..moveTo(dx - 10, dy + eyeH / 2 - 1)..quadraticBezierTo(dx, dy + eyeH / 2 + 2, dx + 10, dy + eyeH / 2 - 1),
+        Paint()..color = _eyePup.withAlpha(80)..style = PaintingStyle.stroke..strokeWidth = 1.2,
+      );
     }
   }
 
-  // ── Eyebrows ──
-  void _drawEyebrows(Canvas c, bool isTalking) {
-    final bp = Paint()
-      ..color = hairColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round;
-
-    final lift = isTalking ? -3.0 : 0.0;
-
+  // ── EYEBROWS ──
+  void _brows(Canvas c) {
+    final lift = talking ? -2.5 : 0.0;
     for (final side in [-1, 1]) {
-      final dx = 16.0 * side;
-      final dy = -98.0 + lift;
-      final p = Path()
-        ..moveTo(dx - 14, dy - 2)
-        ..quadraticBezierTo(dx, dy - 6, dx + 14, dy - 2);
-      c.drawPath(p, bp);
+      final dx = 15.0 * side;
+      c.drawPath(
+        Path()..moveTo(dx - 12, -102 + lift)..quadraticBezierTo(dx, -107 + lift, dx + 12, -102 + lift),
+        Paint()..color = _hairBase..style = PaintingStyle.stroke..strokeWidth = 2..strokeCap = StrokeCap.round,
+      );
     }
   }
 
-  // ── Nose ──
-  void _drawNose(Canvas c) {
-    // Small subtle nose
-    final nosePath = Path()
-      ..moveTo(0, -68)
-      ..quadraticBezierTo(3, -64, 0, -62);
-    c.drawPath(nosePath, Paint()..color = skinShadow..style = PaintingStyle.stroke..strokeWidth = 1.2..strokeCap = StrokeCap.round);
+  // ── NOSE ──
+  void _nose(Canvas c) {
+    c.drawPath(
+      Path()..moveTo(0, -72)..quadraticBezierTo(2.5, -68, 0, -66),
+      Paint()..color = _skinShd..style = PaintingStyle.stroke..strokeWidth = 1..strokeCap = StrokeCap.round,
+    );
   }
 
-  // ── Mouth ──
-  void _drawMouth(Canvas c, bool isTalking) {
-    final my = -54.0;
-
-    if (isTalking && mouthOpen > 0.1) {
-      final mh = (mouthOpen * 10).clamp(2.0, 10.0);
-      // Open mouth
-      c.drawOval(
-        Rect.fromCenter(center: Offset(0, my), width: 14, height: mh),
-        Paint()..color = mouthColor,
+  // ── MOUTH ──
+  void _drawMouth(Canvas c) {
+    if (talking && mouthOpen > 0.1) {
+      final h = (mouthOpen * 9).clamp(2.0, 9.0);
+      c.drawOval(Rect.fromCenter(center: const Offset(0, -58), width: 12, height: h), Paint()..color = _mouth);
+      c.drawOval(Rect.fromCenter(center: const Offset(0, -57), width: 7, height: (h * 0.5).clamp(1.0, 4.5)), Paint()..color = _mouthIn);
+    } else if (dancing) {
+      c.drawPath(
+        Path()..moveTo(-6, -58)..quadraticBezierTo(0, -51, 6, -58),
+        Paint()..color = _mouth..style = PaintingStyle.stroke..strokeWidth = 2..strokeCap = StrokeCap.round,
       );
-      // Inner
-      c.drawOval(
-        Rect.fromCenter(center: Offset(0, my + 1), width: 9, height: (mh * 0.55).clamp(1.0, 5.0)),
-        Paint()..color = const Color(0xFF8B2252),
-      );
-    } else if (isDancing) {
-      // Happy smile
-      final sp = Path()
-        ..moveTo(-7, my)
-        ..quadraticBezierTo(0, my + 6, 7, my);
-      c.drawPath(sp, Paint()
-        ..color = mouthColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.2
-        ..strokeCap = StrokeCap.round);
     } else {
-      // Gentle smile
-      final sp = Path()
-        ..moveTo(-5, my)
-        ..quadraticBezierTo(0, my + 4, 5, my);
-      c.drawPath(sp, Paint()
-        ..color = mouthColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8
-        ..strokeCap = StrokeCap.round);
+      c.drawPath(
+        Path()..moveTo(-4, -58)..quadraticBezierTo(0, -54, 4, -58),
+        Paint()..color = _mouth..style = PaintingStyle.stroke..strokeWidth = 1.8..strokeCap = StrokeCap.round,
+      );
     }
   }
 
-  // ── Blush ──
+  // ── BLUSH ──
   void _drawBlush(Canvas c) {
-    final bp = Paint()..color = blushColor;
-    c.drawCircle(const Offset(-24, -62), 7, bp);
-    c.drawCircle(const Offset(24, -62), 7, bp);
+    c.drawCircle(const Offset(-22, -66), 6, Paint()..color = _blush);
+    c.drawCircle(const Offset(22, -66), 6, Paint()..color = _blush);
+  }
+
+  // ── HAIR BACK ──
+  void _hairBack(Canvas c) {
+    final p = Paint()..color = _hairBase;
+    // Long flowing hair down to waist/thigh
+    final path = Path()
+      ..moveTo(-44, -102)
+      ..cubicTo(-52, -70, -50, -20, -42, 40)
+      ..quadraticBezierTo(-32, 70, -16, 80)
+      ..quadraticBezierTo(-8, 86, 0, 88)
+      ..quadraticBezierTo(8, 86, 16, 80)
+      ..quadraticBezierTo(32, 70, 42, 40)
+      ..cubicTo(50, -20, 52, -70, 44, -102);
+    c.drawPath(path, p);
+    // Gradient highlight
+    final gp = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [_hairGrad, _hairBase],
+      ).createShader(const Rect.fromLTWH(-60, -120, 120, 220));
+    c.drawPath(path, gp..blendMode = BlendMode.srcATop);
+    // Hair end tips (V-shape ends)
+    final tipP = Paint()..color = _hairLight..strokeWidth = 1.5;
+    for (var i = -12; i <= 12; i += 4) {
+      final tipX = i.toDouble();
+      final tipY = 80.0 + (i.abs() * 0.5);
+      c.drawLine(Offset(tipX - 1, tipY - 5), Offset(tipX, tipY), tipP);
+    }
+  }
+
+  // ── HAIR FRONT (BANGS) ──
+  void _hairFront(Canvas c) {
+    final p = Paint()..color = _hairBase;
+    // Bangs - sweeping right
+    final bangs = Path()
+      ..moveTo(-44, -104)
+      ..cubicTo(-32, -80, -24, -60, -12, -56)
+      ..lineTo(0, -56)
+      ..quadraticBezierTo(-4, -62, 14, -58)
+      ..cubicTo(28, -62, 34, -80, 44, -104)
+      ..cubicTo(28, -95, 8, -80, 0, -78)
+      ..cubicTo(-8, -80, -28, -95, -44, -104)
+      ..close();
+    c.drawPath(bangs, p);
+
+    // Side bangs framing face
+    final sideL = Path()
+      ..moveTo(-46, -100)..cubicTo(-52, -76, -48, -50, -36, -34)
+      ..lineTo(-30, -38)..cubicTo(-40, -50, -42, -70, -40, -94)
+      ..close();
+    c.drawPath(sideL, p);
+
+    final sideR = Path()
+      ..moveTo(46, -100)..cubicTo(52, -76, 48, -50, 36, -34)
+      ..lineTo(30, -38)..cubicTo(40, -50, 42, -70, 40, -94)
+      ..close();
+    c.drawPath(sideR, p);
+
+    // Gradient on bangs
+    c.drawPath(bangs, Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [_hairGrad, _hairBase],
+      ).createShader(const Rect.fromLTWH(-50, -110, 100, 60))
+      ..blendMode = BlendMode.srcATop);
+  }
+
+  // ── HAIR STRANDS (long side strands framing face and body) ──
+  void _hairStrands(Canvas c) {
+    double sway;
+    if (talking) {
+      sway = math.sin(t * 3 * math.pi) * 3;
+    } else if (dancing) {
+      sway = math.sin(t * 2 * math.pi) * 5;
+    } else {
+      sway = 0.0;
+    }
+    final sp = Paint()..color = _hairLight..strokeWidth = 2.8..strokeCap = StrokeCap.round;
+    final sp2 = Paint()..color = _hairGrad..strokeWidth = 2.2..strokeCap = StrokeCap.round;
+
+    // Left front strands - long, framing the body
+    c.drawLine(const Offset(-40, -90), Offset(-38 + sway, 10), sp);
+    c.drawLine(const Offset(-38, -84), Offset(-34 + sway * 0.7, 15), sp2);
+
+    // Right front strands
+    c.drawLine(const Offset(40, -90), Offset(38 - sway, 10), sp);
+    c.drawLine(const Offset(38, -84), Offset(34 - sway * 0.7, 15), sp2);
+
+    // Extra long strands behind shoulders
+    c.drawLine(const Offset(-36, -70), Offset(-32, 30), Paint()..color = _hairBase..strokeWidth = 3..strokeCap = StrokeCap.round);
+    c.drawLine(const Offset(36, -70), Offset(32, 30), Paint()..color = _hairBase..strokeWidth = 3..strokeCap = StrokeCap.round);
+
+    // Ahoge
+    c.drawPath(
+      Path()..moveTo(-4, -110)..quadraticBezierTo(0, -118, 6, -112)..quadraticBezierTo(4, -116, 2, -108),
+      Paint()..color = _hairBase,
+    );
+  }
+
+  // ── RIBBON ──
+  void _ribbon_(Canvas c) {
+    final cx = -34.0, cy = -90.0;
+    final rp = Paint()..color = _ribbon;
+    // Left loop
+    c.drawPath(Path()..moveTo(cx, cy)..cubicTo(cx - 14, cy - 10, cx - 12, cy + 10, cx, cy), rp);
+    // Right loop
+    c.drawPath(Path()..moveTo(cx, cy)..cubicTo(cx + 14, cy - 10, cx + 12, cy + 10, cx, cy), rp);
+    // Center
+    c.drawCircle(Offset(cx, cy), 3, Paint()..color = _ribbonDark);
+    // Tails
+    c.drawLine(Offset(cx - 1, cy + 2), Offset(cx - 5, cy + 16), Paint()..color = _ribbonDark..strokeWidth = 2);
+    c.drawLine(Offset(cx + 1, cy + 2), Offset(cx + 5, cy + 16), Paint()..color = _ribbonDark..strokeWidth = 2);
   }
 
   @override
-  bool shouldRepaint(covariant _GirlPainter old) {
-    return mouthOpen != old.mouthOpen ||
-        animState != old.animState ||
-        animValue != old.animValue ||
-        danceAngle != old.danceAngle ||
-        isDancing != old.isDancing;
-  }
+  bool shouldRepaint(covariant _MusePainter o) =>
+      mouthOpen != o.mouthOpen || animState != o.animState || t != o.t;
 }
