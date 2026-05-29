@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     minio_bucket: str = "lingxi"
     jwt_secret: str = "dev-secret-change-in-production"
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60 * 24 * 7
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days in minutes (10080)
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com/v1"
     qwen_api_key: str = ""

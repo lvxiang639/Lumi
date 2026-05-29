@@ -8,7 +8,7 @@ class SyncService {
     required List<Map<String, dynamic>> expenses,
     required DateTime lastSyncAt,
   }) async {
-    return await _api.post('/api/data/sync', body: {
+    return await _api.post('/api/sync', body: {
       'events': events,
       'expenses': expenses,
       'last_sync_at': lastSyncAt.toIso8601String(),

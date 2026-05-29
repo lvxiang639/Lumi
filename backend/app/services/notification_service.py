@@ -10,9 +10,21 @@ from app.models import CalendarEvent
 
 logger = logging.getLogger("notification")
 
-RECURRENCE_DELTAS = {
-    "daily": lambda t: t.replace(day=t.day + 1) if False else None,  # fallback to simplified
-}
+
+def _add_month(t: datetime) -> datetime:
+    """Advance *t* by one calendar month, clamping the day if needed."""
+    import calendar as _calendar
+
+    y, m, d = t.year, t.month, t.day
+    m += 1
+    if m > 12:
+        m = 1
+        y += 1
+    last_day = _calendar.monthrange(y, m)[1]
+    if d > last_day:
+        d = last_day
+    return t.replace(year=y, month=m, day=d)
+
 
 
 class NotificationService:
@@ -75,8 +87,9 @@ class NotificationService:
         elif rule == "weekly":
             return time + timedelta(weeks=1)
         elif rule == "monthly":
-            # Add roughly 30 days for monthly
-            return time + timedelta(days=30)
+            # Advance one calendar month, clamping the day-of-month if needed
+            # (e.g. Jan 31 → Feb 28/29).
+            return _add_month(time)
         elif rule == "yearly":
             return time.replace(year=time.year + 1)
         return None

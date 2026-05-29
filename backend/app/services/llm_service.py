@@ -45,7 +45,7 @@ class LLMRouter:
             return content or ""
         except Exception:
             logger.exception("LLM chat failed, model=%s", model)
-            return ""
+            raise
 
     async def chat_stream(
         self, messages: list[dict], force_model: str | None = None
@@ -76,6 +76,7 @@ class LLMRouter:
                     yield delta.content
         except Exception:
             logger.exception("LLM stream failed, model=%s", model)
+            raise
 
     async def classify_intent(self, text: str) -> str:
         """Returns: chat, search, weather, calendar, expense"""

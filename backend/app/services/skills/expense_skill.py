@@ -68,6 +68,8 @@ class ExpenseSkill(BaseSkill):
             if time_str:
                 try:
                     recorded_at = datetime.fromisoformat(time_str)
+                    if recorded_at.tzinfo is None:
+                        recorded_at = recorded_at.replace(tzinfo=BEIJING_TZ)
                 except (ValueError, TypeError):
                     pass
 

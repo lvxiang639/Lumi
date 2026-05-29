@@ -59,6 +59,11 @@ class CalendarSkill(BaseSkill):
 
             try:
                 event_time = datetime.fromisoformat(time_str)
+                # LLM may return a naive datetime (no tz offset).
+                # Since we told the LLM the current Beijing time, assume
+                # naive timestamps are in Beijing time.
+                if event_time.tzinfo is None:
+                    event_time = event_time.replace(tzinfo=BEIJING_TZ)
             except (ValueError, TypeError):
                 return SkillResult(text="时间格式不正确，请重新说明时间")
 

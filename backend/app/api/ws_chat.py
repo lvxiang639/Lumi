@@ -24,7 +24,10 @@ async def websocket_chat(ws: WebSocket):
     logger.info("WS connected: user=%s", user_id[:8])
 
     async def send_message(msg: dict):
-        await ws.send_text(json.dumps(msg, ensure_ascii=False))
+        try:
+            await ws.send_text(json.dumps(msg, ensure_ascii=False))
+        except Exception:
+            logger.warning("WS send failed (client likely disconnected)")
 
     async with async_session() as db:
         try:

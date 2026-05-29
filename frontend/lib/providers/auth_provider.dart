@@ -37,7 +37,7 @@ class AuthProvider extends ChangeNotifier {
       return result.isNewUser;
     } catch (e) {
       _error = e.toString();
-      rethrow;
+      return false;
     } finally {
       _loading = false;
       notifyListeners();

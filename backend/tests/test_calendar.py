@@ -23,7 +23,7 @@ async def test_create_and_list_events(client):
     # List events
     resp = await client.get("/api/calendar", headers=headers)
     assert resp.status_code == 200
-    items = resp.json()
+    items = resp.json()["items"]
     assert len(items) >= 1
     assert any(e["id"] == event_id for e in items)
 

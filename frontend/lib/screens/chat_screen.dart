@@ -16,6 +16,8 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  static const _defaultCharacterName = '小灵';
+
   final _textController = TextEditingController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -29,8 +31,12 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ChatProvider>().startConversation();
-      context.read<CharacterProvider>().loadConfig();
+      try {
+        context.read<ChatProvider>().startConversation();
+        context.read<CharacterProvider>().loadConfig();
+      } catch (e) {
+        debugPrint('Init error: $e');
+      }
     });
   }
 
@@ -64,7 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         const SizedBox(height: 12),
                         ElevatedButton(
                           onPressed: () {
-                            provider.initCharacter('小灵').then((_) {
+                            provider.initCharacter(_defaultCharacterName).then((_) {
                               if (ctx.mounted) Navigator.pop(ctx);
                             });
                           },

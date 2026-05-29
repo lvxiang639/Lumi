@@ -22,7 +22,7 @@ async def test_create_and_list_expenses(client):
     # List expenses
     resp = await client.get("/api/expenses", headers=headers)
     assert resp.status_code == 200
-    items = resp.json()
+    items = resp.json()["items"]
     assert len(items) >= 1
     assert any(e["id"] == data["id"] for e in items)
 
