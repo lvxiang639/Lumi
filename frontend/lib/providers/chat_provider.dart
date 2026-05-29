@@ -13,16 +13,26 @@ class ChatProvider extends ChangeNotifier {
   String _streamingText = "";
   bool _isProcessing = false;
   String? currentSkill;
+  WsState _wsState = WsState.disconnected;
 
   List<Message> get messages => List.unmodifiable(_messages);
   String get streamingText => _streamingText;
   bool get isProcessing => _isProcessing;
+  WsState get wsState => _wsState;
+  bool get isTtsPlaying => _tts.isPlaying;
+
+  void stopTts() => _tts.stop();
 
   void startConversation({String? conversationId}) {
     _wsSubscription?.cancel();
     _messages.clear();
     _streamingText = "";
     _ws.conversationId = conversationId;
+    _ws.onStateChanged = (s) {
+      _wsState = s;
+      notifyListeners();
+    };
+    _tts.onPlaybackDone = () => notifyListeners();
     _wsSubscription = _ws.messages.listen(_onWsMessage);
     _ws.connect();
   }
@@ -71,8 +81,18 @@ class ChatProvider extends ChangeNotifier {
         final audioBase64 = msg.data['audio'] as String?;
         if (audioBase64 != null) {
           final bytes = base64Decode(audioBase64);
-          _tts.play(Uint8List.fromList(bytes));
+          _tts.addChunk(Uint8List.fromList(bytes));
+          _tts.finishStream();
         }
+        break;
+      case 'tts_audio_chunk':
+        final chunkBase64 = msg.data['chunk'] as String?;
+        if (chunkBase64 != null) {
+          _tts.addChunk(Uint8List.fromList(base64Decode(chunkBase64)));
+        }
+        break;
+      case 'tts_audio_end':
+        _tts.finishStream();
         break;
       case 'done':
         if (_streamingText.isNotEmpty) {

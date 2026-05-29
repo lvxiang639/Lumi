@@ -100,32 +100,36 @@ class ChatOrchestrator:
         conv.updated_at = datetime.now(timezone.utc)
         await db.commit()
 
-        # 5. Synthesize TTS (with character voice pack)
+        # 5. Done — send immediately, don't wait for TTS
+        await send_message(
+            {"type": "done", "conversation_id": str(conv.id)}
+        )
+
+        # 6. Synthesize TTS (streaming, after done)
         try:
             voice = await self._get_character_voice(user_id, db)
             if voice and voice.get("cosyvoice_endpoint"):
                 audio_bytes = await tts_service.synthesize_cosyvoice(
                     response_text, voice["cosyvoice_id"]
                 )
-            else:
-                audio_bytes = await tts_service.synthesize_flash(
-                    response_text, voice=voice["voice"] if voice else "Cherry"
-                )
-            if audio_bytes:
-                await send_message(
-                    {
+                if audio_bytes:
+                    await send_message({
                         "type": "tts_audio",
                         "audio": base64.b64encode(audio_bytes).decode(),
-                        "text": response_text,
-                    }
-                )
+                    })
+            else:
+                # Streaming TTS — send chunks as they arrive
+                voice_name = voice["voice"] if voice else "Cherry"
+                async for chunk in tts_service.synthesize_flash_stream(
+                    response_text, voice=voice_name
+                ):
+                    await send_message({
+                        "type": "tts_audio_chunk",
+                        "chunk": base64.b64encode(chunk).decode(),
+                    })
+                await send_message({"type": "tts_audio_end"})
         except Exception:
             logger.exception("TTS synthesis failed")
-
-        # 6. Done
-        await send_message(
-            {"type": "done", "conversation_id": str(conv.id)}
-        )
 
     async def process_voice(
         self,

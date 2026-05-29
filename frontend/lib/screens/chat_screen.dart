@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
+import '../services/ws_service.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/voice_record_button.dart';
 import '../widgets/live2d_view.dart';
@@ -42,7 +43,19 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (context, chat, _) {
         return Scaffold(
           appBar: AppBar(
-            title: const Text('对话'),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('对话'),
+                if (chat.wsState == WsState.connecting) ...[
+                  const SizedBox(width: 8),
+                  const SizedBox(
+                    width: 12, height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 1.5),
+                  ),
+                ],
+              ],
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.refresh),
@@ -74,6 +87,27 @@ class _ChatScreenState extends State<ChatScreen> {
                 Padding(
                   padding: const EdgeInsets.all(8),
                   child: Chip(label: Text('执行: ${chat.currentSkill}')),
+                ),
+              if (chat.isTtsPlaying)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.volume_up, size: 16, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      const Text('语音播报中…', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      const SizedBox(width: 12),
+                      TextButton.icon(
+                        onPressed: () {
+                          context.read<ChatProvider>().stopTts();
+                        },
+                        icon: const Icon(Icons.stop, size: 16),
+                        label: const Text('取消', style: TextStyle(fontSize: 13)),
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      ),
+                    ],
+                  ),
                 ),
               SafeArea(
                 child: Padding(

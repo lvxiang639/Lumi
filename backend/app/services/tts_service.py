@@ -1,4 +1,5 @@
 import logging
+import base64
 import asyncio
 import httpx
 import dashscope
@@ -44,6 +45,39 @@ class TTSService:
         except Exception:
             logger.exception("TTS synthesize failed")
             return b""
+
+    async def synthesize_flash_stream(self, text: str, voice: str | None = None):
+        """Stream TTS audio chunks as they are generated."""
+        voice = voice or settings.tts_default_voice
+        logger.info("TTS stream start, text_len=%d, voice=%s", len(text), voice)
+        try:
+            responses = await asyncio.to_thread(
+                dashscope.MultiModalConversation.call,
+                model=settings.tts_model_name,
+                api_key=settings.qwen_api_key,
+                text=text,
+                voice=voice,
+                language_type="Chinese",
+                stream=True,
+                incremental_output=True,
+            )
+            total = 0
+            for resp in responses:
+                if resp.status_code != 200:
+                    logger.error(
+                        "TTS stream error: status=%s, code=%s, msg=%s",
+                        resp.status_code, resp.code, resp.message,
+                    )
+                    return
+                audio = resp.output.get("audio", {})
+                data = audio.get("data", "")
+                if data:
+                    chunk = base64.b64decode(data)
+                    total += len(chunk)
+                    yield chunk
+            logger.info("TTS stream done: total=%d bytes", total)
+        except Exception:
+            logger.exception("TTS stream failed")
 
     async def synthesize_cosyvoice(
         self, text: str, cosyvoice_id: str

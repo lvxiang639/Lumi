@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
@@ -18,30 +20,68 @@ class WsService {
   WsState _state = WsState.disconnected;
   final _controller = StreamController<WsMessage>.broadcast();
   String? conversationId;
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  bool _intentionalClose = false;
+
+  static const _initialReconnectDelay = Duration(seconds: 1);
+  void Function(WsState)? onStateChanged;
 
   WsState get state => _state;
   Stream<WsMessage> get messages => _controller.stream;
 
   Future<void> connect() async {
+    _intentionalClose = false;
+    await _doConnect();
+  }
+
+  void _setState(WsState s) {
+    _state = s;
+    onStateChanged?.call(s);
+  }
+
+  Future<void> _doConnect() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token') ?? '';
-    _state = WsState.connecting;
-    _channel = WebSocketChannel.connect(
-      Uri.parse('${AppConfig.wsBaseUrl}/ws/chat?token=$token'),
-    );
-    _state = WsState.connected;
-    _subscription = _channel!.stream.listen(
-      (data) {
-        final json = jsonDecode(data as String) as Map<String, dynamic>;
-        _controller.add(WsMessage(json['type'] as String, json));
-      },
-      onDone: () {
-        _state = WsState.disconnected;
-      },
-      onError: (_) {
-        _state = WsState.disconnected;
-      },
-    );
+    _setState(WsState.connecting);
+    try {
+      _channel = WebSocketChannel.connect(
+        Uri.parse('${AppConfig.wsBaseUrl}/ws/chat?token=$token'),
+      );
+      _subscription = _channel!.stream.listen(
+        (data) {
+          final json = jsonDecode(data as String) as Map<String, dynamic>;
+          _controller.add(WsMessage(json['type'] as String, json));
+        },
+        onDone: _onDisconnected,
+        onError: (_) => _onDisconnected(),
+      );
+      await _channel!.ready;
+      _setState(WsState.connected);
+      _reconnectAttempts = 0;
+    } catch (_) {
+      _onDisconnected();
+    }
+  }
+
+  void _onDisconnected() {
+    _setState(WsState.disconnected);
+    _subscription?.cancel();
+    _subscription = null;
+    _channel = null;
+
+    if (_intentionalClose) return;
+    _scheduleReconnect();
+  }
+
+  void _scheduleReconnect() {
+    _reconnectTimer?.cancel();
+    final delay = _initialReconnectDelay * pow(2, min(_reconnectAttempts, 5));
+    final jitter = Duration(milliseconds: Random().nextInt(1000));
+    _reconnectAttempts++;
+
+    debugPrint('WS reconnect in ${delay + jitter} (attempt $_reconnectAttempts)');
+    _reconnectTimer = Timer(delay + jitter, _doConnect);
   }
 
   void sendText(String text) {
@@ -61,14 +101,20 @@ class WsService {
   }
 
   Future<void> disconnect() async {
+    _intentionalClose = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _subscription?.cancel();
     _subscription = null;
     await _channel?.sink.close();
-    _state = WsState.disconnected;
+    _channel = null;
+    _setState(WsState.disconnected);
     conversationId = null;
   }
 
   void dispose() {
+    _intentionalClose = true;
+    _reconnectTimer?.cancel();
     _subscription?.cancel();
     _channel?.sink.close();
     _controller.close();
