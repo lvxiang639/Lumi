@@ -81,7 +81,15 @@ class CalendarSkill(BaseSkill):
             if repeat_hint:
                 text += f"，{repeat_hint}重复"
 
-            return SkillResult(text=text, data={"event_id": str(event.id)})
+            return SkillResult(
+                text=text,
+                data={
+                    "event_id": str(event.id),
+                    "title": title,
+                    "time": event_time.isoformat(),
+                    "repeat_rule": repeat_rule,
+                },
+            )
 
         except ValueError:
             logger.exception("calendar skill value error")

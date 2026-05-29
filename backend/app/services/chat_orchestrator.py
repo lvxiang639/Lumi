@@ -48,7 +48,12 @@ class ChatOrchestrator:
             await db.flush()
 
             await send_message(
-                {"type": "skill_call", "skill": intent, "status": "done"}
+                {
+                    "type": "skill_call",
+                    "skill": intent,
+                    "status": "done",
+                    "data": result.data,
+                }
             )
             # Stream the skill result text back to client
             await send_message(

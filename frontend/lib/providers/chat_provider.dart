@@ -4,12 +4,14 @@ import 'package:flutter/foundation.dart';
 import '../models/message.dart';
 import '../services/ws_service.dart';
 import '../services/tts_player_service.dart';
+import '../services/calendar_sync_service.dart';
 
 enum CharacterAnimState { idle, talking, dancing }
 
 class ChatProvider extends ChangeNotifier {
   final WsService _ws = WsService();
   final TtsPlayerService _tts = TtsPlayerService();
+  final CalendarSyncService _calendarSync = CalendarSyncService();
   final List<Message> _messages = [];
   StreamSubscription<WsMessage>? _wsSubscription;
   StreamSubscription<double>? _ttsProgressSub;
@@ -109,6 +111,7 @@ class ChatProvider extends ChangeNotifier {
         break;
       case 'skill_call':
         currentSkill = msg.data['skill'] as String?;
+        _onSkillCall(msg.data);
         break;
       case 'tts_audio':
         final audioBase64 = msg.data['audio'] as String?;
@@ -146,6 +149,26 @@ class ChatProvider extends ChangeNotifier {
         break;
     }
     notifyListeners();
+  }
+
+  void _onSkillCall(Map<String, dynamic> data) {
+    final skill = data['skill'] as String?;
+    final eventData = data['data'] as Map<String, dynamic>?;
+    if (skill != 'calendar' || eventData == null) return;
+
+    final title = eventData['title'] as String?;
+    final timeStr = eventData['time'] as String?;
+    final repeatRule = eventData['repeat_rule'] as String? ?? 'none';
+    if (title == null || timeStr == null) return;
+
+    final time = DateTime.tryParse(timeStr);
+    if (time == null) return;
+
+    _calendarSync.addEvent(
+      title: title,
+      time: time,
+      repeatRule: repeatRule,
+    );
   }
 
   Future<void> endConversation() async {
