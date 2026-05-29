@@ -236,10 +236,7 @@ class _GlassChatPanel extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF141832).withValues(alpha: 0.75),
-            border: Border.all(
-              color: const Color(0xFF7C8FFF).withValues(alpha: 0.2),
-            ),
+            color: const Color(0xFF141832).withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(16),
           ),
           child: ListView.builder(
@@ -270,8 +267,8 @@ class _GlassChatPanel extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: isUser
-                ? const Color(0xFF7C8FFF).withValues(alpha: 0.3)
-                : const Color(0xFFFFFFFF).withValues(alpha: 0.1),
+                ? const Color(0xFF7C8FFF).withValues(alpha: 0.2)
+                : const Color(0xFFFFFFFF).withValues(alpha: 0.07),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
@@ -297,7 +294,7 @@ class _GlassChatPanel extends StatelessWidget {
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFFFFF).withValues(alpha: 0.1),
+            color: const Color(0xFFFFFFFF).withValues(alpha: 0.07),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -351,28 +348,28 @@ class _FloatingInputBar extends StatelessWidget {
             child: Container(
               height: 44,
               decoration: BoxDecoration(
-                color: const Color(0xFF141832).withValues(alpha: 0.85),
-                border: Border.all(
-                  color: const Color(0xFF7C8FFF).withValues(alpha: 0.4),
-                ),
+                color: const Color(0xFF141832).withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(22),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: textController,
-                      autofocus: true,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                      decoration: const InputDecoration(
-                        hintText: '输入消息...',
-                        hintStyle:
-                            TextStyle(color: Colors.white30, fontSize: 14),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: TextField(
+                        controller: textController,
+                        autofocus: true,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: const InputDecoration(
+                          hintText: '输入消息...',
+                          hintStyle:
+                              TextStyle(color: Colors.white30, fontSize: 14),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onSubmitted: (_) => onSend(),
                       ),
-                      onSubmitted: (_) => onSend(),
                     ),
                   ),
                   GestureDetector(
@@ -425,10 +422,7 @@ class _FloatingBtn extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: const Color(0xFF141832).withValues(alpha: 0.85),
-          border: Border.all(
-            color: const Color(0xFF7C8FFF).withValues(alpha: 0.3),
-          ),
+          color: const Color(0xFF141832).withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(size / 2),
         ),
         child: Icon(icon, color: Colors.white70, size: size * 0.45),
@@ -482,10 +476,13 @@ class _GlowVoiceButtonState extends State<_GlowVoiceButton>
                 height: 64,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF7C8FFF).withValues(alpha: 0.3),
-                    width: 2,
-                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF7C8FFF).withValues(alpha: 0.2),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -516,10 +513,7 @@ class _TtsIndicator extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF141832).withValues(alpha: 0.8),
-        border: Border.all(
-          color: const Color(0xFF7C8FFF).withValues(alpha: 0.3),
-        ),
+        color: const Color(0xFF141832).withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
