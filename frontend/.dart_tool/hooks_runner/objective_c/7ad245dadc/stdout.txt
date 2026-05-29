@@ -1,54 +1,52 @@
 Running `(cd /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/; TMPDIR=/var/folders/jk/x0z70kjs10s3gb_nk46_ntqr0000gn/T/ PATH=/Applications/Xcode.app/Contents/SharedFrameworks/SwiftBuild.framework/Versions/A/PlugIns/SWBBuildService.bundle/Contents/PlugIns/SWBUniversalPlatformPlugin.bundle/Contents/Frameworks/SWBUniversalPlatform.framework/Resources:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/local/bin:/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec:/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/usr/bin:/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/usr/local/bin:/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin:/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/local/bin:/Applications/Xcode.app/Contents/Developer/usr/bin:/Applications/Xcode.app/Contents/Developer/usr/local/bin:/Users/lvxiang/flutter/bin:/Users/lvxiang/.nvm/versions/node/v24.11.1/bin:/opt/homebrew/opt/mysql@8.4/bin:/Library/Frameworks/Python.framework/Versions/3.12/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Applications/iTerm.app/Contents/Resources/utilities HOME=/Users/lvxiang /Users/lvxiang/flutter/bin/cache/dart-sdk/bin/dart --packages=/Users/lvxiang/workspace/lingxi/frontend/.dart_tool/package_config.json /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/objective_c/7ad245dadc/hook.dill --config=/Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/objective_c/7ad245dadc/input.json )`.
-INFO: 2026-05-28 23:14:07.272920: Using compiler /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang from BuildInput.cCompiler.cc.
+INFO: 2026-05-29 14:51:58.337069: Using compiler /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang from BuildInput.cCompiler.cc.
 
-INFO: 2026-05-28 23:14:07.275658: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -c /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/src/include/dart_api_dl.c -fpic -gline-tables-only -I src -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/include/dart_api_dl.c.o
+INFO: 2026-05-29 14:51:58.339854: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -c /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/src/include/dart_api_dl.c -fpic -gline-tables-only -I src -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/include/dart_api_dl.c.o
 
-INFO: 2026-05-28 23:14:07.276634: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/src/input_stream_adapter.m -fpic -gline-tables-only -I src -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/input_stream_adapter.m.o
+INFO: 2026-05-29 14:51:58.340699: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -c /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/src/objective_c.c -fpic -gline-tables-only -I src -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.c.o
 
-INFO: 2026-05-28 23:14:07.276978: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/src/protocol.m -fpic -gline-tables-only -I src -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/protocol.m.o
+INFO: 2026-05-29 14:51:58.340906: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/src/objective_c.m -fpic -gline-tables-only -I src -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.m.o
 
+ream_adapter.m.o
 
+INFO: 2026-05-29 14:51:58.341231: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/src/objective_c_bindings_generated.m -fpic -gline-tables-only -I src -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c_bindings_generated.m.o
 
-.o
-INFO: 2026-05-28 23:14:07.276817: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/src/observer.m -fpic -gline-tables-only -I src -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/observer.m.o
+pplications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/src/ns_number.m -fpic -gline-tables-only -I src -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/ns_number.m.o
 
-INFO: 2026-05-28 23:14:07.277066: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 -x objective-c -fobjc-arc -c /Users/lvxiang/.pub-cache/hosted/pub.dev/objective_c-9.4.1/src/objective_c_bindings_generated.m -fpic -gline-tables-only -I src -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c_bindings_generated.m.o
+INFO: 2026-05-29 14:51:58.385304: 
+INFO: 2026-05-29 14:51:58.385383: 
+INFO: 2026-05-29 14:51:58.385406: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/include/dart_api_dl.c.o
 
-INFO: 2026-05-28 23:14:07.315818: 
-INFO: 2026-05-28 23:14:07.315945: 
-INFO: 2026-05-28 23:14:07.315992: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/include/dart_api_dl.c.o
+INFO: 2026-05-29 14:51:58.392413: 
+INFO: 2026-05-29 14:51:58.392485: 
+INFO: 2026-05-29 14:51:58.392508: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.c.o
 
-INFO: 2026-05-28 23:14:07.319554: 
-INFO: 2026-05-28 23:14:07.319666: 
-INFO: 2026-05-28 23:14:07.319690: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.c.o
+INFO: 2026-05-29 14:51:58.402442: 
+INFO: 2026-05-29 14:51:58.402483: 
+INFO: 2026-05-29 14:51:58.402493: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/observer.m.o
 
-INFO: 2026-05-28 23:14:07.342412: 
-INFO: 2026-05-28 23:14:07.342451: 
-INFO: 2026-05-28 23:14:07.342461: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/observer.m.o
+INFO: 2026-05-29 14:51:58.418093: 
+INFO: 2026-05-29 14:51:58.418130: 
+INFO: 2026-05-29 14:51:58.418140: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/protocol.m.o
 
-INFO: 2026-05-28 23:14:07.351856: 
-INFO: 2026-05-28 23:14:07.351922: 
-INFO: 2026-05-28 23:14:07.351945: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/protocol.m.o
+INFO: 2026-05-29 14:51:58.643571: 
+INFO: 2026-05-29 14:51:58.643610: 
+INFO: 2026-05-29 14:51:58.643620: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/ns_number.m.o
+INFO: 2026-05-29 14:51:58.643690: 
+INFO: 2026-05-29 14:51:58.643703: 
+INFO: 2026-05-29 14:51:58.643712: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/input_stream_adapter.m.o
 
-INFO: 2026-05-28 23:14:07.512387: 
-INFO: 2026-05-28 23:14:07.512472: 
-INFO: 2026-05-28 23:14:07.512493: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.m.o
+INFO: 2026-05-29 14:51:58.649255: 
+INFO: 2026-05-29 14:51:58.649296: 
+INFO: 2026-05-29 14:51:58.649306: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.m.o
 
-INFO: 2026-05-28 23:14:07.525343: 
-INFO: 2026-05-28 23:14:07.525421: 
-INFO: 2026-05-28 23:14:07.525461: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/input_stream_adapter.m.o
+INFO: 2026-05-29 14:51:58.678184: 
+INFO: 2026-05-29 14:51:58.678219: 
+INFO: 2026-05-29 14:51:58.678234: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c_bindings_generated.m.o
 
-INFO: 2026-05-28 23:14:07.531120: 
-INFO: 2026-05-28 23:14:07.531166: 
-INFO: 2026-05-28 23:14:07.531176: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/ns_number.m.o
+INFO: 2026-05-29 14:51:58.678488: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -shared -Wl,-encryptable -undefined dynamic_lookup -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/include/dart_api_dl.c.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.c.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/input_stream_adapter.m.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.m.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/observer.m.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/ns_number.m.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/protocol.m.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c_bindings_generated.m.o -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/objective_c.dylib
 
-INFO: 2026-05-28 23:14:07.536472: 
-INFO: 2026-05-28 23:14:07.536538: 
-INFO: 2026-05-28 23:14:07.536557: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c_bindings_generated.m.o
-
-INFO: 2026-05-28 23:14:07.537021: Running: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -shared -Wl,-encryptable -undefined dynamic_lookup -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-darwin -mmacos-version-min=13 /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/include/dart_api_dl.c.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.c.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/input_stream_adapter.m.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c.m.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/observer.m.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/ns_number.m.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/protocol.m.o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/obj/src/objective_c_bindings_generated.m.o -o /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/objective_c.dylib
-
-INFO: 2026-05-28 23:14:07.565129: 
-INFO: 2026-05-28 23:14:07.565181: 
-INFO: 2026-05-28 23:14:07.565193: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/objective_c.dylib
+INFO: 2026-05-29 14:51:58.705304: 
+INFO: 2026-05-29 14:51:58.705360: 
+INFO: 2026-05-29 14:51:58.705371: Generated /Users/lvxiang/workspace/lingxi/frontend/.dart_tool/hooks_runner/shared/objective_c/build/7ad245dadc/objective_c.dylib
 

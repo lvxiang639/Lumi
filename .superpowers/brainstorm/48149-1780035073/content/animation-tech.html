@@ -1,0 +1,53 @@
+<h2>虚拟角色动画 — 技术方案对比</h2>
+<p class="subtitle">目标：嘴巴随语音开合、可旋转、可翩翩起舞。哪种技术最合适？</p>
+
+<div class="options">
+  <div class="option" data-choice="rive" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Rive 动画引擎 ⭐ 推荐</h3>
+      <p><b>原理：</b>矢量骨骼动画，可在 Rive 编辑器里创建角色 rigging，定义 Idle / Talk / Dance 等状态机</p>
+      <p><b>Flutter SDK：</b>rive 0.13+ 包，原生支持状态机驱动、实时参数控制（如 mouthOpen 0→1）</p>
+      <p><b>优点：</b>文件小（几十KB）、放大不失真、通过参数实时控制嘴部开合、动画之间平滑过渡</p>
+      <p><b>缺点：</b>需要设计/寻找 .riv 角色文件，或自己用 Rive 编辑器制作</p>
+      <p style="color: #888; font-size: 13px;">社区有免费的 anime character Rive 资源可用</p>
+    </div>
+  </div>
+  <div class="option" data-choice="live2d" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Live2D Cubism SDK</h3>
+      <p><b>原理：</b>专业的 2D 伪 3D 技术，通过变形网格实现角色旋转、表情、口型</p>
+      <p><b>优点：</b>效果最精细，日系动漫风格原生支持，社区模型资源丰富</p>
+      <p><b>缺点：</b>SDK 需商业授权（免费版有限制），Flutter 集成复杂（需原生插件桥接），模型文件大</p>
+      <p style="color: #f80; font-size: 13px;">实现复杂度高，SDK许可证有约束</p>
+    </div>
+  </div>
+  <div class="option" data-choice="lottie" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Lottie + 手动切换</h3>
+      <p><b>原理：</b>After Effects → Lottie JSON 导出，预设几套完整动画（待机/说话/跳舞），按状态切换播放</p>
+      <p><b>优点：</b>Flutter 的 lottie 包成熟，AE 制作资源多</p>
+      <p><b>缺点：</b>无法实时控制嘴部（只有播放/停止），动画之间切换可能生硬，文件较大</p>
+      <p style="color: #f80; font-size: 13px;">"嘴巴跟语音动"这个核心需求难以精细实现</p>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros"><h4>为什么推荐 Rive</h4>
+    <ul>
+      <li>实时参数控制 mouthOpen，TTS 播放时根据音量/进度驱动嘴部开合</li>
+      <li>状态机支持 Idle ↔ Talking ↔ Dancing 平滑过渡</li>
+      <li>纯 Dart/Flutter，无原生桥接，跨平台一致</li>
+      <li>文件小，性能好，开源免费</li>
+    </ul>
+  </div>
+  <div class="cons"><h4>需要注意</h4>
+    <ul>
+      <li>需要一个设计好的 .riv 角色文件（可找现成免费资源或用 Rive 编辑器创建）</li>
+      <li>Rive 编辑器的学习曲线（简单动画很快上手）</li>
+    </ul>
+  </div>
+</div>

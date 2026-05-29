@@ -1,0 +1,110 @@
+<h2>整体 UI 设计方案</h2>
+<p class="subtitle">Q版虚拟角色 + Rive动画 + 单屏对话 + 侧边工具箱</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">主屏 — 对话界面</div>
+    <div class="mockup-body" style="min-height:520px;display:flex;flex-direction:column">
+      <!-- AppBar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0">
+        <span style="font-weight:bold;font-size:16px">✨ 灵犀</span>
+        <div style="display:flex;gap:8px">
+          <button class="mock-button" style="font-size:12px;padding:4px 8px">🔧 工具</button>
+          <div style="width:32px;height:32px;border-radius:16px;background:#e0e0ff;display:flex;align-items:center;justify-content:center;font-size:14px">👤</div>
+        </div>
+      </div>
+      <!-- Character Area -->
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">
+        <div style="width:200px;height:200px;border-radius:100px;background:linear-gradient(135deg, #e8e0ff, #e0e8ff);display:flex;align-items:center;justify-content:center;font-size:80px">
+          🎀
+        </div>
+        <div style="position:absolute;bottom:30px;background:white;border-radius:12px;padding:6px 12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);font-size:12px">
+          你好呀，今天想做什么？
+        </div>
+      </div>
+      <!-- Chat Messages -->
+      <div style="max-height:150px;overflow-y:auto;padding:0 12px;border-top:1px solid #f5f5f5">
+        <div style="display:flex;gap:8px;padding:6px 0;justify-content:flex-end">
+          <div style="background:#6366f1;color:white;padding:6px 12px;border-radius:12px 12px 4px 12px;font-size:13px;max-width:70%">今天花了多少钱</div>
+        </div>
+        <div style="display:flex;gap:8px;padding:6px 0">
+          <div style="background:#f0f0f0;padding:6px 12px;border-radius:12px 12px 12px 4px;font-size:13px;max-width:70%">你今天还没有记账哦~</div>
+        </div>
+      </div>
+      <!-- Input Bar -->
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #f0f0f0">
+        <div style="width:36px;height:36px;border-radius:18px;background:#ff4444;display:flex;align-items:center;justify-content:center;color:white;font-size:16px">🎤</div>
+        <div class="mock-input" style="flex:1;margin:0" placeholder="输入消息..."></div>
+        <button class="mock-button" style="margin:0">发送</button>
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">侧边面板 — 工具箱（滑出）</div>
+    <div class="mockup-body" style="min-height:520px;display:flex;flex-direction:column">
+      <!-- Panel Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f0f0f0">
+        <span style="font-weight:bold;font-size:14px">🔧 助手工具</span>
+        <span style="font-size:18px;color:#999;cursor:pointer">✕</span>
+      </div>
+      <!-- Tabs -->
+      <div style="display:flex;border-bottom:1px solid #e0e0e0">
+        <div style="flex:1;text-align:center;padding:10px;border-bottom:2px solid #6366f1;color:#6366f1;font-weight:bold;font-size:13px">📅 日历</div>
+        <div style="flex:1;text-align:center;padding:10px;color:#999;font-size:13px">💰 记账</div>
+      </div>
+      <!-- Today Overview -->
+      <div style="padding:12px;border-bottom:1px solid #f5f5f5">
+        <div style="font-size:12px;color:#999;margin-bottom:8px">📌 今日概览 · 5月29日</div>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1;background:#f0f0ff;padding:8px;border-radius:8px;text-align:center">
+            <div style="font-size:12px;color:#666">事件</div>
+            <div style="font-size:20px;font-weight:bold;color:#6366f1">2</div>
+          </div>
+          <div style="flex:1;background:#fff0f0;padding:8px;border-radius:8px;text-align:center">
+            <div style="font-size:12px;color:#666">支出</div>
+            <div style="font-size:20px;font-weight:bold;color:#ef4444">¥0</div>
+          </div>
+        </div>
+      </div>
+      <!-- Calendar List -->
+      <div style="padding:12px;flex:1;overflow-y:auto">
+        <div style="font-size:13px;font-weight:bold;margin-bottom:8px">即将到来</div>
+        <div style="background:#f5f5ff;padding:10px;border-radius:8px;margin-bottom:6px;font-size:13px">
+          <b>10:00</b> 团队周会
+        </div>
+        <div style="background:#f5fff5;padding:10px;border-radius:8px;margin-bottom:6px;font-size:13px">
+          <b>15:00</b> 牙医预约
+        </div>
+        <div style="text-align:center;margin-top:8px">
+          <button class="mock-button" style="font-size:12px">+ 添加事件</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>设计要点总结</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:14px">
+    <div style="background:#f5f5ff;padding:12px;border-radius:8px">
+      <b>🎭 角色动画</b><br/>
+      Rive 引擎 · Q版Chibi风格<br/>
+      嘴部参数实时驱动 · Idle/Talk/Dance 三态
+    </div>
+    <div style="background:#fff5f5;padding:12px;border-radius:8px">
+      <b>🧭 导航结构</b><br/>
+      单屏沉浸 · 侧边面板呼出工具<br/>
+      AppBar 工具按钮 + 头像菜单
+    </div>
+    <div style="background:#f0fff0;padding:12px;border-radius:8px">
+      <b>🔧 工具箱</b><br/>
+      右侧滑出面板 · 日历/记账 Tab 切换<br/>
+      今日概览卡片 + 完整列表
+    </div>
+    <div style="background:#fff8f0;padding:12px;border-radius:8px">
+      <b>🎨 视觉风格</b><br/>
+      保持 Material 3 + Indigo 主色调<br/>
+      角色区域渐变背景突出
+    </div>
+  </div>
+</div>

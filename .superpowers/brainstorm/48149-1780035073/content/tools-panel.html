@@ -1,0 +1,77 @@
+<h2>"助手"工具面板 — 日历 + 记账整合设计</h2>
+<p class="subtitle">从对话页右上角按钮呼出的侧边面板，日历和记账在一个面板中共存</p>
+
+<div class="options">
+  <div class="option" data-choice="tab" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Tab 切换面板 ⭐ 推荐</h3>
+      <p>侧边面板顶部两个 Tab：「📅 日历」「💰 记账」</p>
+      <p>默认显示"今日概览"卡片（今日事件 + 今日支出汇总），点击 Tab 进入完整列表</p>
+      <p>面板从右侧滑出，宽度约屏幕 80%，半透明背景不遮挡角色</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">面板结构示意</div>
+        <div class="mockup-body">
+          <div style="display:flex;border-bottom:1px solid #e0e0e0;margin-bottom:8px">
+            <div style="flex:1;text-align:center;padding:8px;border-bottom:2px solid #6366f1;color:#6366f1;font-weight:bold">📅 日历</div>
+            <div style="flex:1;text-align:center;padding:8px;color:#999">💰 记账</div>
+          </div>
+          <div style="padding:8px">
+            <div class="placeholder" style="margin-bottom:8px">📌 今天 · 2024-05-29</div>
+            <div style="background:#f5f5ff;padding:12px;border-radius:8px;margin-bottom:6px">
+              <b>10:00</b> 团队周会
+            </div>
+            <div style="background:#fff5f5;padding:12px;border-radius:8px">
+              <b>午餐</b> -¥35.00
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="cards" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>卡片流面板</h3>
+      <p>面板一打开看到的是"今日概览"卡片流，日历和记账混合展示</p>
+      <p>顶部一个 FAB 菜单切换"添加事件"或"记一笔"</p>
+      <p>按时间线排列：事件 + 消费记录混在一起</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">时间线混合视图</div>
+        <div class="mockup-body">
+          <div style="padding:8px">
+            <div style="font-size:13px;color:#999;margin-bottom:8px">5月29日 周四</div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f0f0ff;border-radius:8px;margin-bottom:6px">
+              <span>📅</span><span>10:00 团队周会</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fff0f0;border-radius:8px;margin-bottom:6px">
+              <span>💰</span><span>午餐 -¥35.00</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fff0f0;border-radius:8px">
+              <span>💰</span><span>咖啡 -¥18.50</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="drawer" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>底部 Sheet 呼出</h3>
+      <p>不是侧边面板，而是从底部滑出的 DraggableSheet</p>
+      <p>Sheet 内用 PageView 左右滑动切换日历/记账</p>
+      <p>半屏时显示概览，拉满全屏显示完整列表</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">底部 Sheet</div>
+        <div class="mockup-body">
+          <div style="text-align:center;color:#ccc;padding:4px">━━━━ 拖动条 ━━━━</div>
+          <div style="display:flex;gap:8px;overflow-x:auto;padding:8px">
+            <div style="min-width:120px;background:#f5f5ff;padding:12px;border-radius:8px;text-align:center">📅<br/>日历</div>
+            <div style="min-width:120px;background:#fff5f5;padding:12px;border-radius:8px;text-align:center">💰<br/>记账</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

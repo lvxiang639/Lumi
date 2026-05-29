@@ -19,6 +19,7 @@
         "permission_handler",
         "provider",
         "record",
+        "rive",
         "shared_preferences",
         "sqflite",
         "uuid",
@@ -62,6 +63,16 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "rive",
+      "version": "0.14.7",
+      "dependencies": [
+        "flutter",
+        "flutter_web_plugins",
+        "meta",
+        "rive_native"
       ]
     },
     {
@@ -322,6 +333,30 @@
       ]
     },
     {
+      "name": "rive_native",
+      "version": "0.1.7",
+      "dependencies": [
+        "args",
+        "ffi",
+        "flutter",
+        "flutter_web_plugins",
+        "graphs",
+        "http",
+        "meta",
+        "path",
+        "plugin_platform_interface",
+        "vector_math",
+        "web"
+      ]
+    },
+    {
+      "name": "flutter_web_plugins",
+      "version": "0.0.0",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
       "name": "fixnum",
       "version": "1.1.1",
       "dependencies": []
@@ -474,6 +509,38 @@
       ]
     },
     {
+      "name": "record_macos",
+      "version": "2.0.0",
+      "dependencies": [
+        "flutter",
+        "record_platform_interface"
+      ]
+    },
+    {
+      "name": "record_ios",
+      "version": "2.0.0",
+      "dependencies": [
+        "flutter",
+        "record_platform_interface"
+      ]
+    },
+    {
+      "name": "record_android",
+      "version": "2.0.1",
+      "dependencies": [
+        "flutter",
+        "record_platform_interface"
+      ]
+    },
+    {
+      "name": "record_linux",
+      "version": "2.0.0",
+      "dependencies": [
+        "flutter",
+        "record_platform_interface"
+      ]
+    },
+    {
       "name": "record_windows",
       "version": "2.0.0",
       "dependencies": [
@@ -497,38 +564,6 @@
       "dependencies": [
         "flutter",
         "plugin_platform_interface"
-      ]
-    },
-    {
-      "name": "record_macos",
-      "version": "2.0.0",
-      "dependencies": [
-        "flutter",
-        "record_platform_interface"
-      ]
-    },
-    {
-      "name": "record_linux",
-      "version": "2.0.0",
-      "dependencies": [
-        "flutter",
-        "record_platform_interface"
-      ]
-    },
-    {
-      "name": "record_ios",
-      "version": "2.0.0",
-      "dependencies": [
-        "flutter",
-        "record_platform_interface"
-      ]
-    },
-    {
-      "name": "record_android",
-      "version": "2.0.1",
-      "dependencies": [
-        "flutter",
-        "record_platform_interface"
       ]
     },
     {
@@ -784,8 +819,13 @@
       ]
     },
     {
-      "name": "typed_data",
-      "version": "1.4.0",
+      "name": "args",
+      "version": "2.7.0",
+      "dependencies": []
+    },
+    {
+      "name": "graphs",
+      "version": "2.3.2",
       "dependencies": [
         "collection"
       ]
@@ -798,10 +838,15 @@
       ]
     },
     {
-      "name": "flutter_web_plugins",
-      "version": "0.0.0",
+      "name": "ffi",
+      "version": "2.2.0",
+      "dependencies": []
+    },
+    {
+      "name": "typed_data",
+      "version": "1.4.0",
       "dependencies": [
-        "flutter"
+        "collection"
       ]
     },
     {
@@ -811,11 +856,6 @@
         "meta",
         "path"
       ]
-    },
-    {
-      "name": "ffi",
-      "version": "2.2.0",
-      "dependencies": []
     },
     {
       "name": "dbus",
@@ -879,11 +919,6 @@
         "meta",
         "petitparser"
       ]
-    },
-    {
-      "name": "args",
-      "version": "2.7.0",
-      "dependencies": []
     },
     {
       "name": "pub_semver",

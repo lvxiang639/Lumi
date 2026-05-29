@@ -1,0 +1,38 @@
+<h2>导航结构方案 — 日历与记账如何整合？</h2>
+<p class="subtitle">当前4个底部tab（对话/日历/记账/角色）→ 精简为更聚焦的结构</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>2-Tab 极简模式</h3>
+      <p>底部仅剩：<b>对话</b>（主屏幕）+ <b>我的</b>（个人中心）</p>
+      <p>日历、记账收进"我的"页面中作为卡片入口，角色设置也在"我的"里面</p>
+      <p style="color: #888; font-size: 14px;">底部: [💬 对话] [👤 我的]</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>单屏 + 侧边面板</h3>
+      <p>对话是唯一主屏幕，取消底部导航栏</p>
+      <p>右上角一个"工具"按钮，点击弹出侧边面板/底部Sheet，包含日历、记账入口</p>
+      <p>角色设置放在顶部 AppBar 的头像菜单里</p>
+      <p style="color: #888; font-size: 14px;">全屏沉浸式对话体验</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>3-Tab 模式</h3>
+      <p>底部保留：<b>对话</b> + <b>助手</b>（日历+记账合一）+ <b>角色</b></p>
+      <p>"助手"页面是一个统一的工具中心，日历和记账在同一个页面内用 TabBar 切换</p>
+      <p style="color: #888; font-size: 14px;">底部: [💬 对话] [🔧 助手] [🎭 角色]</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>我的推荐：方案 B（单屏 + 侧边面板）</h3>
+  <p>理由是：虚拟角色是整个APP的灵魂，应该占据中心舞台，全屏沉浸式对话体验最好。日历和记账作为"偶尔用的工具"，放在侧边面板里呼之即来挥之即去，不抢占主屏幕空间。</p>
+</div>
