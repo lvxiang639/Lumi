@@ -356,57 +356,67 @@ class _MusePainter extends CustomPainter {
   // ── HAIR BACK ──
   void _hairBack(Canvas c) {
     final p = Paint()..color = _hairBase;
-    // Long flowing hair down to waist/thigh
+    // Shoulder-length hair, stays behind head and neck
     final path = Path()
-      ..moveTo(-44, -102)
-      ..cubicTo(-52, -70, -50, -20, -42, 40)
-      ..quadraticBezierTo(-32, 70, -16, 80)
-      ..quadraticBezierTo(-8, 86, 0, 88)
-      ..quadraticBezierTo(8, 86, 16, 80)
-      ..quadraticBezierTo(32, 70, 42, 40)
-      ..cubicTo(50, -20, 52, -70, 44, -102);
+      ..moveTo(-42, -104)
+      ..cubicTo(-48, -72, -44, -30, -34, 4)
+      ..cubicTo(-24, 22, -12, 28, 0, 28)
+      ..cubicTo(12, 28, 24, 22, 34, 4)
+      ..cubicTo(44, -30, 48, -72, 42, -104);
     c.drawPath(path, p);
+
     // Gradient highlight
     final gp = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter, end: Alignment.bottomCenter,
         colors: [_hairGrad, _hairBase],
-      ).createShader(const Rect.fromLTWH(-60, -120, 120, 220));
+      ).createShader(const Rect.fromLTWH(-55, -115, 110, 150));
     c.drawPath(path, gp..blendMode = BlendMode.srcATop);
-    // Hair end tips (V-shape ends)
-    final tipP = Paint()..color = _hairLight..strokeWidth = 1.5;
-    for (var i = -12; i <= 12; i += 4) {
-      final tipX = i.toDouble();
-      final tipY = 80.0 + (i.abs() * 0.5);
-      c.drawLine(Offset(tipX - 1, tipY - 5), Offset(tipX, tipY), tipP);
+
+    // Internal hair streaks for texture (thin lines)
+    final streakP = Paint()..color = _hairLight.withAlpha(100)..strokeWidth = 1.0;
+    for (var i = -18.0; i <= 18; i += 9) {
+      c.drawLine(Offset(i, -100), Offset(i * 0.7, 20), streakP);
+    }
+    // Wispy ends
+    final wispP = Paint()..color = _hairLight.withAlpha(140)..strokeWidth = 0.8;
+    for (var i = -28.0; i <= 28; i += 14) {
+      final wx = i * 0.75;
+      final wy = 26.0 + (i.abs() * 0.15);
+      c.drawLine(Offset(wx - 1, wy - 4), Offset(wx + 1, wy), wispP);
     }
   }
 
   // ── HAIR FRONT (BANGS) ──
   void _hairFront(Canvas c) {
     final p = Paint()..color = _hairBase;
-    // Bangs - sweeping right
+    // Bangs - above eyebrows, parted slightly to show forehead
     final bangs = Path()
-      ..moveTo(-44, -104)
-      ..cubicTo(-32, -80, -24, -60, -12, -56)
-      ..lineTo(0, -56)
-      ..quadraticBezierTo(-4, -62, 14, -58)
-      ..cubicTo(28, -62, 34, -80, 44, -104)
-      ..cubicTo(28, -95, 8, -80, 0, -78)
-      ..cubicTo(-8, -80, -28, -95, -44, -104)
+      ..moveTo(-42, -106)
+      ..cubicTo(-30, -88, -20, -74, -6, -70)
+      ..lineTo(6, -70)
+      ..cubicTo(20, -74, 30, -88, 42, -106)
+      ..cubicTo(28, -98, 10, -86, 0, -84)
+      ..cubicTo(-10, -86, -28, -98, -42, -106)
       ..close();
     c.drawPath(bangs, p);
 
-    // Side bangs framing face
+    // M-shaped hairline detail (visible forehead center)
+    final hairlinePath = Path()
+      ..moveTo(-6, -70)
+      ..quadraticBezierTo(0, -68, 6, -70);
+    c.drawPath(hairlinePath, Paint()..color = _hairGrad..style = PaintingStyle.stroke..strokeWidth = 1.5);
+
+    // Side hair tufts framing face (above ears)
     final sideL = Path()
-      ..moveTo(-46, -100)..cubicTo(-52, -76, -48, -50, -36, -34)
-      ..lineTo(-30, -38)..cubicTo(-40, -50, -42, -70, -40, -94)
+      ..moveTo(-44, -100)..cubicTo(-50, -78, -44, -54, -32, -42)
+      ..lineTo(-26, -46)..cubicTo(-36, -52, -38, -70, -36, -94)
       ..close();
     c.drawPath(sideL, p);
 
     final sideR = Path()
-      ..moveTo(46, -100)..cubicTo(52, -76, 48, -50, 36, -34)
-      ..lineTo(30, -38)..cubicTo(40, -50, 42, -70, 40, -94)
+      ..moveTo(44, -100)..cubicTo(50, -78, 44, -54, 32, -42)
+      ..lineTo(26, -46)..cubicTo(36, -52, 38, -70, 36, -94)
       ..close();
     c.drawPath(sideR, p);
 
@@ -415,40 +425,47 @@ class _MusePainter extends CustomPainter {
       ..shader = const LinearGradient(
         begin: Alignment.topCenter, end: Alignment.bottomCenter,
         colors: [_hairGrad, _hairBase],
-      ).createShader(const Rect.fromLTWH(-50, -110, 100, 60))
+      ).createShader(const Rect.fromLTWH(-50, -112, 100, 50))
       ..blendMode = BlendMode.srcATop);
   }
 
-  // ── HAIR STRANDS (long side strands framing face and body) ──
+  // ── HAIR STRANDS (thin, flowing, drifting feel) ──
   void _hairStrands(Canvas c) {
+    final idleWave = math.sin(t * 1.7 * math.pi) * 1.2;
     double sway;
     if (talking) {
-      sway = math.sin(t * 3 * math.pi) * 3;
+      sway = math.sin(t * 3.5 * math.pi) * 2.5;
     } else if (dancing) {
-      sway = math.sin(t * 2 * math.pi) * 5;
+      sway = math.sin(t * 2.5 * math.pi) * 4;
     } else {
-      sway = 0.0;
+      sway = idleWave;
     }
-    final sp = Paint()..color = _hairLight..strokeWidth = 2.8..strokeCap = StrokeCap.round;
-    final sp2 = Paint()..color = _hairGrad..strokeWidth = 2.2..strokeCap = StrokeCap.round;
 
-    // Left front strands - long, framing the body
-    c.drawLine(const Offset(-40, -90), Offset(-38 + sway, 10), sp);
-    c.drawLine(const Offset(-38, -84), Offset(-34 + sway * 0.7, 15), sp2);
+    final thinP = Paint()..color = _hairLight..strokeWidth = 1.2..strokeCap = StrokeCap.round;
+    final midP = Paint()..color = _hairGrad..strokeWidth = 1.5..strokeCap = StrokeCap.round;
 
-    // Right front strands
-    c.drawLine(const Offset(40, -90), Offset(38 - sway, 10), sp);
-    c.drawLine(const Offset(38, -84), Offset(34 - sway * 0.7, 15), sp2);
+    // Left side - multiple thin flowing strands, curved
+    _strand(c, Offset(-44, -84), Offset(-42 + sway, -56), Offset(-40 + sway * 1.3, -20), thinP);
+    _strand(c, Offset(-42, -76), Offset(-38 + sway * 0.8, -48), Offset(-36 + sway, -14), midP);
+    _strand(c, Offset(-40, -70), Offset(-36 + sway * 0.6, -44), Offset(-34, -6), thinP);
 
-    // Extra long strands behind shoulders
-    c.drawLine(const Offset(-36, -70), Offset(-32, 30), Paint()..color = _hairBase..strokeWidth = 3..strokeCap = StrokeCap.round);
-    c.drawLine(const Offset(36, -70), Offset(32, 30), Paint()..color = _hairBase..strokeWidth = 3..strokeCap = StrokeCap.round);
+    // Right side - multiple thin flowing strands
+    _strand(c, Offset(44, -84), Offset(42 - sway, -56), Offset(40 - sway * 1.3, -20), thinP);
+    _strand(c, Offset(42, -76), Offset(38 - sway * 0.8, -48), Offset(36 - sway, -14), midP);
+    _strand(c, Offset(40, -70), Offset(36 - sway * 0.6, -44), Offset(34, -6), thinP);
 
     // Ahoge
     c.drawPath(
-      Path()..moveTo(-4, -110)..quadraticBezierTo(0, -118, 6, -112)..quadraticBezierTo(4, -116, 2, -108),
+      Path()..moveTo(-3, -109)..quadraticBezierTo(0, -116, 5, -110)..quadraticBezierTo(3, -114, 2, -107),
       Paint()..color = _hairBase,
     );
+  }
+
+  void _strand(Canvas c, Offset from, Offset cp, Offset to, Paint p) {
+    final path = Path()
+      ..moveTo(from.dx, from.dy)
+      ..quadraticBezierTo(cp.dx, cp.dy, to.dx, to.dy);
+    c.drawPath(path, p);
   }
 
   // ── RIBBON ──
