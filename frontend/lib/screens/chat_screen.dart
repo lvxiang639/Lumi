@@ -65,6 +65,10 @@ class _ChatScreenState extends State<ChatScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.65,
+      ),
       builder: (ctx) => _CharacterSheet(provider: provider, config: config),
     );
   }
@@ -536,7 +540,7 @@ class _TtsIndicator extends StatelessWidget {
   }
 }
 
-// ---- character bottom sheet (from original) ----
+// ---- character sheet (redesigned) ----
 
 class _CharacterSheet extends StatelessWidget {
   final CharacterProvider provider;
@@ -548,123 +552,251 @@ class _CharacterSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1F3A),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        border: Border.all(
-          color: const Color(0xFF7C8FFF).withValues(alpha: 0.2),
-        ),
+        color: const Color(0xFF141832),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C8FFF).withValues(alpha: 0.08),
+            blurRadius: 40,
+            offset: const Offset(0, -10),
+          ),
+        ],
       ),
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: provider.loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF7C8FFF)))
-              : config == null
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('尚未初始化角色',
-                            style:
-                                TextStyle(fontSize: 16, color: Colors.white70)),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: () {
-                            provider.initCharacter(_defaultCharacterName).then((_) {
-                              if (context.mounted) Navigator.pop(context);
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF7C8FFF),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // drag handle
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 4),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            if (provider.loading)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(
+                  child: CircularProgressIndicator(color: Color(0xFF7C8FFF)),
+                ),
+              )
+            else if (config == null)
+              Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.person_outline,
+                        size: 48, color: Colors.white24),
+                    const SizedBox(height: 12),
+                    const Text('尚未初始化角色',
+                        style: TextStyle(fontSize: 16, color: Colors.white54)),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: 200,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          provider
+                              .initCharacter(_defaultCharacterName)
+                              .then((_) {
+                            if (context.mounted) Navigator.pop(context);
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF7C8FFF),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Text('初始化默认角色'),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                      ],
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Column(
+                        child: const Text('初始化默认角色'),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // --- header ---
+                      Row(
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF7C8FFF), Color(0xFFA78BFA)],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(Icons.person,
+                                size: 30, color: Colors.white),
+                          ),
+                          const SizedBox(width: 14),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const CircleAvatar(
-                                  radius: 30,
-                                  backgroundColor: Color(0xFF7C8FFF),
-                                  child: Icon(Icons.person,
-                                      size: 36, color: Colors.white)),
-                              const SizedBox(height: 8),
                               Text(config.name,
                                   style: const TextStyle(
                                       fontSize: 20,
-                                      fontWeight: FontWeight.bold,
+                                      fontWeight: FontWeight.w600,
                                       color: Colors.white)),
+                              const SizedBox(height: 2),
                               Text(
-                                  '服装: ${config.outfitName ?? "默认"} | 声音: ${config.voicePackName ?? "默认"}',
-                                  style: const TextStyle(
-                                      fontSize: 13, color: Colors.white38)),
+                                '服装: ${config.outfitName ?? "默认"}  ·  声音: ${config.voicePackName ?? "默认"}',
+                                style: const TextStyle(
+                                    fontSize: 12, color: Colors.white38),
+                              ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text('服装',
-                            style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white70)),
-                        ...provider.outfits.map((o) => _itemTile(
-                              context,
-                              o['name'] as String? ?? '',
-                              o['equipped'] == true,
-                              () => provider.equip('outfit', o['id'] as String),
-                              '穿上',
-                            )),
-                        const Divider(color: Colors.white12),
-                        const Text('声音',
-                            style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white70)),
-                        ...provider.voices.map((v) => _itemTile(
-                              context,
-                              v['name'] as String? ?? '',
-                              v['equipped'] == true,
-                              () => provider.equip(
-                                  'voice_pack', v['id'] as String),
-                              '使用',
-                              subtitle:
-                                  v['type'] as String?,
-                            )),
-                      ],
-                    ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // --- outfits section ---
+                      _sectionHeader('服装', Icons.checkroom_outlined),
+                      const SizedBox(height: 8),
+                      ...provider.outfits.map((o) => _outfitCard(
+                            context,
+                            o['name'] as String? ?? '',
+                            o['equipped'] == true,
+                            () =>
+                                provider.equip('outfit', o['id'] as String),
+                          )),
+
+                      const SizedBox(height: 24),
+
+                      // --- voices section ---
+                      _sectionHeader('声音', Icons.mic_outlined),
+                      const SizedBox(height: 8),
+                      ...provider.voices.map((v) => _voiceCard(
+                            context,
+                            v['name'] as String? ?? '',
+                            v['type'] as String? ?? '',
+                            v['equipped'] == true,
+                            () => provider.equip(
+                                'voice_pack', v['id'] as String),
+                          )),
+
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _itemTile(
+  Widget _sectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF7C8FFF)),
+        const SizedBox(width: 6),
+        Text(title,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFA78BFA))),
+      ],
+    );
+  }
+
+  Widget _outfitCard(
+      BuildContext context, String name, bool equipped, VoidCallback onTap) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: equipped
+            ? const Color(0xFF7C8FFF).withValues(alpha: 0.12)
+            : Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        title: Text(name, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+        trailing: equipped
+            ? const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, size: 16, color: Color(0xFF7C8FFF)),
+                  SizedBox(width: 4),
+                  Text('使用中',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF7C8FFF))),
+                ],
+              )
+            : TextButton(
+                onPressed: onTap,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('穿上',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF7C8FFF))),
+              ),
+      ),
+    );
+  }
+
+  Widget _voiceCard(
     BuildContext context,
     String name,
+    String type,
     bool equipped,
     VoidCallback onTap,
-    String actionLabel, {
-    String? subtitle,
-  }) {
-    return ListTile(
-      title: Text(name, style: const TextStyle(color: Colors.white70)),
-      subtitle: subtitle != null
-          ? Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white38))
-          : null,
-      dense: true,
-      trailing: equipped
-          ? const Text('使用中',
-              style: TextStyle(fontSize: 12, color: Colors.white30))
-          : TextButton(
-              onPressed: onTap,
-              child: Text(actionLabel,
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFF7C8FFF))),
-            ),
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: equipped
+            ? const Color(0xFF7C8FFF).withValues(alpha: 0.12)
+            : Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        title: Text(name, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+        subtitle:
+            Text(type, style: const TextStyle(fontSize: 11, color: Colors.white38)),
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+        trailing: equipped
+            ? const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, size: 16, color: Color(0xFF7C8FFF)),
+                  SizedBox(width: 4),
+                  Text('使用中',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF7C8FFF))),
+                ],
+              )
+            : TextButton(
+                onPressed: onTap,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text('使用',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF7C8FFF))),
+              ),
+      ),
     );
   }
 }
