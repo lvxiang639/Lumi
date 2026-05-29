@@ -36,6 +36,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void startConversation({String? conversationId}) {
+    _tts.stop();
     _wsSubscription?.cancel();
     _ttsProgressSub?.cancel();
     _messages.clear();
@@ -136,6 +137,8 @@ class ChatProvider extends ChangeNotifier {
           _streamingText = "";
         }
         _isProcessing = false;
+        _animState = CharacterAnimState.idle;
+        _mouthOpen = 0.0;
         currentSkill = null;
         if (msg.data['conversation_id'] != null) {
           _ws.conversationId = msg.data['conversation_id'] as String;
