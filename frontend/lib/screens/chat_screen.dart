@@ -22,6 +22,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   final _msgNotifier = ValueNotifier<int>(0);
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _showTextField = false;
 
   @override
@@ -55,7 +56,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _openTools() {
-    Scaffold.of(context).openEndDrawer();
+    _scaffoldKey.currentState?.openEndDrawer();
   }
 
   void _showCharacterMenu() {
@@ -90,6 +91,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
             // ---- main layout ----
             Scaffold(
+              key: _scaffoldKey,
               backgroundColor: Colors.transparent,
               appBar: _buildAppBar(chat),
               endDrawer: const ToolsPanel(),
