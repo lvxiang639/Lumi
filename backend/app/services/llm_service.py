@@ -6,6 +6,7 @@ logger = logging.getLogger("llm")
 
 DEEPSEEK_MODEL = settings.deepseek_model_name
 QWEN_MODEL = settings.qwen_model_name
+CHAT_MODEL = settings.chat_model_name
 
 
 class LLMRouter:
@@ -25,12 +26,16 @@ class LLMRouter:
             model = QWEN_MODEL
         else:
             client = self.deepseek
-            model = force_model or DEEPSEEK_MODEL
+            model = force_model or CHAT_MODEL
         try:
             response = await client.chat.completions.create(
                 model=model,
                 messages=messages,
                 stream=False,
+                temperature=0.6,
+                top_p=0.9,
+                max_tokens=512,
+                frequency_penalty=0.3,
             )
             choices = response.choices
             if not choices:
@@ -50,12 +55,17 @@ class LLMRouter:
             model = QWEN_MODEL
         else:
             client = self.deepseek
-            model = force_model or DEEPSEEK_MODEL
+            model = force_model or CHAT_MODEL
         try:
             stream = await client.chat.completions.create(
                 model=model,
                 messages=messages,
                 stream=True,
+                temperature=0.7,
+                top_p=0.92,
+                max_tokens=1024,
+                frequency_penalty=0.3,
+                presence_penalty=0.2,
             )
             async for chunk in stream:
                 choices = chunk.choices
@@ -85,6 +95,7 @@ class LLMRouter:
                 stream=False,
                 max_tokens=10,
                 temperature=0,
+                top_p=0.8,
             )
             choices = response.choices
             if not choices:
