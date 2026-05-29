@@ -262,26 +262,35 @@ class _GlassChatPanel extends StatelessWidget {
 
   Widget _buildMessage(BuildContext context, dynamic msg) {
     final isUser = msg.role == 'user';
+    final prefix = isUser ? '你: ' : '灵犀: ';
+    final prefixColor = isUser
+        ? const Color(0xFF60A5FA)
+        : const Color(0xFFA78BFA);
+    final textColor = isUser
+        ? const Color(0xFFCBD5E1)
+        : const Color(0xFFE2E8F0);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Align(
-        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.55,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: isUser
-                ? const Color(0xFF7C8FFF).withValues(alpha: 0.2)
-                : const Color(0xFFFFFFFF).withValues(alpha: 0.07),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            msg.content ?? '',
-            style: TextStyle(
-              color: isUser ? Colors.white : Colors.white70,
-              fontSize: 13,
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: prefix,
+                  style: TextStyle(
+                    color: prefixColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                TextSpan(
+                  text: msg.content ?? '',
+                  style: TextStyle(color: textColor, fontSize: 13),
+                ),
+              ],
             ),
           ),
         ),
@@ -291,37 +300,41 @@ class _GlassChatPanel extends StatelessWidget {
 
   Widget _buildStreamingMessage(BuildContext context, String text) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.55,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFFFFF).withValues(alpha: 0.07),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  text,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: RichText(
+            text: TextSpan(
+              children: [
+                const TextSpan(
+                  text: '灵犀: ',
+                  style: TextStyle(
+                    color: Color(0xFFA78BFA),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              const SizedBox(
-                width: 10,
-                height: 10,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: Color(0xFF7C8FFF),
+                TextSpan(
+                  text: text,
+                  style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 13),
                 ),
-              ),
-            ],
+                const WidgetSpan(
+                  child: Padding(
+                    padding: EdgeInsets.only(left: 4),
+                    child: SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: Color(0xFF7C8FFF),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
