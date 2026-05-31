@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'character_html.dart';
+import 'character_view.dart';
 
-/// Renders the HTML/CSS anime character in a WebView and bridges
-/// Flutter → JavaScript for real-time mouth sync and state changes.
+/// Character display widget. Uses WebView (SVG/CSS character) on iOS/Android
+/// where transparent WebView is supported, and PNG-based CharacterView on
+/// macOS where WKWebView's setOpaque is unimplemented.
 class CharacterWebView extends StatefulWidget {
   final double mouthOpen;
   final String animState;
@@ -22,6 +24,10 @@ class CharacterWebView extends StatefulWidget {
 }
 
 class _CharacterWebViewState extends State<CharacterWebView> {
+  // macOS fallback delegates to PNG-based view
+  late final bool _usePng = Platform.isMacOS;
+
+  // WebView state (iOS/Android only)
   WebViewController? _controller;
   bool _ready = false;
   double _lastMouth = -1;
@@ -30,19 +36,15 @@ class _CharacterWebViewState extends State<CharacterWebView> {
   @override
   void initState() {
     super.initState();
-    _initWebView();
+    if (!_usePng) _initWebView();
   }
 
   Future<void> _initWebView() async {
     try {
       _controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted);
-      // setBackgroundColor → setOpaque is unimplemented on macOS WKWebView
-      if (!Platform.isMacOS) {
-        _controller!.setBackgroundColor(Colors.transparent);
-      }
-      _controller!
-        .setNavigationDelegate(
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(Colors.transparent)
+        ..setNavigationDelegate(
           NavigationDelegate(
             onPageFinished: (_) {
               _ready = true;
@@ -51,7 +53,6 @@ class _CharacterWebViewState extends State<CharacterWebView> {
           ),
         );
 
-      // Use embedded HTML — no file-system asset loading
       await _controller!.loadHtmlString(kCharacterHtml);
     } catch (e) {
       debugPrint('CharacterWebView init failed: $e');
@@ -61,8 +62,9 @@ class _CharacterWebViewState extends State<CharacterWebView> {
   @override
   void didUpdateWidget(CharacterWebView old) {
     super.didUpdateWidget(old);
-    if (old.mouthOpen != widget.mouthOpen ||
-        old.animState != widget.animState) {
+    if (!_usePng &&
+        (old.mouthOpen != widget.mouthOpen ||
+         old.animState != widget.animState)) {
       _syncToJs();
     }
   }
@@ -87,19 +89,24 @@ class _CharacterWebViewState extends State<CharacterWebView> {
 
   @override
   Widget build(BuildContext context) {
-    if (_controller == null) {
-      return const Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: Color(0xFF7C8FFF),
-          ),
-        ),
+    // macOS: use PNG character (transparent WebView unsupported)
+    if (_usePng) {
+      return CharacterView(
+        mouthOpen: widget.mouthOpen,
+        animState: widget.animState,
       );
     }
 
+    // iOS/Android: WebView with SVG/CSS character
+    if (_controller == null) {
+      return const Center(
+        child: SizedBox(
+          width: 24, height: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2, color: Color(0xFF7C8FFF)),
+        ),
+      );
+    }
     return WebViewWidget(controller: _controller!);
   }
 }

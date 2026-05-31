@@ -15,7 +15,7 @@ const String kCharacterHtml = r'''
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: #0B0E1E;
+    background: transparent;
     display: flex;
     justify-content: center;
     align-items: center;
