@@ -39,7 +39,7 @@ class WeatherSkill(BaseSkill):
 
     async def execute(self, user_id: str, user_input: str, db) -> SkillResult:
         try:
-            city = await self._extract_city(user_input)
+            city = await self._extract_city(user_input, user_id)
             logger.info("extracted city=%s from input=%s", city, user_input[:60])
 
             # Parallel: weather API + LLM
@@ -110,7 +110,7 @@ class WeatherSkill(BaseSkill):
             logger.exception("llm weather failed")
             return ""
 
-    async def _extract_city(self, user_input: str) -> str:
+    async def _extract_city(self, user_input: str, user_id: str = "") -> str:
         try:
             raw = await llm_router.chat([
                 {"role": "user", "content": CITY_PROMPT.format(user_input=user_input)},
@@ -121,9 +121,9 @@ class WeatherSkill(BaseSkill):
                 return city.strip()
         except Exception:
             logger.exception("city extraction failed")
-        # Fall back to IP geolocation
-        from app.services.location_service import get_city_from_ip
-        return await get_city_from_ip()
+        # Multi-layer fallback: IP geolocation → memory → Beijing
+        from app.services.location_service import get_city
+        return await get_city(user_id=user_id)
 
     async def _summarize(self, user_input: str, api_data: str, llm_answer: str) -> str:
         try:

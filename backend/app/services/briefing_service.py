@@ -11,7 +11,7 @@ from app.config import settings
 from app.database import async_session
 from app.models import CalendarEvent, ExpenseRecord, User
 from app.services.llm_service import llm_router
-from app.services.location_service import get_city_from_ip
+from app.services.location_service import get_city
 
 logger = logging.getLogger("briefing")
 
@@ -72,8 +72,8 @@ async def generate_briefing(user_id: UUID) -> str | None:
         total = exp_result.scalar() or 0.0
         expenses_text = f"共 ¥{total:.2f}" if total > 0 else "昨日无消费"
 
-        # Weather via IP geolocation
-        city = await _get_weather_city()
+        # Weather via multi-layer location detection
+        city = await get_city(user_id=str(user_id))
         weather_text = await _fetch_weather_summary(city)
 
     # Build briefing via LLM
@@ -130,10 +130,6 @@ async def check_and_send_briefings(send_callback) -> None:
 
             await send_callback(user.id, text)
             logger.info("Briefing sent to user=%s", str(user.id)[:8])
-
-
-async def _get_weather_city() -> str:
-    return await get_city_from_ip()
 
 
 async def _fetch_weather_summary(city: str) -> str:
