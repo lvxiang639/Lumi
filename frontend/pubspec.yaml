@@ -27,6 +27,7 @@ dependencies:
   uuid: ^4.5.0
   rive: ^0.14.7
   webview_flutter: ^4.13.1
+  file_picker: ^11.0.2
 
 dev_dependencies:
   flutter_test:
