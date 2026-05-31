@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import Response
@@ -49,8 +50,13 @@ async def convert_file(
         else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
 
+    encoded_name = quote(out_name, safe="")
     return Response(
         content=result,
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{out_name}"'},
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename*=UTF-8''{encoded_name}"
+            ),
+        },
     )
