@@ -20,12 +20,17 @@ class Settings(BaseSettings):
     chat_model_name: str = "deepseek-v4-flash"
     qwen_model_name: str = "qwen-plus"
     asr_model_name: str = "qwen3-asr-flash"
-    tts_model_name: str = "qwen3-tts-flash"
+    tts_model_name: str = "qwen3-tts-flash-2025-11-27"
     tts_default_voice: str = "Cherry"
     searxng_url: str = "http://localhost:8080"
     weather_api_url: str = "https://wttr.in"
     searxng_engines: str = "baidu,sogou,bing"
     notification_check_interval: int = 60
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
 
     model_config = {"env_file": ".env"}
 

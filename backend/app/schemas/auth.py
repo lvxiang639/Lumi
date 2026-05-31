@@ -17,7 +17,9 @@ class UserProfile(BaseModel):
     phone: str
     nickname: str
     avatar: str
+    email: str | None = None
 
 class UpdateProfileRequest(BaseModel):
     nickname: str | None = None
     avatar: str | None = None
+    email: str | None = None

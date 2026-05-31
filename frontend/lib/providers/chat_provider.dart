@@ -27,6 +27,7 @@ class ChatProvider extends ChangeNotifier {
   bool get isProcessing => _isProcessing;
   WsState get wsState => _wsState;
   bool get isTtsPlaying => _tts.isPlaying;
+  String? get conversationId => _ws.conversationId;
   CharacterAnimState get animState => _animState;
   double get mouthOpen => _mouthOpen;
 

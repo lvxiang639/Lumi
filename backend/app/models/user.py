@@ -13,6 +13,7 @@ class User(Base):
     phone: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
     nickname: Mapped[str] = mapped_column(String(50), default="")
     avatar: Mapped[str] = mapped_column(String(500), default="")
+    email: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")

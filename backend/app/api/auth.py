@@ -39,7 +39,11 @@ async def refresh_token(current_user: User = Depends(get_current_user)):
 
 @router.get("/profile", response_model=UserProfile)
 async def get_profile(current_user: User = Depends(get_current_user)):
-    return UserProfile(id=str(current_user.id), phone=current_user.phone, nickname=current_user.nickname, avatar=current_user.avatar)
+    return UserProfile(
+        id=str(current_user.id), phone=current_user.phone,
+        nickname=current_user.nickname, avatar=current_user.avatar,
+        email=current_user.email,
+    )
 
 @router.put("/profile", response_model=UserProfile)
 async def update_profile(req: UpdateProfileRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -47,6 +51,12 @@ async def update_profile(req: UpdateProfileRequest, current_user: User = Depends
         current_user.nickname = req.nickname
     if req.avatar is not None:
         current_user.avatar = req.avatar
+    if req.email is not None:
+        current_user.email = req.email
     await db.commit()
     await db.refresh(current_user)
-    return UserProfile(id=str(current_user.id), phone=current_user.phone, nickname=current_user.nickname, avatar=current_user.avatar)
+    return UserProfile(
+        id=str(current_user.id), phone=current_user.phone,
+        nickname=current_user.nickname, avatar=current_user.avatar,
+        email=current_user.email,
+    )

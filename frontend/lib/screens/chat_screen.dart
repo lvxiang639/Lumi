@@ -7,6 +7,7 @@ import '../widgets/voice_record_button.dart';
 import '../widgets/character_webview.dart';
 import '../widgets/tools_panel.dart';
 import '../widgets/sci_fi_bg.dart';
+import '../services/api_client.dart';
 
 const _defaultCharacterName = '小灵';
 
@@ -57,6 +58,96 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _openTools() {
     _scaffoldKey.currentState?.openEndDrawer();
+  }
+
+  Future<void> _emailSummary() async {
+    final convId = context.read<ChatProvider>().conversationId;
+    if (convId == null) {
+      _showSnack('请先开始对话');
+      return;
+    }
+
+    try {
+      final api = ApiClient();
+      await api.post('/api/conversations/$convId/email-summary');
+      if (mounted) _showSnack('对话摘要已发送到你的邮箱');
+    } on ApiException catch (e) {
+      if (e.statusCode == 400 && e.body.contains('邮箱')) {
+        if (mounted) _showEmailSetup();
+      } else {
+        if (mounted) _showSnack('发送失败，请稍后再试');
+      }
+    } catch (_) {
+      if (mounted) _showSnack('发送失败，请稍后再试');
+    }
+  }
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: const Color(0xFF141832),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showEmailSetup() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1F3A),
+        title: const Text('设置邮箱',
+            style: TextStyle(color: Colors.white70, fontSize: 16)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+            hintText: '输入你的邮箱地址',
+            hintStyle: TextStyle(color: Colors.white30),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF7C8FFF)),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF7C8FFF)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消',
+                style: TextStyle(color: Colors.white38)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final email = ctrl.text.trim();
+              if (email.isEmpty) return;
+              try {
+                final api = ApiClient();
+                await api.put(
+                    '/api/auth/profile', body: {'email': email});
+                if (ctx.mounted) Navigator.pop(ctx);
+                // Retry the email summary
+                await _emailSummary();
+              } catch (_) {
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('保存失败')),
+                  );
+                }
+              }
+            },
+            child: const Text('保存并发送',
+                style: TextStyle(color: Color(0xFF7C8FFF))),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showCharacterMenu() {
@@ -205,6 +296,11 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.email_outlined, color: Colors.white54),
+            tooltip: '发送对话摘要到邮箱',
+            onPressed: () => _emailSummary(),
+          ),
           IconButton(
             icon: const Icon(Icons.build_outlined, color: Colors.white54),
             tooltip: '工具',
