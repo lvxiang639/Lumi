@@ -1,6 +1,7 @@
 import io
 import logging
 import uuid
+from datetime import timedelta
 
 from minio import Minio
 from minio.error import S3Error
@@ -57,7 +58,8 @@ async def get_download_url(object_name: str, expiry_seconds: int = 3600) -> str 
     try:
         client = _get_client()
         return client.presigned_get_object(
-            settings.minio_bucket, object_name, expires=expiry_seconds
+            settings.minio_bucket, object_name,
+            expires=timedelta(seconds=expiry_seconds),
         )
     except S3Error:
         logger.exception("MinIO presigned URL failed")
