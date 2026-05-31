@@ -26,6 +26,7 @@ class ChatOrchestrator:
     ):
         # 1. Get or create conversation
         conv = await self._get_or_create_conv(user_id, conversation_id, db, text)
+        user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
 
         # 2. Classify intent
         intent = await llm_router.classify_intent(text)
@@ -80,8 +81,21 @@ class ChatOrchestrator:
             db.add(user_msg)
             await db.flush()
 
-            # Build LLM messages with current text appended
-            llm_messages = [
+            # Inject long-term memory as system prompt
+            from app.services.memory_service import get_memory_summary
+            memory_summary = await get_memory_summary(user_uuid)
+
+            # Build LLM messages with memory + history
+            llm_messages = []
+            system_prefix = "你是一个贴心的AI助手，名叫灵犀。"
+            if memory_summary:
+                system_prefix += (
+                    "\n\n以下是关于你正在对话的用户的信息，"
+                    "请在对话中自然地运用这些信息（不要刻意提及你知道这些）：\n"
+                    + memory_summary
+                )
+            llm_messages.append({"role": "system", "content": system_prefix})
+            llm_messages += [
                 {"role": m.role.value, "content": m.content} for m in history
             ]
             llm_messages.append({"role": "user", "content": text})
@@ -110,7 +124,12 @@ class ChatOrchestrator:
             {"type": "done", "conversation_id": str(conv.id)}
         )
 
-        # 6. Synthesize TTS (streaming, after done)
+        # 6. Async memory extraction (fire-and-forget, does not block response)
+        from app.services.memory_service import schedule_extraction
+        _dialogue_lines = [f"用户: {text}", f"AI: {response_text}"]
+        schedule_extraction(user_uuid, conv.id, "\n".join(_dialogue_lines))
+
+        # 7. Synthesize TTS (streaming, after done)
         try:
             voice = await self._get_character_voice(user_id, db)
             if voice and voice.get("cosyvoice_endpoint"):

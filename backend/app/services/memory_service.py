@@ -1,0 +1,208 @@
+import asyncio
+import logging
+from uuid import UUID
+
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import async_session
+from app.models import UserMemory
+from app.services.llm_service import llm_router
+
+logger = logging.getLogger("memory")
+
+EXTRACT_PROMPT = """从以下对话中提取关于用户的关键信息。只提取明确表述的事实，不要推测。
+每行一条，格式: key: value（用中文key）
+
+可提取的信息类型:
+- 姓名、年龄、性别
+- 职业、工作地点
+- 所在城市
+- 兴趣爱好、喜欢/讨厌的事物
+- 家庭成员、宠物
+- 习惯、偏好
+- 重要经历
+
+如果对话中没有新的可提取信息，返回空。
+
+对话内容:
+{dialogue}
+
+提取结果（没有就留空）:"""
+
+MERGE_PROMPT = """合并以下关于同一个用户的记忆。合并规则：
+1. 相同key的信息，保留较新的value
+2. 相似的信息合并为一条
+3. 删除互相矛盾的信息（保留较新的）
+4. 输出格式不变: key: value（每行一条）
+
+当前记忆:
+{existing}
+
+新记忆:
+{new_items}
+
+合并结果:"""
+
+MAX_MEMORIES = 50
+MEMORY_SUMMARY_PROMPT = """将以下用户信息压缩为简洁的要点列表，保持关键信息不丢失：
+
+{memories}
+
+压缩结果（每行一条 key: value）:"""
+
+
+async def extract_memories(user_id: UUID, conv_id: UUID, dialogue: str) -> None:
+    """Async: extract facts from a conversation and save to memory store."""
+    if not dialogue.strip():
+        return
+
+    # Extract via LLM
+    try:
+        raw = await llm_router.chat([
+            {"role": "user", "content": EXTRACT_PROMPT.format(dialogue=dialogue)},
+        ])
+    except Exception:
+        logger.exception("memory extraction LLM failed")
+        return
+
+    if not raw or not raw.strip():
+        return
+
+    new_items = []
+    for line in raw.strip().split("\n"):
+        line = line.strip()
+        if not line or ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip()
+        if key and value and len(value) >= 2:
+            new_items.append((key, value))
+
+    if not new_items:
+        return
+
+    async with async_session() as db:
+        await _save_memories(db, user_id, conv_id, new_items)
+        await _enforce_limit(db, user_id)
+
+
+async def _save_memories(
+    db: AsyncSession, user_id: UUID, conv_id: UUID, items: list[tuple[str, str]]
+) -> None:
+    """Insert new memories, updating existing ones with the same key."""
+    for key, value in items:
+        result = await db.execute(
+            select(UserMemory).where(
+                UserMemory.user_id == user_id,
+                UserMemory.key == key,
+            )
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            existing.value = value
+            existing.source_conv_id = conv_id
+        else:
+            db.add(UserMemory(
+                user_id=user_id,
+                key=key,
+                value=value,
+                source_conv_id=conv_id,
+            ))
+    await db.commit()
+
+
+async def _enforce_limit(db: AsyncSession, user_id: UUID) -> None:
+    """Keep at most MAX_MEMORIES per user. Merge/summarize older ones."""
+    result = await db.execute(
+        select(func.count(UserMemory.id)).where(UserMemory.user_id == user_id)
+    )
+    count = result.scalar() or 0
+
+    if count <= MAX_MEMORIES:
+        return
+
+    # Get all memories ordered by most recently updated first
+    result = await db.execute(
+        select(UserMemory)
+        .where(UserMemory.user_id == user_id)
+        .order_by(UserMemory.updated_at.desc())
+        .limit(MAX_MEMORIES + 100)
+    )
+    all_memories = result.scalars().all()
+    keep = all_memories[:MAX_MEMORIES]
+
+    # Summarize the overflow
+    overflow = all_memories[MAX_MEMORIES:]
+    if not overflow:
+        return
+
+    old_text = "\n".join(f"- {m.key}: {m.value}" for m in overflow)
+    keep_text = "\n".join(f"- {m.key}: {m.value}" for m in keep)
+    combined = f"新记忆:\n{old_text}\n\n现有记忆:\n{keep_text}"
+
+    try:
+        compressed = await llm_router.chat([
+            {"role": "user", "content": MEMORY_SUMMARY_PROMPT.format(memories=combined)},
+        ])
+    except Exception:
+        logger.exception("memory compression LLM failed")
+        # Delete overflow without trying to merge
+        for m in overflow:
+            await db.delete(m)
+        await db.commit()
+        return
+
+    # Delete overflow
+    for m in overflow:
+        await db.delete(m)
+    await db.flush()
+
+    # Insert compressed version
+    if compressed and compressed.strip():
+        for line in compressed.strip().split("\n"):
+            line = line.strip()
+            if not line or ":" not in line:
+                continue
+            key, _, value = line.partition(":")
+            key = key.strip()
+            value = value.strip()
+            if key and value and len(value) >= 2:
+                # Update existing or add new
+                r = await db.execute(
+                    select(UserMemory).where(
+                        UserMemory.user_id == user_id,
+                        UserMemory.key == key,
+                    )
+                )
+                e = r.scalar_one_or_none()
+                if e:
+                    e.value = value
+                else:
+                    db.add(UserMemory(user_id=user_id, key=key, value=value))
+
+    await db.commit()
+
+
+async def get_memory_summary(user_id: UUID) -> str:
+    """Get all memories for a user as a compact string for system prompt."""
+    async with async_session() as db:
+        result = await db.execute(
+            select(UserMemory)
+            .where(UserMemory.user_id == user_id)
+            .order_by(UserMemory.updated_at.desc())
+            .limit(MAX_MEMORIES)
+        )
+        memories = result.scalars().all()
+
+    if not memories:
+        return ""
+
+    lines = [f"- {m.key}: {m.value}" for m in memories]
+    return "\n".join(lines)
+
+
+def schedule_extraction(user_id: UUID, conv_id: UUID, dialogue: str) -> None:
+    """Fire-and-forget memory extraction after conversation ends."""
+    asyncio.create_task(extract_memories(user_id, conv_id, dialogue))

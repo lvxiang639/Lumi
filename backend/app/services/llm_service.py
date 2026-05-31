@@ -87,6 +87,7 @@ class LLMRouter:
 - calendar: 日历提醒相关
 - expense: 记账相关
 - convert: 文件格式转换（如Word转PDF、PDF转Word）
+- briefing: 查看今日简报、早晨问候（如"早上好""今日简报""今天有什么"）
 
 用户输入: {text}
 标签:"""
