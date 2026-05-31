@@ -91,14 +91,14 @@ class _CharacterWebViewState extends State<CharacterWebView> {
     if (state != _lastState) {
       _lastState = state;
       _controller!.runJavaScript(
-          "if(window.setState)window.setState('$state')");
+          "if(window.setAnimState)window.setAnimState('$state')");
     }
 
     final emotion = widget.emotion;
     if (emotion != _lastEmotion) {
       _lastEmotion = emotion;
       _controller!.runJavaScript(
-          "if(window.updateEmotion)window.updateEmotion('$emotion')");
+          "if(window.setEmotion)window.setEmotion('$emotion')");
     }
 
     final intensity = widget.emotionIntensity.clamp(0.0, 1.0);
