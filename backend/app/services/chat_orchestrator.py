@@ -94,6 +94,14 @@ class ChatOrchestrator:
                     "请在对话中自然地运用这些信息（不要刻意提及你知道这些）：\n"
                     + memory_summary
                 )
+            # Inject emotion tone
+            from app.services.emotion_service import (
+                analyze as analyze_emotion,
+                get_emotion_prompt,
+            )
+            emotion_tone = await get_emotion_prompt(user_uuid)
+            if emotion_tone:
+                system_prefix += f"\n\n{emotion_tone}"
             llm_messages.append({"role": "system", "content": system_prefix})
             llm_messages += [
                 {"role": m.role.value, "content": m.content} for m in history
@@ -123,6 +131,22 @@ class ChatOrchestrator:
         await send_message(
             {"type": "done", "conversation_id": str(conv.id)}
         )
+
+        # Analyze emotion and push state to frontend
+        try:
+            from app.services.emotion_service import (
+                analyze as analyze_emotion,
+                apply as apply_emotion,
+            )
+            emo_data = await analyze_emotion(text)
+            emo_state = await apply_emotion(user_uuid, emo_data)
+            await send_message({
+                "type": "emotion_update",
+                "emotion": emo_state["emotion"],
+                "intensity": emo_state["intensity"],
+            })
+        except Exception:
+            logger.exception("emotion update failed")
 
         # 6. Async memory extraction (fire-and-forget, does not block response)
         from app.services.memory_service import schedule_extraction
