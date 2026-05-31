@@ -1,6 +1,5 @@
 import base64
 import logging
-import tempfile
 from pathlib import Path
 
 from app.services.skills.base import BaseSkill, SkillResult
