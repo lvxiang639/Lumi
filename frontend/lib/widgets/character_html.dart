@@ -92,7 +92,8 @@ const loader = new GLTFLoader();
 
 // Use a well-known free VRM/VRoid model
 // This is a sample VRM model from the Pixiv three-vrm repository
-const MODEL_URL = 'https://raw.githubusercontent.com/pixiv/three-vrm/main/packages/three-vrm/examples/models/VRM1_Constraint_Twitter.vrm';
+// Free female anime VRM model (three-vrm-girl from Pixiv)
+const MODEL_URL = 'https://raw.githubusercontent.com/pixiv/three-vrm/dev/packages/three-vrm/examples/models/three-vrm-girl.vrm';
 
 loader.load(
   MODEL_URL,
@@ -140,35 +141,101 @@ loader.load(
 // ── Fallback character (if VRM fails to load) ──
 function createFallbackCharacter() {
   const group = new THREE.Group();
-  // Body
-  const bodyGeo = new THREE.CapsuleGeometry(0.15, 0.5);
-  const bodyMat = new THREE.MeshStandardMaterial({ color: '#2D2040', roughness: 0.5 });
-  const body = new THREE.Mesh(bodyGeo, bodyMat);
-  body.position.y = 0.6;
-  group.add(body);
-  // Head
-  const headGeo = new THREE.SphereGeometry(0.22);
-  const headMat = new THREE.MeshStandardMaterial({ color: '#FFF5EE', roughness: 0.3 });
-  const head = new THREE.Mesh(headGeo, headMat);
-  head.position.y = 1.1;
+  const skinMat = new THREE.MeshStandardMaterial({ color: '#FFF0E6', roughness: 0.25 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: '#3D2B3F', roughness: 0.2 });
+  const outfitMat = new THREE.MeshStandardMaterial({ color: '#2D2040', roughness: 0.4 });
+  const skirtMat = new THREE.MeshStandardMaterial({ color: '#3A2850', roughness: 0.4 });
+  const sockMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.3 });
+  const shoeMat = new THREE.MeshStandardMaterial({ color: '#4A3030', roughness: 0.5 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: '#6B3FA0', roughness: 0.1 });
+  const whiteMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.1 });
+
+  // Head (slightly tall for anime style)
+  const headGeo = new THREE.SphereGeometry(0.18, 32, 24);
+  const head = new THREE.Mesh(headGeo, skinMat);
+  head.scale.set(0.95, 1.08, 0.9);
+  head.position.y = 1.35;
   group.add(head);
-  // Eyes
-  const eyeGeo = new THREE.SphereGeometry(0.06);
-  const eyeMat = new THREE.MeshStandardMaterial({ color: '#4A2F7A', roughness: 0.2 });
-  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-  leftEye.position.set(-0.07, 1.15, -0.18);
-  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-  rightEye.position.set(0.07, 1.15, -0.18);
-  group.add(leftEye, rightEye);
-  // Hair
-  const hairGeo = new THREE.SphereGeometry(0.26, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-  const hairMat = new THREE.MeshStandardMaterial({ color: '#2D1B2E', roughness: 0.3 });
-  const hair = new THREE.Mesh(hairGeo, hairMat);
-  hair.position.y = 1.12;
-  group.add(hair);
+
+  // Eyes (big anime eyes)
+  for (const side of [-1, 1]) {
+    const eyeWhite = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 16, 12), whiteMat);
+    eyeWhite.scale.set(0.9, 1.3, 0.3);
+    eyeWhite.position.set(side * 0.065, 1.38, -0.14);
+    group.add(eyeWhite);
+    const iris = new THREE.Mesh(
+      new THREE.SphereGeometry(0.04, 16, 12), eyeMat);
+    iris.scale.set(0.9, 1.3, 0.3);
+    iris.position.set(side * 0.065, 1.38, -0.125);
+    group.add(iris);
+    // Eye shine
+    const shine = new THREE.Mesh(
+      new THREE.SphereGeometry(0.015, 8, 8), whiteMat);
+    shine.position.set(side * 0.05, 1.41, -0.115);
+    group.add(shine);
+  }
+
+  // Hair (layered)
+  const hairBack = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 32, 16, 0, Math.PI * 2, 0, 0.7), hairMat);
+  hairBack.scale.set(1.05, 1.2, 1.15);
+  hairBack.position.y = 1.38;
+  group.add(hairBack);
+  // Side strands
+  for (const side of [-1, 1]) {
+    const strand = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.03, 0.02, 0.6, 8), hairMat);
+    strand.position.set(side * 0.18, 1.05, -0.05);
+    strand.rotation.z = side * 0.3;
+    group.add(strand);
+  }
+  // Hair clips
+  for (const side of [-1, 1]) {
+    const clip = new THREE.Mesh(new THREE.SphereGeometry(0.02),
+      new THREE.MeshStandardMaterial({ color: '#E87080' }));
+    clip.position.set(side * 0.16, 1.38, -0.1);
+    group.add(clip);
+  }
+
+  // Body
+  const bodyGeo = new THREE.CylinderGeometry(0.1, 0.06, 0.45, 16);
+  const body = new THREE.Mesh(bodyGeo, outfitMat);
+  body.position.y = 0.92;
+  group.add(body);
+
+  // Neck
+  const neckGeo = new THREE.CylinderGeometry(0.035, 0.04, 0.08, 12);
+  const neck = new THREE.Mesh(neckGeo, skinMat);
+  neck.position.y = 1.15;
+  group.add(neck);
+
+  // Skirt (flared)
+  const skirtGeo = new THREE.CylinderGeometry(0.04, 0.18, 0.35, 16);
+  const skirt = new THREE.Mesh(skirtGeo, skirtMat);
+  skirt.position.y = 0.52;
+  group.add(skirt);
+
+  // Legs
+  for (const side of [-1, 1]) {
+    // Upper leg
+    const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.35, 12);
+    const leg = new THREE.Mesh(legGeo, skinMat);
+    leg.position.set(side * 0.04, 0.18, 0);
+    group.add(leg);
+  }
+
+  // Arms
+  for (const side of [-1, 1]) {
+    const armGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.45, 8);
+    const arm = new THREE.Mesh(armGeo, skinMat);
+    arm.position.set(side * 0.14, 0.95, 0);
+    arm.rotation.z = side * 0.25;
+    group.add(arm);
+  }
 
   model = group;
-  model.position.set(0, -0.3, 0);
+  model.position.set(0, 0.1, 0);
   scene.add(model);
   document.getElementById('loading').style.display = 'none';
   setupBlink();

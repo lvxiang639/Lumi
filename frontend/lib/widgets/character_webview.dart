@@ -28,8 +28,8 @@ class CharacterWebView extends StatefulWidget {
 }
 
 class _CharacterWebViewState extends State<CharacterWebView> {
-  // macOS fallback delegates to PNG-based view
-  late final bool _usePng = Platform.isMacOS;
+  // Use 3D WebView on all platforms
+  static const bool _usePng = false;
 
   // WebView state (iOS/Android only)
   WebViewController? _controller;
