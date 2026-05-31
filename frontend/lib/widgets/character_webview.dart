@@ -1,6 +1,7 @@
-import 'dart:io' show Platform;
+import 'dart:convert' show base64Encode;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'character_html.dart';
@@ -52,9 +53,19 @@ class _CharacterWebViewState extends State<CharacterWebView> {
         ..setBackgroundColor(Colors.transparent)
         ..setNavigationDelegate(
           NavigationDelegate(
-            onPageFinished: (_) {
+            onPageFinished: (_) async {
               _ready = true;
               _syncToJs();
+              // Inject bundled VRM model as base64
+              try {
+                final bytes = await rootBundle
+                    .load('assets/character/model.vrm');
+                final b64 = base64Encode(bytes.buffer.asUint8List());
+                await _controller!.runJavaScript(
+                    'if(window.loadModelBase64)window.loadModelBase64("$b64")');
+              } catch (_) {
+                // fallback character renders automatically
+              }
             },
           ),
         );

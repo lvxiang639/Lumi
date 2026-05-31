@@ -6,20 +6,11 @@ const String kCharacterHtml = r'''
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: transparent;
-    overflow: hidden;
-    height: 100vh;
-    width: 100vw;
-  }
-  canvas { display: block; }
-  #loading {
-    position: fixed; top: 50%; left: 50%;
-    transform: translate(-50%,-50%);
-    color: #A78BFA; font-family: sans-serif;
-    font-size: 14px; z-index: 10;
-  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:transparent; overflow:hidden; height:100vh; width:100vw; }
+  canvas { display:block; }
+  #loading { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    color:#A78BFA; font-family:sans-serif; font-size:14px; z-index:10; }
 </style>
 </head>
 <body>
@@ -36,416 +27,167 @@ const String kCharacterHtml = r'''
 
 <script type="module">
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// ── Scene setup ──
 const scene = new THREE.Scene();
-
-const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
+const renderer = new THREE.WebGLRenderer({ alpha:true, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth,window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
 document.body.appendChild(renderer.domElement);
 
-const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 20);
-camera.position.set(0, 1.3, 4.5);
-camera.lookAt(0, 0.9, 0);
+const camera = new THREE.PerspectiveCamera(30,
+  window.innerWidth/window.innerHeight, 0.1, 20);
+camera.position.set(0,1.3,4);
+camera.lookAt(0,0.9,0);
 
-// ── Lighting ──
-scene.add(new THREE.AmbientLight('#f0e8ff', 2.5));
-const keyLight = new THREE.DirectionalLight('#ffffff', 4);
-keyLight.position.set(2, 3, 3);
-keyLight.castShadow = true;
-scene.add(keyLight);
-const rimLight = new THREE.DirectionalLight('#c8b8ff', 3);
-rimLight.position.set(-1, 2, -2);
-scene.add(rimLight);
-const fillLight = new THREE.DirectionalLight('#ffe8d0', 1.5);
-fillLight.position.set(0, 0.5, 1);
-scene.add(fillLight);
+scene.add(new THREE.AmbientLight('#f0e8ff',2.5));
+const key = new THREE.DirectionalLight('#ffffff',4);
+key.position.set(2,3,3); key.castShadow=true; scene.add(key);
+scene.add(new THREE.DirectionalLight('#c8b8ff',3).position.set(-1,2,-2)&&null||(()=>{const l=new THREE.DirectionalLight('#c8b8ff',3);l.position.set(-1,2,-2);return l})());
+const rim = new THREE.DirectionalLight('#c8b8ff',3); rim.position.set(-1,2,-2); scene.add(rim);
+const fill = new THREE.DirectionalLight('#ffe8d0',1.5); fill.position.set(0,0.5,1); scene.add(fill);
 
-// ── Ground reflection ──
-const groundGeo = new THREE.PlaneGeometry(10, 10);
-const groundMat = new THREE.MeshStandardMaterial({
-  color: '#0B0E1E', roughness: 0.4, metalness: 0.1, transparent: true, opacity: 0.5
-});
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI / 2;
-ground.position.y = -1.5;
-ground.receiveShadow = true;
-scene.add(ground);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(10,10),
+  new THREE.MeshStandardMaterial({color:'#0B0E1E',roughness:0.4,metalness:0.1,transparent:true,opacity:0.5}));
+ground.rotation.x=-Math.PI/2; ground.position.y=-1.5; ground.receiveShadow=true; scene.add(ground);
 
-// ── VRM / GLTF loader ──
-let model = null;
-let mixer = null;
-let animations = [];
-let blinkTimer = null;
-let autoRotate = true;
-let currentEmotion = 'calm';
-let targetMouthOpen = 0;
-let currentMouthOpen = 0;
+let model=null, mixer=null, blinkTimer=null;
+let baseRotation=0, targetRotation=0, autoRotate=true;
+let targetMouth=0, currentMouth=0, isJumping=false, jumpStart=0;
+let eyeCloseI=-1, mouthOpenI=-1, browAngryI=-1, browSadI=-1, browSurprisedI=-1;
 
 const loader = new GLTFLoader();
 
-// Use a well-known free VRM/VRoid model
-// This is a sample VRM model from the Pixiv three-vrm repository
-// Free female anime VRM model (three-vrm-girl from Pixiv)
-const MODEL_URL = 'https://raw.githubusercontent.com/pixiv/three-vrm/dev/packages/three-vrm/examples/models/three-vrm-girl.vrm';
-
-loader.load(
-  MODEL_URL,
-  (gltf) => {
-    document.getElementById('loading').style.display = 'none';
+// ── Load from Flutter-injected base64 ──
+window.loadModelBase64 = function(b64) {
+  const bytes = Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
+  loader.parse(bytes.buffer, '', gltf => {
+    document.getElementById('loading').style.display='none';
     model = gltf.scene;
-    model.scale.set(1, 1, 1);
-    model.position.set(0, -0.3, 0);
-    model.traverse((child) => {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
+    model.scale.set(1,1,1);
+    model.position.set(0,-0.3,0);
+    model.traverse(c=>{ if(c.isMesh){c.castShadow=true;c.receiveShadow=true;} });
     scene.add(model);
-
-    // Animation clips
-    if (gltf.animations && gltf.animations.length > 0) {
+    if(gltf.animations?.length){
       mixer = new THREE.AnimationMixer(model);
-      animations = gltf.animations;
-      // Try to play first animation as idle
-      const idleClip = gltf.animations.find(a => a.name.toLowerCase().includes('idle')) || gltf.animations[0];
-      const action = mixer.clipAction(idleClip);
-      action.play();
+      const idle = gltf.animations.find(a=>a.name.toLowerCase().includes('idle'))||gltf.animations[0];
+      mixer.clipAction(idle).play();
     }
+    findMorphs(model); setupBlink();
+  }, e => { console.error(e); fallback(); });
+};
 
-    // Morph targets for blink detection
-    findMorphTargets(model);
-    setupBlink();
-  },
-  (progress) => {
-    if (progress.total > 0) {
-      const pct = Math.round((progress.loaded / progress.total) * 100);
-      document.getElementById('loading').textContent = `⏳ 加载中 \${pct}%`;
-    }
-  },
-  (error) => {
-    document.getElementById('loading').textContent = '❌ 模型加载失败，请检查网络连接';
-    console.error('VRM load error:', error);
-    // Fallback: create simple character with basic geometries
-    createFallbackCharacter();
-  }
-);
+setTimeout(()=>{ if(!model) fallback(); }, 3000);
 
-// ── Fallback character (if VRM fails to load) ──
-function createFallbackCharacter() {
-  const group = new THREE.Group();
-  const skinMat = new THREE.MeshStandardMaterial({ color: '#FFF0E6', roughness: 0.25 });
-  const hairMat = new THREE.MeshStandardMaterial({ color: '#3D2B3F', roughness: 0.2 });
-  const outfitMat = new THREE.MeshStandardMaterial({ color: '#2D2040', roughness: 0.4 });
-  const skirtMat = new THREE.MeshStandardMaterial({ color: '#3A2850', roughness: 0.4 });
-  const sockMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.3 });
-  const shoeMat = new THREE.MeshStandardMaterial({ color: '#4A3030', roughness: 0.5 });
-  const eyeMat = new THREE.MeshStandardMaterial({ color: '#6B3FA0', roughness: 0.1 });
-  const whiteMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.1 });
-
-  // Head (slightly tall for anime style)
-  const headGeo = new THREE.SphereGeometry(0.18, 32, 24);
-  const head = new THREE.Mesh(headGeo, skinMat);
-  head.scale.set(0.95, 1.08, 0.9);
-  head.position.y = 1.35;
-  group.add(head);
-
-  // Eyes (big anime eyes)
-  for (const side of [-1, 1]) {
-    const eyeWhite = new THREE.Mesh(
-      new THREE.SphereGeometry(0.055, 16, 12), whiteMat);
-    eyeWhite.scale.set(0.9, 1.3, 0.3);
-    eyeWhite.position.set(side * 0.065, 1.38, -0.14);
-    group.add(eyeWhite);
-    const iris = new THREE.Mesh(
-      new THREE.SphereGeometry(0.04, 16, 12), eyeMat);
-    iris.scale.set(0.9, 1.3, 0.3);
-    iris.position.set(side * 0.065, 1.38, -0.125);
-    group.add(iris);
-    // Eye shine
-    const shine = new THREE.Mesh(
-      new THREE.SphereGeometry(0.015, 8, 8), whiteMat);
-    shine.position.set(side * 0.05, 1.41, -0.115);
-    group.add(shine);
-  }
-
-  // Hair (layered)
-  const hairBack = new THREE.Mesh(
-    new THREE.SphereGeometry(0.22, 32, 16, 0, Math.PI * 2, 0, 0.7), hairMat);
-  hairBack.scale.set(1.05, 1.2, 1.15);
-  hairBack.position.y = 1.38;
-  group.add(hairBack);
-  // Side strands
-  for (const side of [-1, 1]) {
-    const strand = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.03, 0.02, 0.6, 8), hairMat);
-    strand.position.set(side * 0.18, 1.05, -0.05);
-    strand.rotation.z = side * 0.3;
-    group.add(strand);
-  }
-  // Hair clips
-  for (const side of [-1, 1]) {
-    const clip = new THREE.Mesh(new THREE.SphereGeometry(0.02),
-      new THREE.MeshStandardMaterial({ color: '#E87080' }));
-    clip.position.set(side * 0.16, 1.38, -0.1);
-    group.add(clip);
-  }
-
+// ── Fallback female character ──
+function fallback(){
+  const g=new THREE.Group();
+  const s=new THREE.MeshStandardMaterial({color:'#FFF0E6',roughness:0.25});
+  const h=new THREE.MeshStandardMaterial({color:'#3D2B3F',roughness:0.2});
+  const o=new THREE.MeshStandardMaterial({color:'#2D2040',roughness:0.4});
+  const sk=new THREE.MeshStandardMaterial({color:'#3A2850',roughness:0.4});
+  const w=new THREE.MeshStandardMaterial({color:'#FFFFFF',roughness:0.1});
+  const e=new THREE.MeshStandardMaterial({color:'#6B3FA0',roughness:0.1});
+  // Head
+  const hd=new THREE.Mesh(new THREE.SphereGeometry(0.18,32,24),s);hd.scale.set(0.95,1.08,0.9);hd.position.y=1.35;g.add(hd);
+  // Eyes
+  [-1,1].forEach(side=>{
+    const wh=new THREE.Mesh(new THREE.SphereGeometry(0.055,16,12),w);wh.scale.set(0.9,1.3,0.3);wh.position.set(side*0.065,1.38,-0.14);g.add(wh);
+    const ir=new THREE.Mesh(new THREE.SphereGeometry(0.04,16,12),e);ir.scale.set(0.9,1.3,0.3);ir.position.set(side*0.065,1.38,-0.125);g.add(ir);
+    const sh=new THREE.Mesh(new THREE.SphereGeometry(0.015,8,8),w);sh.position.set(side*0.05,1.41,-0.115);g.add(sh);
+  });
+  // Hair
+  const hb=new THREE.Mesh(new THREE.SphereGeometry(0.22,32,16,0,Math.PI*2,0,0.7),h);hb.scale.set(1.05,1.2,1.15);hb.position.y=1.38;g.add(hb);
+  [-1,1].forEach(side=>{
+    const st=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.02,0.6,8),h);st.position.set(side*0.18,1.05,-0.05);st.rotation.z=side*0.3;g.add(st);
+    const cl=new THREE.Mesh(new THREE.SphereGeometry(0.02),new THREE.MeshStandardMaterial({color:'#E87080'}));cl.position.set(side*0.16,1.38,-0.1);g.add(cl);
+  });
   // Body
-  const bodyGeo = new THREE.CylinderGeometry(0.1, 0.06, 0.45, 16);
-  const body = new THREE.Mesh(bodyGeo, outfitMat);
-  body.position.y = 0.92;
-  group.add(body);
-
-  // Neck
-  const neckGeo = new THREE.CylinderGeometry(0.035, 0.04, 0.08, 12);
-  const neck = new THREE.Mesh(neckGeo, skinMat);
-  neck.position.y = 1.15;
-  group.add(neck);
-
-  // Skirt (flared)
-  const skirtGeo = new THREE.CylinderGeometry(0.04, 0.18, 0.35, 16);
-  const skirt = new THREE.Mesh(skirtGeo, skirtMat);
-  skirt.position.y = 0.52;
-  group.add(skirt);
-
-  // Legs
-  for (const side of [-1, 1]) {
-    // Upper leg
-    const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.35, 12);
-    const leg = new THREE.Mesh(legGeo, skinMat);
-    leg.position.set(side * 0.04, 0.18, 0);
-    group.add(leg);
-  }
-
-  // Arms
-  for (const side of [-1, 1]) {
-    const armGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.45, 8);
-    const arm = new THREE.Mesh(armGeo, skinMat);
-    arm.position.set(side * 0.14, 0.95, 0);
-    arm.rotation.z = side * 0.25;
-    group.add(arm);
-  }
-
-  model = group;
-  model.position.set(0, 0.1, 0);
-  scene.add(model);
-  document.getElementById('loading').style.display = 'none';
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.06,0.45,16),o)).position.y=0.92;
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.04,0.08,12),s)).position.y=1.15;
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.18,0.35,16),sk)).position.y=0.52;
+  [-1,1].forEach(side=>{
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.35,12),s)).position.set(side*0.04,0.18,0);
+    const a=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.45,8),s);a.position.set(side*0.14,0.95,0);a.rotation.z=side*0.25;g.add(a);
+  });
+  model=g;model.position.set(0,0.1,0);scene.add(model);
+  document.getElementById('loading').style.display='none';
   setupBlink();
 }
 
-// ── Morph target detection ──
-let eyeCloseIndex = -1;
-let mouthOpenIndex = -1;
-let browAngryIndex = -1;
-let browSadIndex = -1;
-let browSurprisedIndex = -1;
-
-function findMorphTargets(obj) {
-  obj.traverse((child) => {
-    if (child.isMesh && child.morphTargetDictionary) {
-      const d = child.morphTargetDictionary;
-      if ('Fcl_EYE_Close' in d) eyeCloseIndex = d['Fcl_EYE_Close'];
-      if ('Fcl_MTH_A' in d) mouthOpenIndex = d['Fcl_MTH_A'];
-      if ('Fcl_BRW_Angry' in d) browAngryIndex = d['Fcl_BRW_Angry'];
-      if ('Fcl_BRW_Sad' in d) browSadIndex = d['Fcl_BRW_Sad'];
-      if ('Fcl_BRW_Surprised' in d) browSurprisedIndex = d['Fcl_BRW_Surprised'];
+function findMorphs(obj){
+  obj.traverse(c=>{
+    if(c.isMesh&&c.morphTargetDictionary){
+      const d=c.morphTargetDictionary;
+      if('Fcl_EYE_Close' in d) eyeCloseI=d['Fcl_EYE_Close'];
+      if('Fcl_MTH_A' in d) mouthOpenI=d['Fcl_MTH_A'];
+      if('Fcl_BRW_Angry' in d) browAngryI=d['Fcl_BRW_Angry'];
+      if('Fcl_BRW_Sad' in d) browSadI=d['Fcl_BRW_Sad'];
+      if('Fcl_BRW_Surprised' in d) browSurprisedI=d['Fcl_BRW_Surprised'];
     }
   });
 }
 
-// ── Blink ──
-function setupBlink() {
-  if (blinkTimer) clearTimeout(blinkTimer);
-  const delay = 2500 + Math.random() * 3500;
-  blinkTimer = setTimeout(() => {
-    doBlink();
-    setupBlink();
-  }, delay);
+function setupBlink(){blinkTimer&&clearTimeout(blinkTimer);blinkTimer=setTimeout(()=>{doBlink();setupBlink();},2500+Math.random()*3500);}
+function doBlink(){
+  if(!model||eyeCloseI<0) return;
+  const ms=[];model.traverse(c=>{if(c.isMesh&&c.morphTargetInfluences)ms.push(c);});if(!ms.length)return;
+  ms[0].morphTargetInfluences[eyeCloseI]=1;
+  setTimeout(()=>{ms[0].morphTargetInfluences[eyeCloseI]=0;resetExpr();},120);
 }
 
-function doBlink() {
-  if (!model || eyeCloseIndex < 0) return;
-  // Find meshes with morph targets
-  const meshes = [];
-  model.traverse(c => { if (c.isMesh && c.morphTargetInfluences) meshes.push(c); });
-  if (meshes.length === 0) return;
-  const mesh = meshes[0];
-
-  const close = () => {
-    if (eyeCloseIndex >= 0 && mesh.morphTargetInfluences) {
-      mesh.morphTargetInfluences[eyeCloseIndex] = 1;
-    }
-  };
-  const open = () => {
-    if (eyeCloseIndex >= 0 && mesh.morphTargetInfluences) {
-      mesh.morphTargetInfluences[eyeCloseIndex] = 0;
-    }
-    resetExpression();
-  };
-
-  close();
-  setTimeout(open, 120);
+function resetExpr(){
+  if(!model)return;
+  const ms=[];model.traverse(c=>{if(c.isMesh&&c.morphTargetInfluences)ms.push(c);});if(!ms.length)return;
+  [browAngryI,browSadI,browSurprisedI].forEach(i=>{if(i>=0)ms[0].morphTargetInfluences[i]=0;});
 }
-
-// ── Expression control ──
-function setEmotion(emotion) {
-  currentEmotion = emotion;
-  if (!model) return;
-  const meshes = [];
-  model.traverse(c => { if (c.isMesh && c.morphTargetInfluences) meshes.push(c); });
-  if (meshes.length === 0) return;
-  const m = meshes[0];
-
-  resetExpression();
-
-  switch (emotion) {
-    case 'joy':
-      if (browAngryIndex >= 0) m.morphTargetInfluences[browAngryIndex] = 0;
-      break;
-    case 'sad':
-      if (browSadIndex >= 0) m.morphTargetInfluences[browSadIndex] = 0.8;
-      break;
-    case 'angry':
-      if (browAngryIndex >= 0) m.morphTargetInfluences[browAngryIndex] = 0.9;
-      break;
-    case 'surprised':
-      if (browSurprisedIndex >= 0) m.morphTargetInfluences[browSurprisedIndex] = 0.9;
-      break;
-    case 'worried':
-      if (browSadIndex >= 0) m.morphTargetInfluences[browSadIndex] = 0.4;
-      break;
-  }
-}
-
-function resetExpression() {
-  if (!model) return;
-  const meshes = [];
-  model.traverse(c => { if (c.isMesh && c.morphTargetInfluences) meshes.push(c); });
-  if (meshes.length === 0) return;
-  const m = meshes[0];
-  [browAngryIndex, browSadIndex, browSurprisedIndex].forEach(i => {
-    if (i >= 0) m.morphTargetInfluences[i] = 0;
-  });
-}
-
-// ── Mouth sync ──
-function updateMouth(value) {
-  targetMouthOpen = value;
-}
-
-// ── Jump ──
-let isJumping = false;
-let jumpStartTime = 0;
-const JUMP_DURATION = 600;
-
-function doJump() {
-  if (isJumping || !model) return;
-  isJumping = true;
-  jumpStartTime = performance.now();
-}
-
-// ── Auto-rotate ──
-let baseRotation = 0;
-let targetRotation = 0;
-function setRotation(angle) {
-  targetRotation = angle;
-  autoRotate = false;
-  setTimeout(() => { autoRotate = true; }, 5000);
-}
-
-// ── Render loop ──
-const clock = new THREE.Clock();
-function animate() {
-  requestAnimationFrame(animate);
-
-  const delta = clock.getDelta();
-  const now = performance.now();
-
-  if (mixer) mixer.update(delta);
-
-  if (model) {
-    // Auto-rotate
-    if (autoRotate) {
-      baseRotation += delta * 0.3;
-    } else {
-      baseRotation += (targetRotation - baseRotation) * 0.05;
-    }
-    model.rotation.y = baseRotation;
-
-    // Smooth mouth open
-    currentMouthOpen += (targetMouthOpen - currentMouthOpen) * 0.3;
-    const meshes = [];
-    model.traverse(c => { if (c.isMesh && c.morphTargetInfluences) meshes.push(c); });
-    if (meshes.length > 0 && mouthOpenIndex >= 0 && meshes[0].morphTargetInfluences) {
-      meshes[0].morphTargetInfluences[mouthOpenIndex] = currentMouthOpen;
-    }
-
-    // Jump animation
-    if (isJumping) {
-      const elapsed = now - jumpStartTime;
-      if (elapsed > JUMP_DURATION) {
-        isJumping = false;
-        model.position.y = -0.3;
-      } else {
-        const t = elapsed / JUMP_DURATION;
-        // Parabolic jump
-        model.position.y = -0.3 + Math.sin(t * Math.PI) * 0.6;
-        // Squash and stretch
-        const stretch = 1 + Math.sin(t * Math.PI) * 0.1;
-        model.scale.set(1 / (stretch * 0.3 + 0.7), stretch, 1 / (stretch * 0.3 + 0.7));
-      }
-    }
-  }
-
-  renderer.render(scene, camera);
-}
-animate();
-
-// ── Handle resize ──
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
 
 // ── Flutter bridge ──
-window.updateMouth = function(v) {
-  updateMouth(Number(v) || 0);
+window.updateMouth=v=>{ targetMouth=Number(v)||0; };
+window.setEmotion=emo=>{
+  if(!model)return;
+  const ms=[];model.traverse(c=>{if(c.isMesh&&c.morphTargetInfluences)ms.push(c);});if(!ms.length)return;
+  resetExpr();
+  const m={joy:()=>{},sad:()=>{if(browSadI>=0)ms[0].morphTargetInfluences[browSadI]=0.8;},
+    angry:()=>{if(browAngryI>=0)ms[0].morphTargetInfluences[browAngryI]=0.9;},
+    surprised:()=>{if(browSurprisedI>=0)ms[0].morphTargetInfluences[browSurprisedI]=0.9;},
+    worried:()=>{if(browSadI>=0)ms[0].morphTargetInfluences[browSadI]=0.4;}}[emo||'calm'];
+  if(m)m();
 };
+window.setAnimState=s=>{ if(s==='dancing'&&!isJumping){isJumping=true;jumpStart=performance.now();autoRotate=true;} };
 
-window.setEmotion = function(emotion) {
-  setEmotion(emotion || 'calm');
-};
-
-window.setAnimState = function(state) {
-  if (state === 'dancing') {
-    autoRotate = true;
-    doJump();
+// ── Render ──
+const clock=new THREE.Clock();
+(function anim(){requestAnimationFrame(anim);
+  const dt=clock.getDelta(),now=performance.now();
+  if(mixer)mixer.update(dt);
+  if(model){
+    if(autoRotate) baseRotation+=dt*0.3; else baseRotation+=(targetRotation-baseRotation)*0.05;
+    model.rotation.y=baseRotation;
+    currentMouth+=(targetMouth-currentMouth)*0.3;
+    const ms=[];model.traverse(c=>{if(c.isMesh&&c.morphTargetInfluences)ms.push(c);});
+    if(ms.length&&mouthOpenI>=0)ms[0].morphTargetInfluences[mouthOpenI]=currentMouth;
+    if(isJumping){
+      const el=now-jumpStart;const D=600;
+      if(el>D){isJumping=false;model.position.y=-0.3;model.scale.set(1,1,1);}
+      else{const t=el/D;model.position.y=-0.3+Math.sin(t*Math.PI)*0.5;const ss=1+Math.sin(t*Math.PI)*0.1;model.scale.set(1/(ss*0.3+0.7),ss,1/(ss*0.3+0.7));}
+    }
   }
-};
+  renderer.render(scene,camera);
+})();
 
-window.doJump = function() {
-  doJump();
-};
-
-// Expose rotation for Flutter
-let dragStartX = 0;
-let isDragging = false;
-window.addEventListener('pointerdown', (e) => { dragStartX = e.clientX; isDragging = true; });
-window.addEventListener('pointermove', (e) => {
-  if (!isDragging) return;
-  const dx = e.clientX - dragStartX;
-  setRotation(baseRotation + dx * 0.01);
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
 });
-window.addEventListener('pointerup', () => { isDragging = false; });
+
+let dragX=0,isDrag=false;
+window.addEventListener('pointerdown',e=>{dragX=e.clientX;isDrag=true;});
+window.addEventListener('pointermove',e=>{if(!isDrag)return;setTimeout(()=>{autoRotate=false;targetRotation=baseRotation+(e.clientX-dragX)*0.01;},0);});
+window.addEventListener('pointerup',()=>{isDrag=false;setTimeout(()=>{autoRotate=true;},5000);});
 
 console.log('✅ 3D Character ready');
 </script>
