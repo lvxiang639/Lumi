@@ -121,7 +121,9 @@ class WeatherSkill(BaseSkill):
                 return city.strip()
         except Exception:
             logger.exception("city extraction failed")
-        return "Beijing"
+        # Fall back to IP geolocation
+        from app.services.location_service import get_city_from_ip
+        return await get_city_from_ip()
 
     async def _summarize(self, user_input: str, api_data: str, llm_answer: str) -> str:
         try:

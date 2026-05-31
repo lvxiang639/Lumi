@@ -2,6 +2,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from uuid import UUID
 
+import httpx
+
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +11,7 @@ from app.config import settings
 from app.database import async_session
 from app.models import CalendarEvent, ExpenseRecord, User
 from app.services.llm_service import llm_router
+from app.services.location_service import get_city_from_ip
 
 logger = logging.getLogger("briefing")
 
@@ -69,8 +72,9 @@ async def generate_briefing(user_id: UUID) -> str | None:
         total = exp_result.scalar() or 0.0
         expenses_text = f"共 ¥{total:.2f}" if total > 0 else "昨日无消费"
 
-        # Weather (minimal — user's default city or just skip detail)
-        weather_text = "天气晴朗"  # simplified; real weather would need city info
+        # Weather via IP geolocation
+        city = await _get_weather_city()
+        weather_text = await _fetch_weather_summary(city)
 
     # Build briefing via LLM
     prompt = BRIEFING_PROMPT.format(
@@ -126,3 +130,27 @@ async def check_and_send_briefings(send_callback) -> None:
 
             await send_callback(user.id, text)
             logger.info("Briefing sent to user=%s", str(user.id)[:8])
+
+
+async def _get_weather_city() -> str:
+    return await get_city_from_ip()
+
+
+async def _fetch_weather_summary(city: str) -> str:
+    """Fetch a one-line weather summary from wttr.in."""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{settings.weather_api_url}/{city}?format=j1", timeout=10
+            )
+            if resp.status_code != 200:
+                return "天气晴朗"
+            data = resp.json()
+            current = (data.get("current_condition") or [{}])[0]
+            temp = current.get("temp_C", "?")
+            desc_list = current.get("weatherDesc", [{"value": ""}])
+            desc = desc_list[0].get("value", "") if desc_list else ""
+            return f"{city} {desc} {temp}°C"
+    except Exception:
+        logger.exception("weather fetch for briefing failed")
+        return "天气晴朗"
