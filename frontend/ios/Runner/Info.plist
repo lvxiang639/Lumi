@@ -59,6 +59,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>灵犀需要访问麦克风以进行语音对话</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>灵犀需要访问日历以添加事件提醒</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
