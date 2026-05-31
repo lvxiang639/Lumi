@@ -31,23 +31,24 @@ class _CharacterWebViewState extends State<CharacterWebView> {
   }
 
   Future<void> _initWebView() async {
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.transparent)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageFinished: (_) {
-            _ready = true;
-            // Apply initial values once the page is ready
-            _syncToJs();
-          },
-        ),
-      );
+    try {
+      _controller = WebViewController()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageFinished: (_) {
+              _ready = true;
+              _syncToJs();
+            },
+          ),
+        );
 
-    // Load self-contained HTML from assets
-    final html = await rootBundle
-        .loadString('assets/character/character.html');
-    await _controller!.loadHtmlString(html);
+      final html = await rootBundle
+          .loadString('assets/character/character.html');
+      await _controller!.loadHtmlString(html);
+    } catch (e) {
+      debugPrint('CharacterWebView init failed: $e');
+    }
   }
 
   @override
