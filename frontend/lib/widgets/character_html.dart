@@ -1,6 +1,3 @@
-// Auto-generated from assets/character/character.html
-// Embedded directly to avoid asset-load flakiness across platforms.
-
 const String kCharacterHtml = r'''
 <!DOCTYPE html>
 <html lang="zh">
@@ -107,6 +104,40 @@ const String kCharacterHtml = r'''
   @keyframes danceArm {
     0%, 100% { transform: rotate(-7deg); }
     50%      { transform: rotate(7deg); }
+  }
+  /* ── emotion modifiers ── */
+  .char-joy .character {
+    animation-duration: 2.4s;
+  }
+  .char-joy .eyes-group {
+    transform: scaleY(0.85);
+  }
+  .char-joy .mouth-group {
+    transform: scaleY(1.3);
+  }
+  .char-joy .blush-l, .char-joy .blush-r {
+    opacity: 0.8;
+  }
+  .char-sad .character {
+    animation-duration: 5.0s;
+  }
+  .char-sad .eyes-group {
+    transform: translateY(3px);
+  }
+  .char-sad .head-group {
+    transform: rotate(3deg);
+  }
+  .char-angry .eyebrow-l, .char-angry .eyebrow-r {
+    transform: translateY(-3px);
+  }
+  .char-surprised .eyes-group {
+    transform: scale(1.15);
+  }
+  .char-surprised .mouth-group {
+    transform: scaleY(1.5);
+  }
+  .char-worried .eyebrow-l, .char-worried .eyebrow-r {
+    transform: translateY(2px);
   }
 </style>
 </head>
@@ -415,6 +446,22 @@ const String kCharacterHtml = r'''
   window.setState = function(s) {
     char.classList.remove('dancing');
     if (s === 'dancing') char.classList.add('dancing');
+  };
+  window.updateEmotion = function(emotion) {
+    document.querySelectorAll('[class*="char-"]').forEach(function(el) {
+      ['char-joy','char-sad','char-angry','char-surprised','char-worried'].forEach(function(c) {
+        el.classList.remove(c);
+      });
+    });
+    if (emotion && emotion !== 'calm') {
+      document.body.classList.add('char-' + emotion);
+    }
+  };
+
+  window.updateEmotionIntensity = function(v) {
+    // Intensity drives animation speed (0.5x to 1.5x)
+    var speed = 0.5 + (1 - v) * 1.0;
+    document.querySelector('.character').style.animationDuration = (3.2 * speed) + 's';
   };
 </script>
 </body>
