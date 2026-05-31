@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -33,8 +35,13 @@ class _CharacterWebViewState extends State<CharacterWebView> {
   Future<void> _initWebView() async {
     try {
       _controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setNavigationDelegate(
+        ..setJavaScriptMode(JavaScriptMode.unrestricted);
+      // setBackgroundColor → setOpaque is unimplemented on macOS WKWebView
+      if (!Platform.isMacOS) {
+        _controller!.setBackgroundColor(Colors.transparent);
+      }
+      _controller!
+        .setNavigationDelegate(
           NavigationDelegate(
             onPageFinished: (_) {
               _ready = true;
