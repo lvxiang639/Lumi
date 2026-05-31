@@ -12,11 +12,15 @@ import 'character_view.dart';
 class CharacterWebView extends StatefulWidget {
   final double mouthOpen;
   final String animState;
+  final String emotion;
+  final double emotionIntensity;
 
   const CharacterWebView({
     super.key,
     this.mouthOpen = 0.0,
     this.animState = 'idle',
+    this.emotion = 'calm',
+    this.emotionIntensity = 0.0,
   });
 
   @override
@@ -32,6 +36,8 @@ class _CharacterWebViewState extends State<CharacterWebView> {
   bool _ready = false;
   double _lastMouth = -1;
   String _lastState = '';
+  String _lastEmotion = '';
+  double _lastEmotionIntensity = -1;
 
   @override
   void initState() {
@@ -64,7 +70,9 @@ class _CharacterWebViewState extends State<CharacterWebView> {
     super.didUpdateWidget(old);
     if (!_usePng &&
         (old.mouthOpen != widget.mouthOpen ||
-         old.animState != widget.animState)) {
+         old.animState != widget.animState ||
+         old.emotion != widget.emotion ||
+         old.emotionIntensity != widget.emotionIntensity)) {
       _syncToJs();
     }
   }
@@ -85,6 +93,20 @@ class _CharacterWebViewState extends State<CharacterWebView> {
       _controller!.runJavaScript(
           "if(window.setState)window.setState('$state')");
     }
+
+    final emotion = widget.emotion;
+    if (emotion != _lastEmotion) {
+      _lastEmotion = emotion;
+      _controller!.runJavaScript(
+          "if(window.updateEmotion)window.updateEmotion('$emotion')");
+    }
+
+    final intensity = widget.emotionIntensity.clamp(0.0, 1.0);
+    if (intensity != _lastEmotionIntensity) {
+      _lastEmotionIntensity = intensity;
+      _controller!.runJavaScript(
+          'if(window.updateEmotionIntensity)window.updateEmotionIntensity(${intensity.toStringAsFixed(3)})');
+    }
   }
 
   @override
@@ -94,6 +116,8 @@ class _CharacterWebViewState extends State<CharacterWebView> {
       return CharacterView(
         mouthOpen: widget.mouthOpen,
         animState: widget.animState,
+        emotion: widget.emotion,
+        emotionIntensity: widget.emotionIntensity,
       );
     }
 

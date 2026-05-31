@@ -21,6 +21,8 @@ class ChatProvider extends ChangeNotifier {
   WsState _wsState = WsState.disconnected;
   CharacterAnimState _animState = CharacterAnimState.idle;
   double _mouthOpen = 0.0;
+  String _emotion = 'calm';
+  double _emotionIntensity = 0.0;
 
   List<Message> get messages => List.unmodifiable(_messages);
   String get streamingText => _streamingText;
@@ -30,6 +32,8 @@ class ChatProvider extends ChangeNotifier {
   String? get conversationId => _ws.conversationId;
   CharacterAnimState get animState => _animState;
   double get mouthOpen => _mouthOpen;
+  String get emotion => _emotion;
+  double get emotionIntensity => _emotionIntensity;
 
   void stopTts() => _tts.stop();
 
@@ -130,6 +134,10 @@ class ChatProvider extends ChangeNotifier {
         break;
       case 'tts_audio_end':
         _tts.finishStream();
+        break;
+      case 'emotion_update':
+        _emotion = msg.data['emotion'] as String? ?? 'calm';
+        _emotionIntensity = (msg.data['intensity'] as num?)?.toDouble() ?? 0.0;
         break;
       case 'done':
         if (_streamingText.isNotEmpty) {

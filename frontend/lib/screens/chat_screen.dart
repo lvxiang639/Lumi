@@ -248,6 +248,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: CharacterWebView(
                       mouthOpen: chat.mouthOpen,
                       animState: chat.animState.name,
+                      emotion: chat.emotion,
+                      emotionIntensity: chat.emotionIntensity,
                     ),
                   ),
 
