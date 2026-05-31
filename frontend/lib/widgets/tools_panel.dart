@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -25,7 +26,7 @@ class _ToolsPanelState extends State<ToolsPanel>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CalendarProvider>().loadEvents();
       context.read<ExpenseProvider>().load();
@@ -69,6 +70,7 @@ class _ToolsPanelState extends State<ToolsPanel>
                 Tab(text: '📅 日历'),
                 Tab(text: '💰 记账'),
                 Tab(text: '🔄 转换'),
+                Tab(text: '📁 文件'),
               ],
             ),
             Expanded(
@@ -78,6 +80,7 @@ class _ToolsPanelState extends State<ToolsPanel>
                   _CalendarTab(),
                   _ExpenseTab(),
                   _ConversionTab(),
+                  _FilesTab(),
                 ],
               ),
             ),
@@ -384,6 +387,122 @@ class _ConversionTabState extends State<_ConversionTab> {
             ),
         ],
       ),
+    );
+  }
+}
+
+// ── Files ──────────────────────────────────────────────────────────
+
+class _FilesTab extends StatefulWidget {
+  const _FilesTab();
+
+  @override
+  State<_FilesTab> createState() => _FilesTabState();
+}
+
+class _FilesTabState extends State<_FilesTab> {
+  List<Map<String, dynamic>> _files = [];
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token') ?? '';
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/tools/files');
+      final resp = await http.get(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        setState(() {
+          _files = (data['items'] as List?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [];
+        });
+      }
+    } catch (_) {}
+    setState(() => _loading = false);
+  }
+
+  Future<void> _download(String url, String name) async {
+    try {
+      final resp = await http.get(Uri.parse(url));
+      if (resp.statusCode == 200) {
+        final dir = await getTemporaryDirectory();
+        final f = File('${dir.path}/$name');
+        await f.writeAsBytes(resp.bodyBytes);
+        if (Platform.isMacOS || Platform.isIOS) {
+          await Process.run('open', [f.path]);
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('已下载: $name')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('下载失败: $e')),
+        );
+      }
+    }
+  }
+
+  String _fmtSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_files.isEmpty) {
+      return ListView(
+        children: const [
+          SizedBox(height: 80),
+          Center(
+              child: Text('暂无转换文件',
+                  style: TextStyle(color: Colors.grey))),
+        ],
+      );
+    }
+    return ListView.builder(
+      itemCount: _files.length,
+      itemBuilder: (context, i) {
+        final f = _files[i];
+        final name = f['target_name'] as String? ?? '';
+        final size = f['file_size'] as int? ?? 0;
+        final url = f['download_url'] as String? ?? '';
+        final dt = f['created_at'] as String? ?? '';
+        return ListTile(
+          leading: Icon(
+            name.endsWith('.pdf') ? Icons.picture_as_pdf : Icons.description,
+            color: name.endsWith('.pdf') ? Colors.red : Colors.blue,
+          ),
+          title: Text(name, style: const TextStyle(fontSize: 14)),
+          subtitle: Text(
+              '${_fmtSize(size)} · ${dt.length >= 16 ? dt.substring(0, 16) : dt}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          trailing: IconButton(
+            icon: const Icon(Icons.download, size: 20),
+            onPressed: url.isNotEmpty ? () => _download(url, name) : null,
+          ),
+        );
+      },
     );
   }
 }

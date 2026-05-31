@@ -7,10 +7,11 @@ from app.models.voice_pack import VoicePack
 from app.models.outfit import Outfit
 from app.models.calendar_event import CalendarEvent
 from app.models.expense_record import ExpenseRecord
+from app.models.converted_file import ConvertedFile
 from app.database import Base
 
 __all__ = [
     "Base", "User", "Conversation", "Message", "MessageRole", "MessageType",
     "Character", "UserInventory", "ItemType", "VoicePack", "Outfit",
-    "CalendarEvent", "ExpenseRecord",
+    "CalendarEvent", "ExpenseRecord", "ConvertedFile",
 ]

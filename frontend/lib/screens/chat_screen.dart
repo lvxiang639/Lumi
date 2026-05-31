@@ -9,6 +9,7 @@ import '../widgets/tools_panel.dart';
 import '../widgets/sci_fi_bg.dart';
 import '../services/api_client.dart';
 import '../config.dart';
+import 'dart:convert' show jsonDecode;
 import 'dart:io' show File, Platform, Process;
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -93,14 +94,13 @@ class _ChatScreenState extends State<ChatScreen> {
       final resp = await http.Response.fromStream(streamed);
 
       if (resp.statusCode == 200) {
-        final dir = await getTemporaryDirectory();
-        final outName = name.replaceAll(RegExp(r'\.\w+$'), '.$target');
-        final outFile = File('${dir.path}/$outName');
-        await outFile.writeAsBytes(resp.bodyBytes);
-        chat.sendText('✅ 转换完成: $outName');
-        // Open on macOS/iOS
-        if (Platform.isMacOS || Platform.isIOS) {
-          Process.run('open', [outFile.path]);
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final outName = data['target_name'] as String? ?? 'output';
+        final downloadUrl = data['download_url'] as String? ?? '';
+        chat.sendText('✅ 转换完成: $outName\n下载链接已保存到工具 → 📁 文件');
+        // Try to open download URL directly
+        if (downloadUrl.isNotEmpty && (Platform.isMacOS || Platform.isIOS)) {
+          Process.run('open', [downloadUrl]);
         }
       } else {
         chat.sendText('❌ 转换失败，请重试');
