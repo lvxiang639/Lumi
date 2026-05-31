@@ -222,3 +222,8 @@ tail -f /tmp/lingxi.log
 docker compose -f backend/docker-compose.yml logs -f db
 docker compose -f backend/docker-compose.yml logs -f searxng
 ```
+
+# 其他
+sk-sp-D.IMMMD.RSuB.MEUCIEQPR7y00EHj2wo5usqUIh8D8Et5H2ECV8tN1FDggjgPAiEA8G4lDdG1NNFbiPAc7Qq8XOJrkh8+rAOieItBll1slTc=
+
+https://bailian.console.aliyun.com/cn-beijing?tab=api#/api/?type=model&url=2986952
