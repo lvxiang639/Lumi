@@ -4,7 +4,7 @@ import '../providers/chat_provider.dart';
 import '../providers/character_provider.dart';
 import '../services/ws_service.dart';
 import '../widgets/voice_record_button.dart';
-import '../widgets/character_view.dart';
+import '../widgets/character_webview.dart';
 import '../widgets/tools_panel.dart';
 import '../widgets/sci_fi_bg.dart';
 
@@ -107,7 +107,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     left: 0,
                     right: 0,
                     height: MediaQuery.of(context).size.height * 0.58,
-                    child: CharacterView(
+                    child: CharacterWebView(
                       mouthOpen: chat.mouthOpen,
                       animState: chat.animState.name,
                     ),

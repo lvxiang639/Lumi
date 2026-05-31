@@ -26,6 +26,7 @@ dependencies:
   permission_handler: ^11.3.0
   uuid: ^4.5.0
   rive: ^0.14.7
+  webview_flutter: ^4.13.1
 
 dev_dependencies:
   flutter_test:

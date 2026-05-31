@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<style>
+  :root {
+    --mouth-open: 0;
+    --mood: 0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: transparent;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .container {
+    position: relative;
+    width: 300px;
+    height: 520px;
+  }
+
+  /* ── breathing ── */
+  .character {
+    animation: breathe 3.2s ease-in-out infinite;
+    transform-origin: center 250px;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-8px); }
+  }
+
+  /* ── hair sway ── */
+  .hair-l, .hair-r, .bangs, .ponytail {
+    animation: hairSway 3.8s ease-in-out infinite;
+    transform-origin: 150px 110px;
+  }
+  @keyframes hairSway {
+    0%, 100% { transform: rotate(0deg); }
+    30%      { transform: rotate(0.8deg); }
+    70%      { transform: rotate(-0.6deg); }
+  }
+
+  /* ── skirt sway ── */
+  .skirt-group {
+    animation: skirtSway 2.4s ease-in-out infinite;
+    transform-origin: 150px 230px;
+  }
+  @keyframes skirtSway {
+    0%, 100% { transform: rotate(0deg); }
+    50%      { transform: rotate(1.5deg); }
+  }
+
+  /* ── eyes blink ── */
+  .eye-l, .eye-r {
+    transform-origin: center;
+  }
+  .blinking .eye-l, .blinking .eye-r {
+    animation: blink 0.12s ease-in-out;
+  }
+  @keyframes blink {
+    0%, 100% { transform: scaleY(1); }
+    50%      { transform: scaleY(0.05); }
+  }
+
+  /* ── mouth ── */
+  .mouth-group {
+    transform-origin: 150px 135px;
+    transition: transform 0.06s ease-out;
+  }
+
+  /* ── dancing ── */
+  .dancing .character {
+    animation: danceBody 0.5s ease-in-out infinite;
+  }
+  .dancing .hair-l, .dancing .hair-r {
+    animation: danceHair 0.45s ease-in-out infinite;
+  }
+  .dancing .skirt-group {
+    animation: danceSkirt 0.4s ease-in-out infinite;
+  }
+  .dancing .arm-l, .dancing .arm-r {
+    animation: danceArm 0.55s ease-in-out infinite;
+  }
+  @keyframes danceBody {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    25%      { transform: translateY(-12px) rotate(0deg); }
+    50%      { transform: translateY(0) rotate(2deg); }
+    75%      { transform: translateY(-8px) rotate(0deg); }
+  }
+  @keyframes danceHair {
+    0%, 100% { transform: rotate(-4deg); }
+    50%      { transform: rotate(4deg); }
+  }
+  @keyframes danceSkirt {
+    0%, 100% { transform: rotate(-6deg); }
+    50%      { transform: rotate(6deg); }
+  }
+  @keyframes danceArm {
+    0%, 100% { transform: rotate(-8deg); }
+    50%      { transform: rotate(8deg); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════ SVG ANIME CHARACTER ════════ -->
+<div class="container" id="character">
+<svg viewBox="0 0 300 550" class="character" id="charSvg">
+
+  <defs>
+    <!-- skin gradient -->
+    <radialGradient id="skin" cx="50%" cy="40%">
+      <stop offset="0%" stop-color="#FFF0E6"/>
+      <stop offset="100%" stop-color="#FDDCB5"/>
+    </radialGradient>
+    <!-- hair gradient -->
+    <linearGradient id="hairGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2D1B2E"/>
+      <stop offset="100%" stop-color="#1A1020"/>
+    </linearGradient>
+    <!-- eye gradient -->
+    <radialGradient id="eyeGrad" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#6B3FA0"/>
+      <stop offset="60%" stop-color="#3A1F6E"/>
+      <stop offset="100%" stop-color="#1A0A3E"/>
+    </radialGradient>
+    <!-- blush -->
+    <radialGradient id="blush" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#FF9999" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#FF9999" stop-opacity="0"/>
+    </radialGradient>
+    <!-- top gradient -->
+    <linearGradient id="topGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3A2A4A"/>
+      <stop offset="100%" stop-color="#2D1B3A"/>
+    </linearGradient>
+    <!-- skirt gradient -->
+    <linearGradient id="skirtGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4A3A5A"/>
+      <stop offset="100%" stop-color="#3A2A4A"/>
+    </linearGradient>
+    <!-- eye shine -->
+    <radialGradient id="eyeShine" cx="40%" cy="30%">
+      <stop offset="0%" stop-color="white" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- ══ BACK HAIR ══ -->
+  <g class="hair-back">
+    <path d="M98 90 Q70 90 55 150 Q45 200 48 280 Q50 320 55 350
+             L150 370 L245 350 Q250 320 252 280 Q255 200 245 150
+             Q230 90 202 90 Z"
+          fill="url(#hairGrad)"/>
+    <!-- ponytail suggestion -->
+    <path d="M130 150 Q120 220 100 320 Q95 350 110 360 Q130 340 140 280 Q148 220 140 150 Z"
+          fill="#2A1A2E"/>
+  </g>
+
+  <!-- ══ LEGS ══ -->
+  <g class="legs">
+    <!-- left leg -->
+    <rect x="118" y="320" width="20" height="105" rx="8" fill="url(#skin)"/>
+    <!-- right leg -->
+    <rect x="162" y="320" width="20" height="105" rx="8" fill="url(#skin)"/>
+    <!-- left knee highlight -->
+    <ellipse cx="128" cy="338" rx="6" ry="3" fill="#FFF5EE" opacity="0.5"/>
+    <ellipse cx="172" cy="338" rx="6" ry="3" fill="#FFF5EE" opacity="0.5"/>
+    <!-- left sock -->
+    <rect x="118" y="395" width="20" height="40" rx="6" fill="white"/>
+    <line x1="120" y1="405" x2="136" y2="405" stroke="#E0E0E0" stroke-width="0.5"/>
+    <line x1="120" y1="415" x2="136" y2="415" stroke="#E0E0E0" stroke-width="0.5"/>
+    <line x1="120" y1="425" x2="136" y2="425" stroke="#E0E0E0" stroke-width="0.5"/>
+    <!-- right sock -->
+    <rect x="162" y="395" width="20" height="40" rx="6" fill="white"/>
+    <line x1="164" y1="405" x2="180" y2="405" stroke="#E0E0E0" stroke-width="0.5"/>
+    <line x1="164" y1="415" x2="180" y2="415" stroke="#E0E0E0" stroke-width="0.5"/>
+    <line x1="164" y1="425" x2="180" y2="425" stroke="#E0E0E0" stroke-width="0.5"/>
+  </g>
+
+  <!-- ══ SHOES ══ -->
+  <g class="shoes">
+    <ellipse cx="128" cy="438" rx="18" ry="8" fill="#5A3A3A"/>
+    <ellipse cx="172" cy="438" rx="18" ry="8" fill="#5A3A3A"/>
+  </g>
+
+  <!-- ══ BODY / TOP ══ -->
+  <g class="body-group">
+    <!-- neck -->
+    <rect x="140" y="165" width="20" height="14" rx="4" fill="url(#skin)"/>
+    <!-- torso -->
+    <path d="M100 180 Q95 210 98 240 L202 240 Q205 210 200 180 Z"
+          fill="url(#topGrad)"/>
+    <!-- collar -->
+    <path d="M115 180 L150 200 L185 180" stroke="white" stroke-width="1.5"
+          fill="none" opacity="0.4"/>
+    <!-- chest ribbon -->
+    <path d="M145 195 L150 210 L155 195" stroke="#7C3A6A" stroke-width="2"
+          fill="none"/>
+    <!-- waist belt -->
+    <rect x="100" y="235" width="100" height="6" rx="2" fill="#5A3A5A"/>
+  </g>
+
+  <!-- ══ SKIRT ══ -->
+  <g class="skirt-group">
+    <path d="M98 238 Q95 280 80 320 L220 320 Q205 280 202 238 Z"
+          fill="url(#skirtGrad)"/>
+    <!-- pleats -->
+    <line x1="110" y1="245" x2="105" y2="318" stroke="#5A4A6A" stroke-width="0.8"/>
+    <line x1="130" y1="242" x2="130" y2="320" stroke="#5A4A6A" stroke-width="0.8"/>
+    <line x1="150" y1="240" x2="150" y2="320" stroke="#5A4A6A" stroke-width="0.8"/>
+    <line x1="170" y1="242" x2="170" y2="320" stroke="#5A4A6A" stroke-width="0.8"/>
+    <line x1="190" y1="245" x2="195" y2="318" stroke="#5A4A6A" stroke-width="0.8"/>
+  </g>
+
+  <!-- ══ ARMS ══ -->
+  <g class="arm-l" style="transform-origin:100px 185px">
+    <path d="M100 185 Q82 210 78 250 Q76 265 80 270"
+          stroke="url(#skin)" stroke-width="14" stroke-linecap="round" fill="none"/>
+    <!-- hand -->
+    <ellipse cx="80" cy="274" rx="10" ry="8" fill="url(#skin)"/>
+  </g>
+  <g class="arm-r" style="transform-origin:200px 185px">
+    <path d="M200 185 Q218 210 222 250 Q224 265 220 270"
+          stroke="url(#skin)" stroke-width="14" stroke-linecap="round" fill="none"/>
+    <ellipse cx="220" cy="274" rx="10" ry="8" fill="url(#skin)"/>
+  </g>
+
+  <!-- ══ HEAD ══ -->
+  <g class="head-group">
+    <ellipse cx="150" cy="110" rx="50" ry="56" fill="url(#skin)"/>
+    <!-- chin shadow -->
+    <ellipse cx="150" cy="150" rx="22" ry="6" fill="#F5D5B8" opacity="0.5"/>
+  </g>
+
+  <!-- ══ EYES ══ -->
+  <g class="eyes-group">
+    <!-- left eye -->
+    <g class="eye-l" style="transform-origin:125px 107px">
+      <ellipse cx="125" cy="107" rx="13" ry="18" fill="white"/>
+      <ellipse cx="125" cy="107" rx="12" ry="16" fill="url(#eyeGrad)"/>
+      <ellipse cx="125" cy="105" rx="8" ry="12" fill="#1A0530"/>
+      <circle cx="121" cy="100" r="5" fill="url(#eyeShine)"/>
+      <circle cx="128" cy="108" r="2.5" fill="white" opacity="0.7"/>
+      <!-- upper lash -->
+      <path d="M112 100 Q125 88 138 100" stroke="#1A1020" stroke-width="2.5" fill="none"/>
+      <!-- lower lash -->
+      <path d="M114 112 Q125 120 136 112" stroke="#1A1020" stroke-width="1" fill="none" opacity="0.5"/>
+    </g>
+    <!-- right eye -->
+    <g class="eye-r" style="transform-origin:175px 107px">
+      <ellipse cx="175" cy="107" rx="13" ry="18" fill="white"/>
+      <ellipse cx="175" cy="107" rx="12" ry="16" fill="url(#eyeGrad)"/>
+      <ellipse cx="175" cy="105" rx="8" ry="12" fill="#1A0530"/>
+      <circle cx="171" cy="100" r="5" fill="url(#eyeShine)"/>
+      <circle cx="178" cy="108" r="2.5" fill="white" opacity="0.7"/>
+      <path d="M162 100 Q175 88 188 100" stroke="#1A1020" stroke-width="2.5" fill="none"/>
+      <path d="M164 112 Q175 120 186 112" stroke="#1A1020" stroke-width="1" fill="none" opacity="0.5"/>
+    </g>
+    <!-- eyebrows -->
+    <path d="M114 87 Q125 82 138 86" stroke="#3A2A4A" stroke-width="2" fill="none" opacity="0.7"/>
+    <path d="M162 86 Q175 82 186 87" stroke="#3A2A4A" stroke-width="2" fill="none" opacity="0.7"/>
+  </g>
+
+  <!-- ══ MOUTH ══ -->
+  <g class="mouth-group" id="mouthGroup">
+    <!-- closed mouth -->
+    <path d="M140 128 Q150 132 160 128" stroke="#D08080" stroke-width="1.5"
+          fill="none" stroke-linecap="round" id="mouthClosed"/>
+    <!-- open mouth (inside) -->
+    <ellipse cx="150" cy="132" rx="8" ry="2" fill="#8B3040" opacity="0" id="mouthOpen"/>
+  </g>
+
+  <!-- ══ BLUSH ══ -->
+  <ellipse cx="108" cy="120" rx="12" ry="6" fill="url(#blush)"/>
+  <ellipse cx="192" cy="120" rx="12" ry="6" fill="url(#blush)"/>
+
+  <!-- ══ NOSE ══ -->
+  <path d="M148 115 L145 120 Q150 122 155 120 L152 115" stroke="#E8C8A8"
+        stroke-width="0.8" fill="none" opacity="0.5"/>
+
+  <!-- ══ FRONT HAIR ══ -->
+  <g class="hair-front">
+    <!-- bangs -->
+    <path d="M100 90 Q95 55 110 42 Q130 30 150 32 Q170 30 190 42
+             Q205 55 200 90 Q195 72 185 65 Q170 55 150 56 Q130 55 115 65
+             Q105 72 100 90 Z" fill="url(#hairGrad)"/>
+    <!-- left side strand -->
+    <path d="M100 88 Q85 80 78 70 Q72 95 74 140 Q75 175 82 210"
+          fill="none" stroke="url(#hairGrad)" stroke-width="14" stroke-linecap="round"/>
+    <path d="M100 88 Q85 80 78 70 Q72 95 74 140 Q75 175 82 210"
+          fill="none" stroke="#3A2A4A" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+    <!-- right side strand -->
+    <path d="M200 88 Q215 80 222 70 Q228 95 226 140 Q225 175 218 210"
+          fill="none" stroke="url(#hairGrad)" stroke-width="14" stroke-linecap="round"/>
+    <path d="M200 88 Q215 80 222 70 Q228 95 226 140 Q225 175 218 210"
+          fill="none" stroke="#3A2A4A" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+    <!-- ahoge (antenna hair) -->
+    <path d="M155 38 Q165 15 175 10" stroke="url(#hairGrad)" stroke-width="3"
+          fill="none" stroke-linecap="round"/>
+  </g>
+
+</svg>
+</div>
+
+<script>
+  const char = document.getElementById('character');
+  const mouthGrp = document.getElementById('mouthGroup');
+  const mouthClosed = document.getElementById('mouthClosed');
+  const mouthOpen = document.getElementById('mouthOpen');
+
+  let blinkTimer = null;
+
+  /* ── blink scheduler ── */
+  function scheduleBlink() {
+    if (blinkTimer) clearTimeout(blinkTimer);
+    const delay = 2500 + Math.random() * 3500;
+    blinkTimer = setTimeout(() => {
+      char.classList.add('blinking');
+      setTimeout(() => char.classList.remove('blinking'), 150);
+      scheduleBlink();
+    }, delay);
+  }
+  scheduleBlink();
+
+  /* ── Flutter → HTML bridge ── */
+  window.updateMouth = function(v) {
+    const val = Math.min(1, Math.max(0, Number(v) || 0));
+    // Interpolate: closed (scaleY=0.3) → open (scaleY=1.5)
+    const sy = 0.3 + val * 1.2;
+    mouthGrp.style.transform = 'scaleY(' + sy + ')';
+    mouthClosed.style.opacity = 1 - val * 0.8;
+    mouthOpen.setAttribute('opacity', val * 0.7);
+    mouthOpen.setAttribute('ry', 1 + val * 5);
+  };
+
+  window.setState = function(s) {
+    char.classList.remove('dancing');
+    if (s === 'dancing') char.classList.add('dancing');
+  };
+</script>
+</body>
+</html>
