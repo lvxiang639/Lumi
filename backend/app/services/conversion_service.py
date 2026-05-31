@@ -95,7 +95,7 @@ async def _docx_to_pdf(docx_bytes: bytes) -> bytes:
         pdf.multi_cell(0, 6, text, align=align)
         pdf.ln(1)
 
-    pdf_bytes = pdf.output()
+    pdf_bytes = bytes(pdf.output())
     logger.info("DOCX→PDF converted, size=%d", len(pdf_bytes))
     return pdf_bytes
 
