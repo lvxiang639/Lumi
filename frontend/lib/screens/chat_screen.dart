@@ -10,10 +10,8 @@ import '../widgets/sci_fi_bg.dart';
 import '../services/api_client.dart';
 import '../config.dart';
 import 'dart:convert' show jsonDecode;
-import 'dart:io' show File, Platform, Process;
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 
 const _defaultCharacterName = '小灵';
@@ -96,12 +94,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
         final outName = data['target_name'] as String? ?? 'output';
-        final downloadUrl = data['download_url'] as String? ?? '';
-        chat.sendText('✅ 转换完成: $outName\n下载链接已保存到工具 → 📁 文件');
-        // Try to open download URL directly
-        if (downloadUrl.isNotEmpty && (Platform.isMacOS || Platform.isIOS)) {
-          Process.run('open', [downloadUrl]);
-        }
+        chat.sendText('✅ 转换完成: $outName\n可到工具 → 📄 文件处理 中下载');
       } else {
         chat.sendText('❌ 转换失败，请重试');
       }

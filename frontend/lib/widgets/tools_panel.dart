@@ -26,7 +26,7 @@ class _ToolsPanelState extends State<ToolsPanel>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CalendarProvider>().loadEvents();
       context.read<ExpenseProvider>().load();
@@ -69,8 +69,7 @@ class _ToolsPanelState extends State<ToolsPanel>
               tabs: const [
                 Tab(text: '📅 日历'),
                 Tab(text: '💰 记账'),
-                Tab(text: '🔄 转换'),
-                Tab(text: '📁 文件'),
+                Tab(text: '📄 文件处理'),
               ],
             ),
             Expanded(
@@ -79,8 +78,7 @@ class _ToolsPanelState extends State<ToolsPanel>
                 children: const [
                   _CalendarTab(),
                   _ExpenseTab(),
-                  _ConversionTab(),
-                  _FilesTab(),
+                  _FileProcessingTab(),
                 ],
               ),
             ),
@@ -206,20 +204,47 @@ class _ExpenseTab extends StatelessWidget {
   }
 }
 
-// ── Conversion ─────────────────────────────────────────────────────
+// ── File Processing (Conversion + File List) ─────────────────────────
 
-class _ConversionTab extends StatefulWidget {
-  const _ConversionTab();
+class _FileProcessingTab extends StatefulWidget {
+  const _FileProcessingTab();
 
   @override
-  State<_ConversionTab> createState() => _ConversionTabState();
+  State<_FileProcessingTab> createState() => _FileProcessingTabState();
 }
 
-class _ConversionTabState extends State<_ConversionTab> {
+class _FileProcessingTabState extends State<_FileProcessingTab> {
   String? _selectedFile;
   String? _outputFormat;
   bool _converting = false;
   String _status = '';
+
+  // file list state
+  List<Map<String, dynamic>> _files = [];
+  bool _loadingFiles = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFiles();
+  }
+
+  Future<void> _loadFiles() async {
+    setState(() => _loadingFiles = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token') ?? '';
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/tools/files');
+      final resp = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        setState(() {
+          _files = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        });
+      }
+    } catch (_) {}
+    setState(() => _loadingFiles = false);
+  }
 
   Future<void> _pickFile() async {
     final result = await FilePicker.pickFiles(
@@ -239,197 +264,34 @@ class _ConversionTabState extends State<_ConversionTab> {
 
   Future<void> _convert() async {
     if (_selectedFile == null || _outputFormat == null) return;
-
-    setState(() {
-      _converting = true;
-      _status = '转换中...';
-    });
+    setState(() { _converting = true; _status = '转换中...'; });
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token') ?? '';
-
       final uri = Uri.parse(
           '${AppConfig.apiBaseUrl}/api/tools/convert?target=$_outputFormat');
-
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $token'
         ..files.add(await http.MultipartFile.fromPath('file', _selectedFile!));
-
       final streamed = await request.send();
       final resp = await http.Response.fromStream(streamed);
 
       if (resp.statusCode == 200) {
-        final dir = await getTemporaryDirectory();
-        final outName = _selectedFile!
-            .split('/')
-            .last
-            .replaceAll(RegExp(r'\.\w+$'), '.$_outputFormat');
-        final outFile = File('${dir.path}/$outName');
-        await outFile.writeAsBytes(resp.bodyBytes);
-
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final outName = data['target_name'] as String? ?? 'output';
         setState(() {
           _converting = false;
-          _status = '✅ 转换完成: $outName (已保存到临时目录)';
+          _status = '✅ 转换完成: $outName';
+          _selectedFile = null;
         });
-
-        // Open with system default app
-        if (Platform.isMacOS || Platform.isIOS) {
-          await Process.run('open', [outFile.path]);
-        }
+        _loadFiles(); // refresh file list
       } else {
-        final body = resp.body;
-        setState(() {
-          _converting = false;
-          _status = '转换失败: $body';
-        });
+        setState(() { _converting = false; _status = '转换失败'; });
       }
     } catch (e) {
-      setState(() {
-        _converting = false;
-        _status = '转换出错: $e';
-      });
+      setState(() { _converting = false; _status = '转换出错: $e'; });
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final sourceExt =
-        _selectedFile != null ? _selectedFile!.split('.').last : '';
-    final targetLabel =
-        _outputFormat == 'pdf' ? '📄 PDF' : '📝 Word';
-
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Icon(Icons.swap_horiz, size: 48, color: Colors.indigo),
-          const SizedBox(height: 12),
-          const Text('Word ↔ PDF 转换',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          const Text('支持 .docx 和 .pdf 互相转换',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey)),
-          const SizedBox(height: 24),
-
-          // Step 1: pick file
-          OutlinedButton.icon(
-            onPressed: _pickFile,
-            icon: const Icon(Icons.upload_file),
-            label: const Text('选择文件 (.docx / .pdf)'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Source → target
-          if (_selectedFile != null) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(sourceExt.toUpperCase(),
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold)),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Icon(Icons.arrow_forward, color: Colors.indigo),
-                ),
-                Text(targetLabel,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Convert button
-            ElevatedButton.icon(
-              onPressed: _converting ? null : _convert,
-              icon: _converting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.play_arrow),
-              label: Text(_converting ? '转换中...' : '开始转换'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 16),
-
-          // Status
-          if (_status.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _status.startsWith('✅')
-                    ? Colors.green.shade50
-                    : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(_status,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: _status.startsWith('✅')
-                        ? Colors.green.shade700
-                        : Colors.grey.shade700,
-                  )),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Files ──────────────────────────────────────────────────────────
-
-class _FilesTab extends StatefulWidget {
-  const _FilesTab();
-
-  @override
-  State<_FilesTab> createState() => _FilesTabState();
-}
-
-class _FilesTabState extends State<_FilesTab> {
-  List<Map<String, dynamic>> _files = [];
-  bool _loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token') ?? '';
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/tools/files');
-      final resp = await http.get(
-        uri,
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as Map<String, dynamic>;
-        setState(() {
-          _files = (data['items'] as List?)
-                  ?.cast<Map<String, dynamic>>() ??
-              [];
-        });
-      }
-    } catch (_) {}
-    setState(() => _loading = false);
   }
 
   Future<void> _download(String url, String name) async {
@@ -442,67 +304,147 @@ class _FilesTabState extends State<_FilesTab> {
         if (Platform.isMacOS || Platform.isIOS) {
           await Process.run('open', [f.path]);
         }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('已下载: $name')),
-          );
-        }
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载失败: $e')),
-        );
-      }
-    }
+    } catch (_) {}
   }
 
   String _fmtSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    }
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_files.isEmpty) {
-      return ListView(
-        children: const [
-          SizedBox(height: 80),
-          Center(
-              child: Text('暂无转换文件',
-                  style: TextStyle(color: Colors.grey))),
+    final sourceExt = _selectedFile != null ? _selectedFile!.split('.').last : '';
+    final targetLabel = _outputFormat == 'pdf' ? '📄 PDF' : '📝 Word';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Conversion section ──
+          const Icon(Icons.swap_horiz, size: 40, color: Colors.indigo),
+          const SizedBox(height: 8),
+          const Text('Word ↔ PDF 转换',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          const Text('支持 .docx 和 .pdf 互相转换',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey)),
+          const SizedBox(height: 16),
+
+          OutlinedButton.icon(
+            onPressed: _pickFile,
+            icon: const Icon(Icons.upload_file),
+            label: const Text('选择文件 (.docx / .pdf)'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          if (_selectedFile != null) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(sourceExt.toUpperCase(),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Icon(Icons.arrow_forward, color: Colors.indigo),
+                ),
+                Text(targetLabel,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _converting ? null : _convert,
+              icon: _converting
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.play_arrow),
+              label: Text(_converting ? '转换中...' : '开始转换'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.indigo,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ],
+
+          if (_status.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _status.startsWith('✅')
+                    ? Colors.green.shade50
+                    : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(_status, textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _status.startsWith('✅') ? Colors.green.shade700 : Colors.grey.shade700,
+                  )),
+            ),
+
+          // ── File list section ──
+          const SizedBox(height: 28),
+          const Divider(),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.history, size: 18, color: Colors.indigo),
+              const SizedBox(width: 8),
+              const Text('转换历史',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                onPressed: _loadFiles,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          if (_loadingFiles)
+            const Center(child: CircularProgressIndicator())
+          else if (_files.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                  child: Text('暂无转换文件',
+                      style: TextStyle(color: Colors.grey, fontSize: 13))),
+            )
+          else
+            ...List.generate(_files.length, (i) {
+              final f = _files[i];
+              final name = f['target_name'] as String? ?? '';
+              final size = f['file_size'] as int? ?? 0;
+              final url = f['download_url'] as String? ?? '';
+              final dt = f['created_at'] as String? ?? '';
+              return ListTile(
+                leading: Icon(
+                  name.endsWith('.pdf') ? Icons.picture_as_pdf : Icons.description,
+                  color: name.endsWith('.pdf') ? Colors.red : Colors.blue,
+                ),
+                title: Text(name, style: const TextStyle(fontSize: 14)),
+                subtitle: Text(
+                    '${_fmtSize(size)} · ${dt.length >= 16 ? dt.substring(0, 16) : dt}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                trailing: IconButton(
+                  icon: const Icon(Icons.download, size: 20),
+                  onPressed: url.isNotEmpty ? () => _download(url, name) : null,
+                ),
+              );
+            }),
         ],
-      );
-    }
-    return ListView.builder(
-      itemCount: _files.length,
-      itemBuilder: (context, i) {
-        final f = _files[i];
-        final name = f['target_name'] as String? ?? '';
-        final size = f['file_size'] as int? ?? 0;
-        final url = f['download_url'] as String? ?? '';
-        final dt = f['created_at'] as String? ?? '';
-        return ListTile(
-          leading: Icon(
-            name.endsWith('.pdf') ? Icons.picture_as_pdf : Icons.description,
-            color: name.endsWith('.pdf') ? Colors.red : Colors.blue,
-          ),
-          title: Text(name, style: const TextStyle(fontSize: 14)),
-          subtitle: Text(
-              '${_fmtSize(size)} · ${dt.length >= 16 ? dt.substring(0, 16) : dt}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          trailing: IconButton(
-            icon: const Icon(Icons.download, size: 20),
-            onPressed: url.isNotEmpty ? () => _download(url, name) : null,
-          ),
-        );
-      },
+      ),
     );
   }
 }
