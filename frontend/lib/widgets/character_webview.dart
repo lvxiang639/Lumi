@@ -1,8 +1,9 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
+import 'character_html.dart';
 
 /// Renders the HTML/CSS anime character in a WebView and bridges
 /// Flutter → JavaScript for real-time mouth sync and state changes.
@@ -50,9 +51,8 @@ class _CharacterWebViewState extends State<CharacterWebView> {
           ),
         );
 
-      final html = await rootBundle
-          .loadString('assets/character/character.html');
-      await _controller!.loadHtmlString(html);
+      // Use embedded HTML — no file-system asset loading
+      await _controller!.loadHtmlString(kCharacterHtml);
     } catch (e) {
       debugPrint('CharacterWebView init failed: $e');
     }
