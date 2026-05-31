@@ -8,6 +8,12 @@ import '../widgets/character_webview.dart';
 import '../widgets/tools_panel.dart';
 import '../widgets/sci_fi_bg.dart';
 import '../services/api_client.dart';
+import '../config.dart';
+import 'dart:io' show File, Platform, Process;
+import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 
 const _defaultCharacterName = '小灵';
 
@@ -54,6 +60,54 @@ class _ChatScreenState extends State<ChatScreen> {
     context.read<ChatProvider>().sendText(text);
     _showTextField = false;
     setState(() {});
+  }
+
+  Future<void> _pickAndSendFile() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['docx', 'pdf'],
+    );
+    if (result == null || result.files.single.path == null) return;
+
+    final path = result.files.single.path!;
+    final name = result.files.single.name;
+    final ext = name.split('.').last.toLowerCase();
+    final target = ext == 'pdf' ? 'docx' : 'pdf';
+
+    if (!mounted) return;
+    // Show file attachment in chat
+    final chat = context.read<ChatProvider>();
+    final text = target == 'pdf' ? '帮我把这个转成PDF' : '帮我把这个转成Word';
+    chat.sendText('📎 上传: $name — $text');
+
+    // Upload + convert via HTTP
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token') ?? '';
+      final uri = Uri.parse(
+          '${AppConfig.apiBaseUrl}/api/tools/convert?target=$target');
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(await http.MultipartFile.fromPath('file', path));
+      final streamed = await request.send();
+      final resp = await http.Response.fromStream(streamed);
+
+      if (resp.statusCode == 200) {
+        final dir = await getTemporaryDirectory();
+        final outName = name.replaceAll(RegExp(r'\.\w+$'), '.$target');
+        final outFile = File('${dir.path}/$outName');
+        await outFile.writeAsBytes(resp.bodyBytes);
+        chat.sendText('✅ 转换完成: $outName');
+        // Open on macOS/iOS
+        if (Platform.isMacOS || Platform.isIOS) {
+          Process.run('open', [outFile.path]);
+        }
+      } else {
+        chat.sendText('❌ 转换失败，请重试');
+      }
+    } catch (e) {
+      chat.sendText('❌ 转换出错: $e');
+    }
   }
 
   void _openTools() {
@@ -256,6 +310,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   setState(() => _showTextField = !_showTextField);
                 },
                 onSend: _sendText,
+                onPickFile: _pickAndSendFile,
               ),
             ),
           ],
@@ -445,12 +500,14 @@ class _FloatingInputBar extends StatelessWidget {
   final bool showTextField;
   final VoidCallback onToggleText;
   final VoidCallback onSend;
+  final VoidCallback onPickFile;
 
   const _FloatingInputBar({
     required this.textController,
     required this.showTextField,
     required this.onToggleText,
     required this.onSend,
+    required this.onPickFile,
   });
 
   @override
@@ -504,6 +561,14 @@ class _FloatingInputBar extends StatelessWidget {
           icon: showTextField ? Icons.close : Icons.chat_bubble_outline,
           size: 44,
           onTap: onToggleText,
+        ),
+        const SizedBox(width: 12),
+
+        // file upload button
+        _FloatingBtn(
+          icon: Icons.attach_file,
+          size: 44,
+          onTap: onPickFile,
         ),
         const SizedBox(width: 12),
 

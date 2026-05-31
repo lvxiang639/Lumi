@@ -79,13 +79,14 @@ class LLMRouter:
             raise
 
     async def classify_intent(self, text: str) -> str:
-        """Returns: chat, search, weather, calendar, expense"""
+        """Returns: chat, search, weather, calendar, expense, convert"""
         prompt = f"""分析用户意图，只返回一个标签:
 - chat: 普通闲聊
 - search: 需要搜索信息
 - weather: 查询天气
 - calendar: 日历提醒相关
 - expense: 记账相关
+- convert: 文件格式转换（如Word转PDF、PDF转Word）
 
 用户输入: {text}
 标签:"""
