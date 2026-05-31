@@ -8,11 +8,15 @@ import 'package:flutter/material.dart';
 class CharacterView extends StatefulWidget {
   final double mouthOpen; // 0.0–1.0 from TTS energy envelope
   final String animState; // idle | talking | dancing
+  final String emotion; // joy/sad/angry/calm/surprised/worried
+  final double emotionIntensity; // 0.0-1.0
 
   const CharacterView({
     super.key,
     this.mouthOpen = 0.0,
     this.animState = 'idle',
+    this.emotion = 'calm',
+    this.emotionIntensity = 0.0,
   });
 
   @override
@@ -126,14 +130,25 @@ class _CharacterViewState extends State<CharacterView>
         final blink = _blinkCtrl.value;
         final particle = _particleCtrl.value;
 
+        // ---- emotion-driven effects ----
+        final effectiveBounce = widget.emotion == 'joy'
+            ? _bounceEnergy * 1.4
+            : _bounceEnergy;
+        final emotionScale = switch (widget.emotion) {
+          'surprised' => 1.0 + widget.emotionIntensity * 0.04,
+          'sad'       => 1.0 - widget.emotionIntensity * 0.02,
+          'angry'     => 1.0 + widget.emotionIntensity * 0.01,
+          _           => 1.0,
+        };
+
         // --- transforms ---
         final breathCurve = math.sin(breath * math.pi);
         final floatY =
-            breathCurve * 10 * (1.0 + _bounceEnergy * 0.5);
+            breathCurve * 10 * (1.0 + effectiveBounce * 0.5);
         final tiltCurve = math.sin(head * 2 * math.pi);
-        final tilt = tiltCurve * 0.03 * (1.0 + _bounceEnergy);
+        final tilt = tiltCurve * 0.03 * (1.0 + effectiveBounce);
         final bounceCurve = math.sin(bounce * 2 * math.pi);
-        final bounceY = bounceCurve * 3 * _bounceEnergy;
+        final bounceY = bounceCurve * 3 * effectiveBounce;
         final mouthScale = _mouthValue;
 
         final blinkScaleY = blink < 0.5
@@ -181,7 +196,8 @@ class _CharacterViewState extends State<CharacterView>
                   angle: tilt + danceSway,
                   child: Transform(
                     transform: Matrix4.identity()
-                      ..setEntry(1, 1, blinkScaleY),
+                      ..setEntry(0, 0, emotionScale)
+                      ..setEntry(1, 1, blinkScaleY * emotionScale),
                     alignment: const Alignment(0, -0.4),
                     child: Image.asset(
                       'assets/character.png',
