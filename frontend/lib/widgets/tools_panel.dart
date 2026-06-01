@@ -247,16 +247,15 @@ class _ExpenseContentState extends State<_ExpenseContent> {
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _textPrimary)),
             ]),
           ),
-          if (stats != null && stats!['by_category'] != null)
+          if (stats != null && stats['by_category'] != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Wrap(spacing: 6, runSpacing: 4,
-                children: (stats!['by_category'] as Map<String, dynamic>).entries.map((e) => Chip(
+                children: (stats['by_category'] as Map<String, dynamic>).entries.map((e) => Chip(
                   label: Text('${e.key} ¥${(e.value as num).toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, color: _textSecondary)),
                   backgroundColor: _cardBg, side: const BorderSide(color: _border),
                 )).toList()),
               ),
-            ),
           const Divider(color: _border, height: 1),
           if (p.records.isEmpty)
             const Expanded(child: Center(child: Text('暂无记录', style: TextStyle(color: _textSecondary))))
@@ -597,9 +596,9 @@ class _EmailContentState extends State<_EmailContent> {
                 Text(preview, style: const TextStyle(color: _textSecondary, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),
                 Row(children: [
-                  Text(recipient, style: const TextStyle(color: _textDim, fontSize: 10)),
+                  Text(recipient, style: const TextStyle(color: _textSecondary, fontSize: 10)),
                   const Spacer(),
-                  Text(sentAt.length >= 16 ? sentAt.substring(0, 16) : sentAt, style: const TextStyle(color: _textDim, fontSize: 10)),
+                  Text(sentAt.length >= 16 ? sentAt.substring(0, 16) : sentAt, style: const TextStyle(color: _textSecondary, fontSize: 10)),
                 ]),
               ]),
             );

@@ -1,18 +1,15 @@
 import 'dart:convert' show jsonDecode;
-import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config.dart';
 import '../providers/chat_provider.dart';
 import '../providers/character_provider.dart';
-import '../services/api_client.dart';
 import '../services/ws_service.dart';
 import '../widgets/character_webview.dart';
 import '../widgets/sci_fi_bg.dart';
@@ -20,7 +17,6 @@ import '../widgets/tools_panel.dart';
 import '../widgets/voice_record_button.dart';
 
 // ── Palette ──
-const _bgDeep = Color(0xFF060918);
 const _surface = Color(0xFF0F1229);
 const _accent = Color(0xFF818CF8);
 const _accentWarm = Color(0xFFF0ABFC);
@@ -133,7 +129,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 Positioned(bottom: 125, left: 0, right: 0,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(h: 12, v: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(color: _surface.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(20)),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         const Icon(Icons.volume_up, size: 14, color: _accent), const SizedBox(width: 6),
@@ -179,7 +175,7 @@ class _ChatScreenState extends State<ChatScreen> {
         Padding(padding: const EdgeInsets.only(right: 4), child: GestureDetector(
           onTap: () => setState(() => _showTools = true),
           child: Container(
-            padding: const EdgeInsets.symmetric(h: 10, v: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: _accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
@@ -233,7 +229,6 @@ class _Msgs extends StatelessWidget {
     final isUser = m.role == 'user';
     final content = (m.content ?? '').toString();
     final label = isUser ? '你' : '灵犀';
-    final labelColor = isUser ? const Color(0xFF60A5FA) : _accentWarm;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: GestureDetector(
@@ -304,7 +299,7 @@ class _InputBar extends StatelessWidget {
           child: Container(
             height: 42,
             decoration: BoxDecoration(color: _surface.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(21), border: Border.all(color: _accent.withValues(alpha: 0.2))),
-            padding: const EdgeInsets.symmetric(h: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(children: [
               Expanded(child: Material(color: Colors.transparent,
                 child: TextField(controller: ctrl, autofocus: true,
@@ -396,7 +391,7 @@ class _CharSheet extends StatelessWidget {
               SizedBox(width: 180,
                 child: ElevatedButton(
                   onPressed: () => provider.initCharacter(_defaultCharacterName).then((_) { if (ctx.mounted) Navigator.pop(ctx); }),
-                  style: ElevatedButton.styleFrom(backgroundColor: _accent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)), padding: const EdgeInsets.symmetric(v: 12)),
+                  style: ElevatedButton.styleFrom(backgroundColor: _accent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)), padding: const EdgeInsets.symmetric(vertical: 12)),
                   child: const Text('初始化角色'),
                 ),
               ),
@@ -442,10 +437,10 @@ class _CharSheet extends StatelessWidget {
       child: ListTile(
         title: Text(name, style: const TextStyle(color: _textMain, fontSize: 13)),
         subtitle: sub != null ? Text(sub, style: const TextStyle(fontSize: 11, color: _textDim)) : null,
-        dense: true, contentPadding: const EdgeInsets.symmetric(h: 12),
+        dense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         trailing: active
             ? const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.check_circle, size: 14, color: _accent), SizedBox(width: 4), Text('使用中', style: TextStyle(fontSize: 11, color: _accent))])
-            : TextButton(onPressed: onTap, style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(h: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            : TextButton(onPressed: onTap, style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 child: Text(label, style: const TextStyle(fontSize: 11, color: _accentWarm))),
       ),
     );
