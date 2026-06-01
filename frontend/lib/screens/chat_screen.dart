@@ -109,37 +109,20 @@ class _ChatScreenState extends State<ChatScreen> {
             backgroundColor: Colors.transparent,
             appBar: _bar(chat),
             body: Stack(children: [
-              // Character
-              Positioned(top: 0, left: 0, right: 0,
-                height: MediaQuery.of(context).size.height * 0.55,
+              // Messages — full screen
+              if (msgs.isNotEmpty || streaming.isNotEmpty)
+                Positioned(top: 0, left: 0, right: 0, bottom: 90,
+                  child: _Msgs(msgs: msgs, streaming: streaming, ctrl: _scrollCtrl),
+                ),
+              // Character — small, bottom-right
+              Positioned(bottom: 70, right: 4,
+                width: 140, height: 240,
                 child: CharacterWebView(mouthOpen: chat.mouthOpen, animState: chat.animState.name,
                     emotion: chat.emotion, emotionIntensity: chat.emotionIntensity),
               ),
-              // Messages
-              if (msgs.isNotEmpty || streaming.isNotEmpty)
-                Positioned(left: 14, right: 14, bottom: 130,
-                  height: MediaQuery.of(context).size.height * 0.26,
-                  child: _Msgs(msgs: msgs, streaming: streaming, ctrl: _scrollCtrl),
-                ),
-              // Status indicators
               if (chat.wsState == WsState.connecting)
                 const Positioned(top: 0, left: 0, right: 0,
                     child: LinearProgressIndicator(backgroundColor: Colors.transparent, color: _accent)),
-              if (chat.isTtsPlaying)
-                Positioned(bottom: 125, left: 0, right: 0,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: _surface.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(20)),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.volume_up, size: 14, color: _accent), const SizedBox(width: 6),
-                        const Text('播报中', style: TextStyle(color: _textDim, fontSize: 11)),
-                        const SizedBox(width: 8),
-                        GestureDetector(onTap: chat.stopTts, child: const Icon(Icons.stop, size: 14, color: Colors.redAccent)),
-                      ]),
-                    ),
-                  ),
-                ),
             ]),
           ),
           // Input bar
@@ -204,24 +187,14 @@ class _Msgs extends StatelessWidget {
 
   @override
   Widget build(BuildContext ctx) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        decoration: BoxDecoration(
-          color: _surface.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _border),
-          boxShadow: [BoxShadow(color: _accent.withValues(alpha: 0.04), blurRadius: 30)],
-        ),
-        child: ListView.builder(
-          controller: ctrl, padding: const EdgeInsets.all(12),
-          itemCount: msgs.length + (streaming.isNotEmpty ? 1 : 0),
-          itemBuilder: (ctx, i) {
-            if (i < msgs.length) return _bubble(ctx, msgs[i]);
-            return _streamBubble(ctx, streaming);
-          },
-        ),
-      ),
+    return ListView.builder(
+      controller: ctrl,
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      itemCount: msgs.length + (streaming.isNotEmpty ? 1 : 0),
+      itemBuilder: (ctx, i) {
+        if (i < msgs.length) return _bubble(ctx, msgs[i]);
+        return _streamBubble(ctx, streaming);
+      },
     );
   }
 
