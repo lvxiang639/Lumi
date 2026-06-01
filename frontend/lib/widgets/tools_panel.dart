@@ -19,14 +19,18 @@ class ToolsPanel extends StatefulWidget {
   State<ToolsPanel> createState() => _ToolsPanelState();
 }
 
-class _ToolsPanelState extends State<ToolsPanel>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+class _ToolsPanelState extends State<ToolsPanel> {
+  int _selectedIndex = 0;
+
+  static const _menuItems = [
+    _MenuItem(Icons.calendar_month_outlined, '日历'),
+    _MenuItem(Icons.shopping_bag_outlined, '记账'),
+    _MenuItem(Icons.swap_horiz_outlined, '文件处理'),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CalendarProvider>().loadEvents();
       context.read<ExpenseProvider>().load();
@@ -34,51 +38,78 @@ class _ToolsPanelState extends State<ToolsPanel>
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Drawer(
-      width: MediaQuery.of(context).size.width * 0.82,
+      width: MediaQuery.of(context).size.width * 0.85,
       child: SafeArea(
-        child: Column(
+        child: Row(
           children: [
+            // ── Left vertical menu ──
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
-              child: Row(
+              width: 68,
+              decoration: const BoxDecoration(
+                color: Color(0xFF111530),
+                border: Border(
+                  right: BorderSide(color: Color(0xFF2A2F5A), width: 1),
+                ),
+              ),
+              child: Column(
                 children: [
+                  const SizedBox(height: 12),
                   const Text('助手工具',
                       style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold)),
+                          fontSize: 11, color: Colors.white38)),
+                  const SizedBox(height: 12),
+                  ...List.generate(_menuItems.length, (i) {
+                    final active = i == _selectedIndex;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedIndex = i),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: active
+                              ? const Color(0xFF7C8FFF).withValues(alpha: 0.2)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(_menuItems[i].icon,
+                                size: 22,
+                                color: active
+                                    ? const Color(0xFFA78BFA)
+                                    : Colors.white38),
+                            const SizedBox(height: 4),
+                            Text(_menuItems[i].label,
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: active
+                                        ? const Color(0xFFA78BFA)
+                                        : Colors.white38)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close, color: Colors.white38),
                     onPressed: () => Navigator.pop(context),
                   ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
-            TabBar(
-              controller: _tabController,
-              labelColor: Colors.indigo,
-              unselectedLabelColor: Colors.grey,
-              isScrollable: true,
-              tabs: const [
-                Tab(text: '📅 日历'),
-                Tab(text: '💰 记账'),
-                Tab(text: '📄 文件处理'),
-              ],
-            ),
+            // ── Right content panel ──
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
+              child: IndexedStack(
+                index: _selectedIndex,
                 children: const [
-                  _CalendarTab(),
-                  _ExpenseTab(),
-                  _FileProcessingTab(),
+                  _CalendarContent(),
+                  _ExpenseContent(),
+                  _ConversionContent(),
                 ],
               ),
             ),
@@ -89,44 +120,70 @@ class _ToolsPanelState extends State<ToolsPanel>
   }
 }
 
+class _MenuItem {
+  final IconData icon;
+  final String label;
+  const _MenuItem(this.icon, this.label);
+}
+
 // ── Calendar ──────────────────────────────────────────────────────
 
-class _CalendarTab extends StatelessWidget {
-  const _CalendarTab();
+class _CalendarContent extends StatelessWidget {
+  const _CalendarContent();
 
   @override
   Widget build(BuildContext context) {
     return Consumer<CalendarProvider>(
-      builder: (context, provider, _) {
-        if (provider.loading) {
+      builder: (context, p, _) {
+        if (p.loading) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (provider.events.isEmpty) {
-          return ListView(
-            children: const [
-              SizedBox(height: 80),
-              Center(
-                  child: Text('暂无提醒事件',
-                      style: TextStyle(color: Colors.grey))),
-            ],
-          );
-        }
-        return ListView.builder(
-          itemCount: provider.events.length,
-          itemBuilder: (context, i) {
-            final event = provider.events[i];
-            final dt = event.time;
-            return ListTile(
-              leading: const Icon(Icons.event, color: Colors.indigo),
-              title: Text(event.title),
-              subtitle: Text(
-                  '${dt.year}/${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}'),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline, size: 20),
-                onPressed: () => provider.deleteEvent(event.id),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 20, 16, 12),
+              child: Text('📅 日历提醒',
+                  style: TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.bold)),
+            ),
+            if (p.events.isEmpty)
+              const Expanded(
+                  child:
+                      Center(child: Text('暂无提醒', style: TextStyle(color: Colors.grey))))
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: p.events.length,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  itemBuilder: (_, i) {
+                    final e = p.events[i];
+                    final dt = e.time;
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      child: ListTile(
+                        leading:
+                            const Icon(Icons.event, color: Colors.indigo),
+                        title: Text(e.title),
+                        subtitle: Text(
+                            '${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              size: 20, color: Colors.redAccent),
+                          onPressed: () {
+                            p.deleteEvent(e.id);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('已删除')),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            );
-          },
+          ],
         );
       },
     );
@@ -135,91 +192,226 @@ class _CalendarTab extends StatelessWidget {
 
 // ── Expense ────────────────────────────────────────────────────────
 
-class _ExpenseTab extends StatelessWidget {
-  const _ExpenseTab();
+class _ExpenseContent extends StatefulWidget {
+  const _ExpenseContent();
+
+  @override
+  State<_ExpenseContent> createState() => _ExpenseContentState();
+}
+
+class _ExpenseContentState extends State<_ExpenseContent> {
+  String _period = 'month'; // 'week' or 'month'
+
+  void _showEditDialog(BuildContext context, ExpenseProvider p,
+      String id, double amount, String category, String remark) {
+    final amtCtrl =
+        TextEditingController(text: amount.abs().toStringAsFixed(2));
+    final catCtrl = TextEditingController(text: category);
+    final remCtrl = TextEditingController(text: remark);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('编辑记录'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amtCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: '金额'),
+            ),
+            TextField(
+              controller: catCtrl,
+              decoration: const InputDecoration(labelText: '分类'),
+            ),
+            TextField(
+              controller: remCtrl,
+              decoration: const InputDecoration(labelText: '备注'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              final newAmt = double.tryParse(amtCtrl.text) ?? amount;
+              p.update(id, {
+                'amount': amount < 0 ? -newAmt : newAmt,
+                'category': catCtrl.text,
+                'remark': remCtrl.text,
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<ExpenseProvider>(
-      builder: (context, provider, _) {
-        if (provider.loading) {
+      builder: (context, p, _) {
+        if (p.loading) {
           return const Center(child: CircularProgressIndicator());
         }
+
+        final stats = _period == 'week' ? p.weeklyStats : p.stats;
         final totalExpense =
-            (provider.stats?['total_expense'] as num?)?.toDouble() ?? 0.0;
-        if (provider.records.isEmpty) {
-          return ListView(
-            children: [
-              const SizedBox(height: 80),
-              const Center(
-                  child: Text('暂无记账记录',
-                      style: TextStyle(color: Colors.grey))),
-              if (totalExpense > 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
+            (stats?['total_expense'] as num?)?.toDouble() ?? 0.0;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
+              child: Text('💰 记账',
+                  style: TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.bold)),
+            ),
+
+            // ── Summary card ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  _summaryChip('周', 'week'),
+                  const SizedBox(width: 8),
+                  _summaryChip('月', 'month'),
+                  const Spacer(),
+                  Text(
+                      '${_period == "week" ? "本周" : "本月"}支出: ¥${totalExpense.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // ── Category breakdown ──
+            if (stats != null && stats!['by_category'] != null)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: (stats!['by_category'] as Map<String, dynamic>)
+                      .entries
+                      .map((e) => Chip(
+                            label: Text(
+                                '${e.key} ¥${(e.value as num).toStringAsFixed(0)}',
+                                style: const TextStyle(fontSize: 12)),
+                            backgroundColor: Colors.grey.shade200,
+                          ))
+                      .toList(),
+                ),
+              ),
+
+            const Divider(),
+
+            // ── Records list ──
+            if (p.records.isEmpty)
+              const Expanded(
                   child: Center(
-                    child: Text(
-                        '本月支出: ¥${totalExpense.toStringAsFixed(2)}',
-                        style: const TextStyle(color: Colors.indigo)),
-                  ),
+                      child: Text('暂无记录',
+                          style: TextStyle(color: Colors.grey))))
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: p.records.length,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  itemBuilder: (_, i) {
+                    final r = p.records[i];
+                    final isExpense = r.amount > 0;
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isExpense
+                              ? Colors.red.shade100
+                              : Colors.green.shade100,
+                          radius: 18,
+                          child: Text(r.category,
+                              style: const TextStyle(fontSize: 11)),
+                        ),
+                        title: Text(
+                          '${isExpense ? "-" : "+"}¥${r.amount.abs().toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: isExpense ? Colors.red : Colors.green,
+                          ),
+                        ),
+                        subtitle: r.remark.isNotEmpty
+                            ? Text(r.remark,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12))
+                            : null,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined,
+                                  size: 18),
+                              onPressed: () => _showEditDialog(
+                                  context,
+                                  p,
+                                  r.id,
+                                  r.amount,
+                                  r.category,
+                                  r.remark),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline,
+                                  size: 18, color: Colors.redAccent),
+                              onPressed: () => p.delete(r.id),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
-            ],
-          );
-        }
-        return ListView.builder(
-          itemCount: provider.records.length,
-          itemBuilder: (context, i) {
-            final record = provider.records[i];
-            final isExpense = record.amount > 0;
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: isExpense
-                    ? Colors.red.shade100
-                    : Colors.green.shade100,
-                child: Text(record.category,
-                    style: const TextStyle(fontSize: 12)),
               ),
-              title: Text(
-                  record.remark.isEmpty ? record.category : record.remark),
-              subtitle: Text(_fmtDt(record.recordedAt)),
-              trailing: Text(
-                '${isExpense ? "-" : "+"}¥${record.amount.abs().toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: isExpense ? Colors.red : Colors.green,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              onLongPress: () => provider.delete(record.id),
-            );
-          },
+          ],
         );
       },
     );
   }
 
-  static String _fmtDt(DateTime dt) {
-    final s = dt.toString();
-    return s.length >= 16 ? s.substring(0, 16) : s;
+  Widget _summaryChip(String label, String period) {
+    final active = _period == period;
+    return GestureDetector(
+      onTap: () => setState(() => _period = period),
+      child: Chip(
+        label: Text(label, style: const TextStyle(fontSize: 12)),
+        backgroundColor: active ? Colors.indigo.shade100 : Colors.grey.shade200,
+      ),
+    );
   }
 }
 
-// ── File Processing (Conversion + File List) ─────────────────────────
+// ── Conversion ─────────────────────────────────────────────────────
 
-class _FileProcessingTab extends StatefulWidget {
-  const _FileProcessingTab();
+class _ConversionContent extends StatefulWidget {
+  const _ConversionContent();
 
   @override
-  State<_FileProcessingTab> createState() => _FileProcessingTabState();
+  State<_ConversionContent> createState() => _ConversionContentState();
 }
 
-class _FileProcessingTabState extends State<_FileProcessingTab> {
+class _ConversionContentState extends State<_ConversionContent> {
   String? _selectedFile;
   String? _outputFormat;
   bool _converting = false;
   String _status = '';
-
-  // file list state
   List<Map<String, dynamic>> _files = [];
   bool _loadingFiles = false;
 
@@ -234,12 +426,15 @@ class _FileProcessingTabState extends State<_FileProcessingTab> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token') ?? '';
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/tools/files');
-      final resp = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      final resp = await http.get(
+          Uri.parse('${AppConfig.apiBaseUrl}/api/tools/files'),
+          headers: {'Authorization': 'Bearer $token'});
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
         setState(() {
-          _files = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          _files = (data['items'] as List?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [];
         });
       }
     } catch (_) {}
@@ -248,9 +443,7 @@ class _FileProcessingTabState extends State<_FileProcessingTab> {
 
   Future<void> _pickFile() async {
     final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['docx', 'pdf'],
-    );
+        type: FileType.custom, allowedExtensions: ['docx', 'pdf']);
     if (result != null && result.files.single.path != null) {
       final name = result.files.single.name;
       final ext = name.split('.').last.toLowerCase();
@@ -264,8 +457,10 @@ class _FileProcessingTabState extends State<_FileProcessingTab> {
 
   Future<void> _convert() async {
     if (_selectedFile == null || _outputFormat == null) return;
-    setState(() { _converting = true; _status = '转换中...'; });
-
+    setState(() {
+      _converting = true;
+      _status = '转换中...';
+    });
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token') ?? '';
@@ -273,24 +468,24 @@ class _FileProcessingTabState extends State<_FileProcessingTab> {
           '${AppConfig.apiBaseUrl}/api/tools/convert?target=$_outputFormat');
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $token'
-        ..files.add(await http.MultipartFile.fromPath('file', _selectedFile!));
+        ..files.add(await http.MultipartFile.fromPath(
+            'file', _selectedFile!));
       final streamed = await request.send();
       final resp = await http.Response.fromStream(streamed);
-
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
         final outName = data['target_name'] as String? ?? 'output';
         setState(() {
           _converting = false;
-          _status = '✅ 转换完成: $outName';
+          _status = '✅ $outName';
           _selectedFile = null;
         });
-        _loadFiles(); // refresh file list
+        _loadFiles();
       } else {
         setState(() { _converting = false; _status = '转换失败'; });
       }
     } catch (e) {
-      setState(() { _converting = false; _status = '转换出错: $e'; });
+      setState(() { _converting = false; _status = '出错: $e'; });
     }
   }
 
@@ -310,29 +505,29 @@ class _FileProcessingTabState extends State<_FileProcessingTab> {
 
   String _fmtSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   @override
   Widget build(BuildContext context) {
-    final sourceExt = _selectedFile != null ? _selectedFile!.split('.').last : '';
-    final targetLabel = _outputFormat == 'pdf' ? '📄 PDF' : '📝 Word';
+    final sourceExt =
+        _selectedFile != null ? _selectedFile!.split('.').last : '';
+    final targetLabel =
+        _outputFormat == 'pdf' ? '📄 PDF' : '📝 Word';
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Conversion section ──
-          const Icon(Icons.swap_horiz, size: 40, color: Colors.indigo),
-          const SizedBox(height: 8),
-          const Text('Word ↔ PDF 转换',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Text('📄 文件处理',
+              style:
+                  TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text('支持 .docx 和 .pdf 互相转换',
-              textAlign: TextAlign.center,
+          const Text('Word ↔ PDF 互相转换',
               style: TextStyle(fontSize: 13, color: Colors.grey)),
           const SizedBox(height: 16),
 
@@ -341,8 +536,7 @@ class _FileProcessingTabState extends State<_FileProcessingTab> {
             icon: const Icon(Icons.upload_file),
             label: const Text('选择文件 (.docx / .pdf)'),
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
+                padding: const EdgeInsets.symmetric(vertical: 14)),
           ),
           const SizedBox(height: 12),
 
@@ -351,21 +545,26 @@ class _FileProcessingTabState extends State<_FileProcessingTab> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(sourceExt.toUpperCase(),
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold)),
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  padding: EdgeInsets.symmetric(horizontal: 8),
                   child: Icon(Icons.arrow_forward, color: Colors.indigo),
                 ),
                 Text(targetLabel,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: _converting ? null : _convert,
               icon: _converting
-                  ? const SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.play_arrow),
               label: Text(_converting ? '转换中...' : '开始转换'),
               style: ElevatedButton.styleFrom(
@@ -386,40 +585,40 @@ class _FileProcessingTabState extends State<_FileProcessingTab> {
                     : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(_status, textAlign: TextAlign.center,
+              child: Text(_status,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: _status.startsWith('✅') ? Colors.green.shade700 : Colors.grey.shade700,
-                  )),
+                      fontSize: 13,
+                      color: _status.startsWith('✅')
+                          ? Colors.green.shade700
+                          : Colors.grey.shade700)),
             ),
 
-          // ── File list section ──
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 8),
+
           Row(
             children: [
-              const Icon(Icons.history, size: 18, color: Colors.indigo),
-              const SizedBox(width: 8),
               const Text('转换历史',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.bold)),
               const Spacer(),
               IconButton(
-                icon: const Icon(Icons.refresh, size: 20),
-                onPressed: _loadFiles,
-              ),
+                  icon: const Icon(Icons.refresh, size: 20),
+                  onPressed: _loadFiles),
             ],
           ),
-          const SizedBox(height: 8),
 
           if (_loadingFiles)
             const Center(child: CircularProgressIndicator())
           else if (_files.isEmpty)
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
+              padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(
-                  child: Text('暂无转换文件',
-                      style: TextStyle(color: Colors.grey, fontSize: 13))),
+                  child: Text('暂无文件',
+                      style:
+                          TextStyle(color: Colors.grey, fontSize: 13))),
             )
           else
             ...List.generate(_files.length, (i) {
@@ -430,16 +629,22 @@ class _FileProcessingTabState extends State<_FileProcessingTab> {
               final dt = f['created_at'] as String? ?? '';
               return ListTile(
                 leading: Icon(
-                  name.endsWith('.pdf') ? Icons.picture_as_pdf : Icons.description,
-                  color: name.endsWith('.pdf') ? Colors.red : Colors.blue,
+                  name.endsWith('.pdf')
+                      ? Icons.picture_as_pdf
+                      : Icons.description,
+                  color: name.endsWith('.pdf')
+                      ? Colors.red
+                      : Colors.blue,
                 ),
-                title: Text(name, style: const TextStyle(fontSize: 14)),
+                title: Text(name, style: const TextStyle(fontSize: 13)),
                 subtitle: Text(
                     '${_fmtSize(size)} · ${dt.length >= 16 ? dt.substring(0, 16) : dt}',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    style: const TextStyle(
+                        fontSize: 11, color: Colors.grey)),
                 trailing: IconButton(
                   icon: const Icon(Icons.download, size: 20),
-                  onPressed: url.isNotEmpty ? () => _download(url, name) : null,
+                  onPressed:
+                      url.isNotEmpty ? () => _download(url, name) : null,
                 ),
               );
             }),

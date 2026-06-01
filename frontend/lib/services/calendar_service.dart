@@ -23,6 +23,6 @@ class CalendarService {
   }
 
   Future<void> deleteEvent(String id) async {
-    await _api.delete('/api/calendar/events/$id');
+    await _api.delete('/api/calendar/$id');
   }
 }

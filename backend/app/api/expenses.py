@@ -1,6 +1,6 @@
 from uuid import UUID
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 from app.database import get_db
@@ -54,15 +54,28 @@ async def create_expense(
 
 @router.get("/stats")
 async def get_expense_stats(
+    period: str = Query("month", pattern="^(week|month)$"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ExpenseStats:
+    from datetime import datetime, timedelta
+
+    now = datetime.now(timezone.utc)
+    if period == "week":
+        start = now - timedelta(days=now.weekday())
+        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
     rows_result = await db.execute(
         select(
             ExpenseRecord.category,
             func.sum(ExpenseRecord.amount),
         )
-        .where(ExpenseRecord.user_id == current_user.id)
+        .where(
+            ExpenseRecord.user_id == current_user.id,
+            ExpenseRecord.recorded_at >= start,
+        )
         .group_by(ExpenseRecord.category)
     )
     by_category: dict[str, float] = {}

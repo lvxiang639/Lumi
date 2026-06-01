@@ -26,7 +26,15 @@ class ExpenseService {
     await _api.delete('/api/expenses/$id');
   }
 
-  Future<Map<String, dynamic>> getStats() async {
-    return await _api.get('/api/expenses/stats');
+  Future<ExpenseRecord> updateExpense(String id, Map<String, dynamic> body) async {
+    final data = await _api.put('/api/expenses/$id', body: body);
+    return ExpenseRecord.fromJson(data);
+  }
+
+  Future<Map<String, dynamic>> getStats({String? period}) async {
+    final params = <String, String>{};
+    if (period != null) params['period'] = period;
+    return await _api.get('/api/expenses/stats',
+        queryParams: params.isNotEmpty ? params : null);
   }
 }
