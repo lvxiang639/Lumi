@@ -30,6 +30,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _msgNotifier = ValueNotifier<int>(0);
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _showTextField = false;
+  bool _showToolsPanel = false;
 
   @override
   void initState() {
@@ -104,7 +105,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _openTools() {
-    _scaffoldKey.currentState?.openEndDrawer();
+    setState(() => _showToolsPanel = true);
   }
 
   Future<void> _emailSummary() async {
@@ -236,7 +237,6 @@ class _ChatScreenState extends State<ChatScreen> {
               key: _scaffoldKey,
               backgroundColor: Colors.transparent,
               appBar: _buildAppBar(chat),
-              endDrawer: const ToolsPanel(),
               body: Stack(
                 children: [
                   // ---- character (upper 60%) ----
@@ -308,6 +308,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 onPickFile: _pickAndSendFile,
               ),
             ),
+
+            // ---- tools panel overlay ----
+            if (_showToolsPanel)
+              Positioned.fill(
+                child: ToolsPanel(
+                  onClose: () => setState(() => _showToolsPanel = false),
+                ),
+              ),
           ],
         );
       },

@@ -13,7 +13,9 @@ import '../providers/calendar_provider.dart';
 import '../providers/expense_provider.dart';
 
 class ToolsPanel extends StatefulWidget {
-  const ToolsPanel({super.key});
+  final VoidCallback? onClose;
+
+  const ToolsPanel({super.key, this.onClose});
 
   @override
   State<ToolsPanel> createState() => _ToolsPanelState();
@@ -23,9 +25,9 @@ class _ToolsPanelState extends State<ToolsPanel> {
   int _selectedIndex = 0;
 
   static const _menuItems = [
-    _MenuItem(Icons.calendar_month_outlined, '日历'),
-    _MenuItem(Icons.shopping_bag_outlined, '记账'),
-    _MenuItem(Icons.swap_horiz_outlined, '文件处理'),
+    _MenuItem(Icons.calendar_month, '日历', Color(0xFFF59E0B)),
+    _MenuItem(Icons.account_balance_wallet, '记账', Color(0xFF10B981)),
+    _MenuItem(Icons.swap_horiz, '文件处理', Color(0xFF6366F1)),
   ];
 
   @override
@@ -39,9 +41,20 @@ class _ToolsPanelState extends State<ToolsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return Drawer(
-      width: MediaQuery.of(context).size.width * 0.85,
-      child: SafeArea(
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: widget.onClose ?? () => Navigator.pop(context),
+        ),
+        title: const Text('助手工具',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        centerTitle: true,
+      ),
+      body: SafeArea(
         child: Row(
           children: [
             // ── Left vertical menu ──
@@ -79,14 +92,14 @@ class _ToolsPanelState extends State<ToolsPanel> {
                             Icon(_menuItems[i].icon,
                                 size: 22,
                                 color: active
-                                    ? const Color(0xFFA78BFA)
+                                    ? _menuItems[i].color
                                     : Colors.white38),
                             const SizedBox(height: 4),
                             Text(_menuItems[i].label,
                                 style: TextStyle(
                                     fontSize: 10,
                                     color: active
-                                        ? const Color(0xFFA78BFA)
+                                        ? _menuItems[i].color
                                         : Colors.white38)),
                           ],
                         ),
@@ -94,11 +107,6 @@ class _ToolsPanelState extends State<ToolsPanel> {
                     );
                   }),
                   const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white38),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const SizedBox(height: 8),
                 ],
               ),
             ),
@@ -123,7 +131,8 @@ class _ToolsPanelState extends State<ToolsPanel> {
 class _MenuItem {
   final IconData icon;
   final String label;
-  const _MenuItem(this.icon, this.label);
+  final Color color;
+  const _MenuItem(this.icon, this.label, this.color);
 }
 
 // ── Calendar ──────────────────────────────────────────────────────

@@ -60,10 +60,13 @@ async def get_expense_stats(
 ) -> ExpenseStats:
     from datetime import datetime, timedelta
 
-    now = datetime.now(timezone.utc)
+    # Use Beijing time for date filtering (user's timezone)
+    beijing_tz = timezone(timedelta(hours=8))
+    now = datetime.now(beijing_tz)
     if period == "week":
-        start = now - timedelta(days=now.weekday())
-        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+        start = (now - timedelta(days=now.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
     else:
         start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
