@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from app.database import get_db
-from app.models import Conversation, Message, User
+from app.models import Conversation, Message, User, SentEmail
 from app.api.deps import get_current_user
 from app.schemas.conversation import ConversationItem, MessageItem, UpdateTitleRequest
 from app.services.llm_service import llm_router
@@ -183,4 +183,40 @@ async def email_summary(
     if not success:
         raise HTTPException(500, "邮件发送失败，请检查邮箱配置")
 
+    # 7. Save sent email record
+    db.add(SentEmail(
+        user_id=current_user.id,
+        conv_title=conv.title,
+        recipient=current_user.email,
+        summary_preview=summary.strip()[:200],
+    ))
+    await db.commit()
+
     return {"status": "sent", "email": current_user.email}
+
+
+@router.get("/sent-emails")
+async def list_sent_emails(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all sent email summaries for the current user."""
+    result = await db.execute(
+        select(SentEmail)
+        .where(SentEmail.user_id == current_user.id)
+        .order_by(SentEmail.sent_at.desc())
+        .limit(20)
+    )
+    records = result.scalars().all()
+    return {
+        "items": [
+            {
+                "id": str(r.id),
+                "conv_title": r.conv_title,
+                "recipient": r.recipient,
+                "summary_preview": r.summary_preview,
+                "sent_at": r.sent_at.isoformat(),
+            }
+            for r in records
+        ]
+    }

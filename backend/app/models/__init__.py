@@ -10,11 +10,12 @@ from app.models.expense_record import ExpenseRecord
 from app.models.converted_file import ConvertedFile
 from app.models.user_memory import UserMemory
 from app.models.emotion_state import UserEmotionState
+from app.models.sent_email import SentEmail
 from app.database import Base
 
 __all__ = [
     "Base", "User", "Conversation", "Message", "MessageRole", "MessageType",
     "Character", "UserInventory", "ItemType", "VoicePack", "Outfit",
-    "CalendarEvent", "ExpenseRecord", "ConvertedFile", "UserMemory",
+    "CalendarEvent", "ExpenseRecord", "ConvertedFile", "UserMemory", "SentEmail",
     "UserEmotionState",
 ]

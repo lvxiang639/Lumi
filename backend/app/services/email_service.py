@@ -2,7 +2,7 @@ import asyncio
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from smtplib import SMTP, SMTPException
+from smtplib import SMTP_SSL, SMTPException
 
 from app.config import settings
 
@@ -35,8 +35,7 @@ async def send_email(to: str, subject: str, body: str) -> bool:
 
 
 def _send_sync(msg: MIMEMultipart, to: str) -> None:
-    with SMTP(settings.smtp_host, settings.smtp_port) as smtp:
-        smtp.starttls()
+    with SMTP_SSL(settings.smtp_host, settings.smtp_port) as smtp:
         if settings.smtp_username:
             smtp.login(settings.smtp_username, settings.smtp_password)
         smtp.send_message(msg)

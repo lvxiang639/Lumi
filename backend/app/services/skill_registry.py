@@ -5,6 +5,7 @@ from app.services.skills.expense_skill import expense_skill
 from app.services.skills.search import search_skill
 from app.services.skills.convert_skill import convert_skill
 from app.services.skills.briefing_skill import briefing_skill
+from app.services.skills.email_skill import email_skill
 
 
 class SkillRegistry:
@@ -16,6 +17,7 @@ class SkillRegistry:
             "search": search_skill,
             "convert": convert_skill,
             "briefing": briefing_skill,
+            "email": email_skill,
         }
 
     def get(self, name: str) -> BaseSkill | None:
