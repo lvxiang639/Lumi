@@ -114,9 +114,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 Positioned(top: 0, left: 0, right: 0, bottom: 90,
                   child: _Msgs(msgs: msgs, streaming: streaming, ctrl: _scrollCtrl),
                 ),
-              // Character — small, bottom-right
-              Positioned(bottom: 70, right: 4,
-                width: 140, height: 240,
+              // Character — Q pet, bottom-right
+              Positioned(bottom: 68, right: 0,
+                width: 130, height: 200,
                 child: CharacterWebView(mouthOpen: chat.mouthOpen, animState: chat.animState.name,
                     emotion: chat.emotion, emotionIntensity: chat.emotionIntensity),
               ),
