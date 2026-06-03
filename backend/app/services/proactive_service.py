@@ -19,6 +19,7 @@ from app.config import settings
 from app.database import async_session
 from app.models import (
     User, CalendarEvent, ExpenseRecord, Conversation, Message, UserMemory,
+    UserEmotionState,
 )
 from app.services.llm_service import llm_router
 from app.services.connection_manager import send_to_user, online_users
@@ -49,6 +50,7 @@ class ProactiveService:
     def __init__(self):
         self._task: asyncio.Task | None = None
         self._interval = settings.notification_check_interval * 30  # ~30 min
+        self._last_emotion_care: dict[str, datetime] = {}  # user_id → last care sent
 
     async def _poll(self):
         while True:
@@ -120,6 +122,15 @@ class ProactiveService:
 
             # ── Check 5: Memory topic ──
             msg = await self._check_memory(user_id, now, db)
+            if msg:
+                await send_to_user(user_id, {
+                    "type": "llm_stream", "delta": msg,
+                })
+                await send_to_user(user_id, {"type": "done"})
+                return
+
+            # ── Check 6: Emotion care ──
+            msg = await self._check_emotion(user_id, now, db)
             if msg:
                 await send_to_user(user_id, {
                     "type": "llm_stream", "delta": msg,
@@ -253,6 +264,35 @@ class ProactiveService:
         except Exception:
             return None
 
+    async def _check_emotion(
+        self, user_id: str, now: datetime, db
+    ) -> str | None:
+        """Check if user has been sad/angry and needs care."""
+        # Don't spam — once per 4 hours
+        last = self._last_emotion_care.get(user_id)
+        if last and (now - last).total_seconds() < 14400:
+            return None
+
+        r = await db.execute(
+            select(UserEmotionState).where(
+                UserEmotionState.user_id == user_id
+            )
+        )
+        state = r.scalar_one_or_none()
+        if not state or state.intensity < 0.5:
+            return None
+        if state.current_emotion not in ("sad", "angry", "worried"):
+            return None
+
+        self._last_emotion_care[user_id] = now
+
+        messages = {
+            "sad": "喵~ 感觉你心情不太好，要聊聊吗？我一直在这里陪你 🐱",
+            "angry": "喵... 看起来你有点生气，深呼吸，一切都会好起来的~",
+            "worried": "喵~ 你好像有点焦虑，需要我帮你做点什么吗？",
+        }
+        return messages.get(state.current_emotion)
+
     def start(self):
         if self._task is None:
             self._task = asyncio.create_task(self._poll())
@@ -269,3 +309,47 @@ class ProactiveService:
 
 
 proactive_service = ProactiveService()
+
+# In-memory tracker: user_id → last greeting time
+_last_greeting: dict[str, datetime] = {}
+
+GREETING_PROMPT = """你是一只关心主人的小猫灵犀。根据以下用户信息和当前时间，想一个简短温暖的欢迎语（不超过35字）。
+要自然、可爱，不要刻意复述记忆。如果没有特别的信息就返回空。
+
+当前时间: {now}
+用户信息:
+{memories}
+
+小猫灵犀的欢迎语:"""
+
+
+async def send_memory_greeting(user_id: str) -> str | None:
+    """Generate a personalized greeting on connect. One per 6 hours."""
+    now = datetime.now(BEIJING_TZ)
+    last = _last_greeting.get(user_id)
+    if last and (now - last).total_seconds() < 21600:  # 6 hours
+        return None
+
+    _last_greeting[user_id] = now
+
+    async with async_session() as db:
+        r = await db.execute(
+            select(UserMemory)
+            .where(UserMemory.user_id == user_id)
+            .order_by(UserMemory.updated_at.desc())
+            .limit(8)
+        )
+        memories = r.scalars().all()
+        if len(memories) < 2:
+            return None
+
+        mem_text = "\n".join(f"- {m.key}: {m.value}" for m in memories)
+        prompt = GREETING_PROMPT.format(
+            now=now.strftime("%H:%M"), memories=mem_text
+        )
+        try:
+            result = await llm_router.chat([{"role": "user", "content": prompt}])
+            result = (result or "").strip()
+            return result if result else None
+        except Exception:
+            return None

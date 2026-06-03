@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -31,6 +32,19 @@ async def websocket_chat(ws: WebSocket):
             logger.warning("WS send failed (client likely disconnected)")
 
     register(user_id, send_message)
+
+    # Send memory-driven greeting on connect
+    async def _send_greeting():
+        try:
+            from app.services.proactive_service import send_memory_greeting
+            msg = await send_memory_greeting(user_id)
+            if msg:
+                await send_message({"type": "llm_stream", "delta": msg})
+                await send_message({"type": "done"})
+        except Exception:
+            pass
+
+    asyncio.create_task(_send_greeting())
 
     async with async_session() as db:
         try:
