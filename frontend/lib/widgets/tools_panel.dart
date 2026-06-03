@@ -36,7 +36,10 @@ class _ToolsPanelState extends State<ToolsPanel> {
   static const _menuItems = [
     _MenuItem(Icons.calendar_month_rounded, '日历', Color(0xFFF59E0B)),
     _MenuItem(Icons.account_balance_wallet_rounded, '记账', Color(0xFF10B981)),
-    _MenuItem(Icons.swap_horiz_rounded, '文件处理', Color(0xFF6366F1)),
+    _MenuItem(Icons.edit_note_rounded, '笔记', Color(0xFF06B6D4)),
+    _MenuItem(Icons.document_scanner_rounded, 'OCR', Color(0xFF8B5CF6)),
+    _MenuItem(Icons.mood_rounded, '心情', Color(0xFFEC4899)),
+    _MenuItem(Icons.swap_horiz_rounded, '文件', Color(0xFF6366F1)),
     _MenuItem(Icons.mail_outline_rounded, '邮件', Color(0xFFEC4899)),
   ];
 
@@ -113,6 +116,9 @@ class _ToolsPanelState extends State<ToolsPanel> {
               children: const [
                 _CalendarContent(),
                 _ExpenseContent(),
+                _NotesContent(),
+                _OcrContent(),
+                _MoodContent(),
                 _ConversionContent(),
                 _EmailContent(),
               ],
@@ -606,4 +612,194 @@ class _EmailContentState extends State<_EmailContent> {
       ]),
     );
   }
+
+// ── Notes ──────────────────────────────────────────────────────────
+
+class _NotesContent extends StatefulWidget {
+  const _NotesContent();
+  @override
+  State<_NotesContent> createState() => _NotesContentState();
+}
+
+class _NotesContentState extends State<_NotesContent> {
+  List<Map<String, dynamic>> _notes = [];
+  bool _loading = false;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final data = await ApiClient().get('/api/notes?note_type=note');
+      setState(() => _notes = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? []);
+    } catch (_) {}
+    setState(() => _loading = false);
+  }
+
+  Future<void> _add() async {
+    final t = TextEditingController(), c = TextEditingController();
+    await showDialog(context: context, builder: (ctx) => AlertDialog(
+      backgroundColor: _surface,
+      title: const Text('新建笔记', style: TextStyle(color: _textPrimary)),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: t, style: const TextStyle(color: _textPrimary),
+            decoration: const InputDecoration(hintText: '标题', hintStyle: TextStyle(color: _textSecondary))),
+        TextField(controller: c, maxLines: 4, style: const TextStyle(color: _textPrimary),
+            decoration: const InputDecoration(hintText: '内容', hintStyle: TextStyle(color: _textSecondary))),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消', style: TextStyle(color: _textSecondary))),
+        TextButton(onPressed: () async {
+          if (c.text.trim().isEmpty) return;
+          await ApiClient().post('/api/notes', body: {'title': t.text, 'content': c.text, 'note_type': 'note'});
+          Navigator.pop(ctx); _load();
+        }, child: const Text('保存', style: TextStyle(color: _accent))),
+      ],
+    ));
+  }
+
+  Future<void> _delete(String id) async {
+    await ApiClient().delete('/api/notes/$id'); _load();
+  }
+
+  @override
+  Widget build(BuildContext ctx) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Padding(padding: const EdgeInsets.fromLTRB(16,20,16,8), child: Row(children: [
+      const Icon(Icons.edit_note_rounded, size:20, color:Color(0xFF06B6D4)), const SizedBox(width:8),
+      const Text('笔记', style: TextStyle(fontSize:17, fontWeight:FontWeight.bold, color:_textPrimary)),
+      const Spacer(),
+      IconButton(icon: const Icon(Icons.add, color: _accent), onPressed: _add),
+    ])),
+    if (_loading) const Center(child: CircularProgressIndicator(color: _accent))
+    else if (_notes.isEmpty) const Expanded(child: Center(child: Text('暂无笔记', style: TextStyle(color: _textSecondary))))
+    else Expanded(child: ListView.builder(
+      itemCount: _notes.length, padding: const EdgeInsets.symmetric(horizontal:8),
+      itemBuilder: (_,i){ final n=_notes[i];
+        return Container(margin: const EdgeInsets.symmetric(horizontal:8, vertical:3),
+          decoration: BoxDecoration(color: _cardBg.withValues(alpha:0.6), borderRadius: BorderRadius.circular(10)),
+          child: ListTile(title: Text(n['title'] as String? ?? '', style: const TextStyle(color: _textPrimary, fontSize:14)),
+            subtitle: Text((n['content'] as String? ?? ''), maxLines:2, overflow:TextOverflow.ellipsis,
+                style: const TextStyle(color: _textSecondary, fontSize:12)),
+            trailing: IconButton(icon: const Icon(Icons.delete_outline, size:18, color:Colors.redAccent), onPressed: ()=>_delete(n['id'] as String)),
+          ),
+        );
+      },
+    )),
+  ]);
+}
+
+// ── OCR ────────────────────────────────────────────────────────────
+
+class _OcrContent extends StatefulWidget {
+  const _OcrContent();
+  @override
+  State<_OcrContent> createState() => _OcrContentState();
+}
+
+class _OcrContentState extends State<_OcrContent> {
+  String _result = '';
+  bool _loading = false;
+
+  Future<void> _scan() async {
+    final r = await FilePicker.pickFiles(type: FileType.image);
+    if (r == null || r.files.single.path == null) return;
+    setState(() { _loading = true; _result = '识别中...'; });
+    try {
+      final tok = (await SharedPreferences.getInstance()).getString('access_token') ?? '';
+      final req = http.MultipartRequest('POST', Uri.parse('${AppConfig.apiBaseUrl}/api/tools/ocr'))
+        ..headers['Authorization'] = 'Bearer $tok'
+        ..files.add(await http.MultipartFile.fromPath('file', r.files.single.path!));
+      final resp = await http.Response.fromStream(await req.send());
+      if (resp.statusCode == 200) {
+        final d = jsonDecode(resp.body) as Map<String, dynamic>;
+        final type = d['type'] as String? ?? 'text';
+        final typeLabel = {'receipt':'🧾 发票','card':'👤 名片','text':'📄 文字'}[type]??'📄';
+        setState(() { _loading = false; _result = '$typeLabel\n${d['text']}'; });
+      } else { setState(() { _loading = false; _result = '识别失败'; }); }
+    } catch (e) { setState(() { _loading = false; _result = '出错: $e'; }); }
+  }
+
+  @override
+  Widget build(BuildContext ctx) => Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    const Row(children: [Icon(Icons.document_scanner_rounded, size:20, color:Color(0xFF8B5CF6)), SizedBox(width:8),
+      Text('图片 OCR', style: TextStyle(fontSize:17, fontWeight:FontWeight.bold, color:_textPrimary))]),
+    const SizedBox(height:4),
+    const Text('拍照识别文字，支持发票、名片、普通文字', style: TextStyle(fontSize:12, color:_textSecondary)),
+    const SizedBox(height:16),
+    ElevatedButton.icon(onPressed: _loading?null:_scan,
+      icon: _loading?const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)):const Icon(Icons.camera_alt),
+      label: Text(_loading?'识别中...':'拍照 / 选择图片'),
+      style: ElevatedButton.styleFrom(backgroundColor:const Color(0xFF8B5CF6),foregroundColor:Colors.white,padding:const EdgeInsets.symmetric(vertical:14),shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(12)))),
+    if (_result.isNotEmpty) Container(margin:const EdgeInsets.only(top:16),padding:const EdgeInsets.all(14),
+      decoration:BoxDecoration(color:_cardBg,borderRadius:BorderRadius.circular(10)),
+      child: SelectableText(_result, style: const TextStyle(color:_textPrimary, fontSize:14, height:1.6))),
+  ]));
+}
+
+// ── Mood ───────────────────────────────────────────────────────────
+
+class _MoodContent extends StatefulWidget {
+  const _MoodContent();
+  @override
+  State<_MoodContent> createState() => _MoodContentState();
+}
+
+class _MoodContentState extends State<_MoodContent> {
+  List<Map<String, dynamic>> _moods = [];
+  Map<String, int> _stats = {};
+  bool _loading = false;
+
+  static const _emotions = [
+    ('😊', 'joy'), ('😢', 'sad'), ('😠', 'angry'),
+    ('😌', 'calm'), ('😲', 'surprised'), ('😟', 'worried'),
+  ];
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final api = ApiClient();
+      final moodsData = await api.get('/api/notes/moods');
+      _moods = (moodsData['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final statsData = await api.get('/api/notes/moods/stats?period=week');
+      _stats = (statsData['by_emotion'] as Map?)?.map((k,v)=>(k as String, v as int)) ?? {};
+    } catch (_) {}
+    setState(() => _loading = false);
+  }
+
+  Future<void> _log(String emotion) async {
+    await ApiClient().post('/api/notes/moods', body: {'emotion': emotion, 'intensity': 1.0});
+    _load();
+  }
+
+  @override
+  Widget build(BuildContext ctx) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    const Padding(padding: EdgeInsets.fromLTRB(16,20,16,8), child: Row(children: [
+      Icon(Icons.mood_rounded, size:20, color:Color(0xFFEC4899)), SizedBox(width:8),
+      Text('心情日记', style: TextStyle(fontSize:17, fontWeight:FontWeight.bold, color:_textPrimary))])),
+    Padding(padding: const EdgeInsets.symmetric(horizontal:16), child: Wrap(spacing:8,
+      children: _emotions.map((e) => GestureDetector(onTap:()=>_log(e.$2), child: Chip(
+        avatar: Text(e.$1, style: const TextStyle(fontSize:18)),
+        label: Text(e.$2, style: const TextStyle(fontSize:11, color:_textSecondary)),
+        backgroundColor: _cardBg, side: const BorderSide(color:_border),
+      ))).toList())),
+    if (_stats.isNotEmpty) Padding(padding: const EdgeInsets.all(16), child: Wrap(spacing:8, runSpacing:4,
+      children: _stats.entries.where((e)=>e.value>0).map((e)=>Chip(
+        label: Text('${_emotions.firstWhere((x)=>x.$2==e.key).$1} ×${e.value}', style: const TextStyle(fontSize:12, color:_textSecondary)),
+        backgroundColor: _cardBg,
+      )).toList()))),
+    const Divider(color: _border),
+    if (_loading) const Center(child: CircularProgressIndicator(color: _accent))
+    else if (_moods.isEmpty) const Expanded(child: Center(child: Text('暂无记录', style: TextStyle(color: _textSecondary))))
+    else Expanded(child: ListView.builder(itemCount: _moods.length, padding: const EdgeInsets.symmetric(horizontal:8),
+      itemBuilder:(_,i){ final m=_moods[i]; final emo=_emotions.firstWhere((e)=>e.$2==(m['emotion']??''), orElse:()=>('❓',''));
+        return ListTile(leading: Text(emo.$1, style: const TextStyle(fontSize:22)),
+          title: Text(m['emotion'] as String? ?? '', style: const TextStyle(color: _textPrimary, fontSize:14)),
+          subtitle: Text((m['created_at'] as String? ?? '').length>=16?(m['created_at'] as String).substring(0,16):'',
+              style: const TextStyle(fontSize:11, color:_textSecondary)));
+      })),
+  ]);
 }

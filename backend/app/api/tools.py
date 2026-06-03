@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import User, ConvertedFile
 from app.services.conversion_service import convert
 from app.services.minio_service import upload_file, get_download_url, get_file
+from app.services.llm_service import llm_router
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/tools", tags=["tools"])
@@ -142,3 +143,41 @@ async def download_file(
             ),
         },
     )
+
+
+@router.post("/ocr")
+async def ocr_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Extract text from an image using Qwen-VL."""
+    import base64
+    file_bytes = await file.read()
+    b64 = base64.b64encode(file_bytes).decode()
+    data_url = f"data:image/jpeg;base64,{b64}"
+
+    prompt = """请识别这张图片中的所有文字内容。同时判断图片类型：
+- receipt: 发票/收据/小票
+- card: 名片
+- text: 普通文字
+
+返回JSON格式: {"type": "receipt|card|text", "text": "识别出的所有文字"}"""
+
+    try:
+        raw = await llm_router.chat([
+            {"role": "user", "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": data_url}},
+            ]},
+        ], force_model="qwen")
+    except Exception:
+        raise HTTPException(500, "OCR识别失败")
+
+    import json, re
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        m = re.search(r'\{[^}]+\}', raw)
+        data = json.loads(m.group()) if m else {"type": "text", "text": raw}
+
+    return {"type": data.get("type", "text"), "text": data.get("text", raw)}
