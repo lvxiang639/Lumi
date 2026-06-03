@@ -40,12 +40,16 @@ async def startup():
     await seed_defaults()
     from app.services.notification_service import notification_service
     notification_service.start()
+    from app.services.proactive_service import proactive_service
+    proactive_service.start()
 
 
 @app.on_event("shutdown")
 async def shutdown():
     from app.services.notification_service import notification_service
     await notification_service.stop()
+    from app.services.proactive_service import proactive_service
+    await proactive_service.stop()
 
 
 @app.get("/health")

@@ -6,6 +6,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.database import async_session
 from app.core.security import decode_access_token
 from app.services.chat_orchestrator import chat_orchestrator
+from app.services.connection_manager import register, unregister
 
 logger = logging.getLogger("ws")
 router = APIRouter()
@@ -28,6 +29,8 @@ async def websocket_chat(ws: WebSocket):
             await ws.send_text(json.dumps(msg, ensure_ascii=False))
         except Exception:
             logger.warning("WS send failed (client likely disconnected)")
+
+    register(user_id, send_message)
 
     async with async_session() as db:
         try:
@@ -65,4 +68,5 @@ async def websocket_chat(ws: WebSocket):
                     await send_message({"type": "error", "message": "处理消息时出错，请重试"})
 
         except WebSocketDisconnect:
+            unregister(user_id, send_message)
             logger.info("WS disconnected: user=%s", user_id[:8])
