@@ -25,11 +25,17 @@ async def websocket_chat(ws: WebSocket):
     await ws.accept()
     logger.info("WS connected: user=%s", user_id[:8])
 
+    connected = True
+
     async def send_message(msg: dict):
+        nonlocal connected
+        if not connected:
+            return
         try:
             await ws.send_text(json.dumps(msg, ensure_ascii=False))
         except Exception:
-            logger.warning("WS send failed (client likely disconnected)")
+            connected = False
+            unregister(user_id, send_message)
 
     register(user_id, send_message)
 
