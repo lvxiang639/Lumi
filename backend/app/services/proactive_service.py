@@ -49,8 +49,10 @@ MEMORY_PROMPT = """你是一只关心主人的小猫。根据以下关于用户�
 class ProactiveService:
     def __init__(self):
         self._task: asyncio.Task | None = None
-        self._interval = settings.notification_check_interval * 30  # ~30 min
-        self._last_emotion_care: dict[str, datetime] = {}  # user_id → last care sent
+        self._interval = settings.notification_check_interval * 45  # ~45 min (was 30)
+        self._last_emotion_care: dict[str, datetime] = {}  # user_id → last
+        self._weather_cache: dict[str, tuple[str, datetime]] = {}  # city → (msg, time)
+        self._memory_cache: dict[str, tuple[str, datetime]] = {}  # user_id → (msg, time)
 
     async def _poll(self):
         while True:
@@ -139,16 +141,18 @@ class ProactiveService:
                 return
 
     async def _check_weather(self, user_id: str, now: datetime) -> str | None:
-        """Check if there's weather worth warning about."""
-        # Only check once per 2 hours to avoid spamming
-        # For now: check every cycle but use a simple heuristic
+        """Check weather with 2-hour cache per city to reduce LLM cost."""
         try:
             city = await get_city(user_id=user_id)
-            prompt = WEATHER_PROMPT.format(
-                now=now.strftime("%H:%M"), city=city
-            )
+            cached = self._weather_cache.get(city)
+            if cached:
+                msg, ts = cached
+                if (now - ts).total_seconds() < 7200:  # 2 hour cache
+                    return msg if msg != "__NONE__" else None
+            prompt = WEATHER_PROMPT.format(now=now.strftime("%H:%M"), city=city)
             result = await llm_router.chat([{"role": "user", "content": prompt}])
             result = (result or "").strip()
+            self._weather_cache[city] = (result or "__NONE__", now)
             return result if result else None
         except Exception:
             return None
@@ -244,7 +248,13 @@ class ProactiveService:
     async def _check_memory(
         self, user_id: str, now: datetime, db
     ) -> str | None:
-        """Use memories to start a conversation."""
+        """Use memories to start a conversation. Cache for 6 hours."""
+        cached = self._memory_cache.get(user_id)
+        if cached:
+            msg, ts = cached
+            if (now - ts).total_seconds() < 21600:  # 6 hour cache
+                return msg if msg != "__NONE__" else None
+
         r = await db.execute(
             select(UserMemory)
             .where(UserMemory.user_id == user_id)
@@ -260,6 +270,7 @@ class ProactiveService:
         try:
             result = await llm_router.chat([{"role": "user", "content": prompt}])
             result = (result or "").strip()
+            self._memory_cache[user_id] = (result or "__NONE__", now)
             return result if result else None
         except Exception:
             return None

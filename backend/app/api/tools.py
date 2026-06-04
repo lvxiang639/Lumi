@@ -150,28 +150,37 @@ async def ocr_image(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
-    """Extract text from an image using Qwen-VL."""
+    """Extract text from an image using Qwen multimodal API."""
     import base64
     file_bytes = await file.read()
     b64 = base64.b64encode(file_bytes).decode()
-    data_url = f"data:image/jpeg;base64,{b64}"
 
-    prompt = """请识别这张图片中的所有文字内容。同时判断图片类型：
+    prompt = """请识别图片中的所有文字内容。同时判断图片类型:
 - receipt: 发票/收据/小票
 - card: 名片
 - text: 普通文字
 
-返回JSON格式: {"type": "receipt|card|text", "text": "识别出的所有文字"}"""
+返回JSON: {"type": "receipt|card|text", "text": "识别出的文字"}"""
 
     try:
-        raw = await llm_router.chat([
-            {"role": "user", "content": [
+        # Use Qwen's multimodal endpoint directly (not DeepSeek)
+        from openai import AsyncOpenAI
+        from app.config import settings
+        qwen_mm = AsyncOpenAI(
+            api_key=settings.qwen_api_key,
+            base_url=settings.qwen_base_url,
+        )
+        resp = await qwen_mm.chat.completions.create(
+            model=settings.qwen_model_name,
+            messages=[{"role": "user", "content": [
                 {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": {"url": data_url}},
-            ]},
-        ], force_model="qwen")
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+            ]}],
+            max_tokens=512,
+        )
+        raw = resp.choices[0].message.content or ""
     except Exception:
-        raise HTTPException(500, "OCR识别失败")
+        raise HTTPException(500, "OCR识别失败，请确认图片格式正确")
 
     import json, re
     try:

@@ -26,11 +26,12 @@ class Settings(BaseSettings):
     weather_api_url: str = "https://wttr.in"
     searxng_engines: str = "baidu,sogou,bing"
     notification_check_interval: int = 60
-    smtp_host: str = "smtp.126.com"
+    # SMTP — configure via .env, defaults are empty (must be set to send email)
+    smtp_host: str = ""
     smtp_port: int = 465
-    smtp_username: str = "lvxiang639@126.com"
-    smtp_password: str = "SZewKRe3rvHpXvwY"
-    smtp_from_email: str = "lvxiang639@126.com"
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
 
     model_config = {"env_file": ".env"}
 

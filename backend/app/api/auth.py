@@ -1,3 +1,4 @@
+from time import time
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,8 +11,27 @@ from app.api.deps import get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+# Simple in-memory rate limiter: phone → (count, window_start)
+_rate_limits: dict[str, tuple[int, float]] = {}
+
+def _check_rate_limit(key: str, max_req: int = 10, window: int = 60) -> bool:
+    now = time()
+    entry = _rate_limits.get(key)
+    if entry is None or (now - entry[1]) > window:
+        _rate_limits[key] = (1, now)
+        return True
+    count, start = entry
+    if count >= max_req:
+        return False
+    _rate_limits[key] = (count + 1, start)
+    return True
+
+
 @router.post("/login", response_model=LoginResponse)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
+    # Rate limit: 10 requests per 60 seconds per phone number
+    if not _check_rate_limit(req.phone):
+        raise HTTPException(429, "请求过于频繁，请稍后再试")
     result = await db.execute(select(User).where(User.phone == req.phone))
     user = result.scalar_one_or_none()
     is_new = False
