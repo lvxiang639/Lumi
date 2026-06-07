@@ -32,14 +32,40 @@ class ChatOrchestrator:
         conv = await self._get_or_create_conv(user_id, conversation_id, db, text)
         user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
 
-        # 2. Classify intent
-        intent = await llm_router.classify_intent(text)
+        # 2. Classify intent (skip for system-generated display messages)
+        _SYSTEM_PREFIXES = ('📋', '✅', '❌', '📝', '📧', '📎')
+        if text.strip().startswith(_SYSTEM_PREFIXES):
+            intent = "chat"  # system display msg — no skill, just save + echo
+        else:
+            intent = await llm_router.classify_intent(text)
         logger.info("user=%s conv=%s intent=%s text=%s", user_id[:8], str(conv.id)[:8], intent, text[:60])
 
         # 3. Execute skill or chat
         if intent != "chat" and skill_registry.has(intent):
             skill = skill_registry.get(intent)
-            result = await skill.execute(user_id, text, db)
+
+            # Load conversation history for context-aware skill responses
+            msgs_result = await db.execute(
+                select(Message)
+                .where(Message.conv_id == conv.id)
+                .order_by(Message.created_at.desc())
+                .limit(20)
+            )
+            history = msgs_result.scalars().all()
+            history.reverse()
+
+            # Build context string from recent conversation
+            if history:
+                context_lines = ["【对话上下文——请结合此前的对话内容理解用户的意图】"]
+                for m in history:
+                    role_label = "用户" if m.role == MessageRole.user else "AI"
+                    context_lines.append(f"{role_label}: {m.content or ''}")
+                context_str = "\n".join(context_lines)
+                contextualized_text = f"{context_str}\n\n用户最新输入: {text}"
+            else:
+                contextualized_text = text
+
+            result = await skill.execute(user_id, contextualized_text, db)
             response_text = result.text
 
             # Save user message after skill execution
@@ -48,6 +74,7 @@ class ChatOrchestrator:
                 role=MessageRole.user,
                 type=MessageType.text,
                 content=text,
+                created_at=datetime.now(timezone.utc),
             )
             db.add(user_msg)
             await db.flush()
@@ -81,6 +108,7 @@ class ChatOrchestrator:
                 role=MessageRole.user,
                 type=MessageType.text,
                 content=text,
+                created_at=datetime.now(timezone.utc),
             )
             db.add(user_msg)
             await db.flush()
@@ -135,6 +163,7 @@ class ChatOrchestrator:
             role=MessageRole.assistant,
             type=MessageType.text,
             content=response_text,
+            created_at=datetime.now(timezone.utc),
         )
         db.add(assistant_msg)
         conv.updated_at = datetime.now(timezone.utc)
@@ -163,7 +192,18 @@ class ChatOrchestrator:
 
         # 6. Async memory extraction (fire-and-forget, does not block response)
         from app.services.memory_service import schedule_extraction
-        _dialogue_lines = [f"用户: {text}", f"AI: {response_text}"]
+        # Build full recent dialogue for better context in memory extraction
+        _recent_msgs = await db.execute(
+            select(Message)
+            .where(Message.conv_id == conv.id)
+            .order_by(Message.created_at.asc())
+            .limit(40)
+        )
+        _recent = _recent_msgs.scalars().all()
+        _dialogue_lines = []
+        for _m in _recent:
+            _role = "用户" if _m.role == MessageRole.user else "AI"
+            _dialogue_lines.append(f"{_role}: {_m.content or ''}")
         schedule_extraction(user_uuid, conv.id, "\n".join(_dialogue_lines))
 
         # ============================================================

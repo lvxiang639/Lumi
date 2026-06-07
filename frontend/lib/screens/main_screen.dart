@@ -4,6 +4,7 @@ import '../providers/conversation_provider.dart';
 import '../providers/character_provider.dart';
 import 'conversation_list_screen.dart';
 import 'tools/tools_center_screen.dart';
+import 'discover_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _pages = const [
     ConversationListScreen(),
     ToolsCenterScreen(),
+    DiscoverScreen(),
     ProfileScreen(),
   ];
 
@@ -51,6 +53,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.apps_outlined),
             activeIcon: Icon(Icons.apps),
             label: '工具',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.explore_outlined),
+            activeIcon: Icon(Icons.explore),
+            label: '发现',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
