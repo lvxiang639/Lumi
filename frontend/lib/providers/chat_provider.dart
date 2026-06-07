@@ -13,6 +13,8 @@ class ChatProvider extends ChangeNotifier {
   String _streamingText = "";
   bool _isProcessing = false;
   String? currentSkill;
+  List<String> _quickReplies = [];
+  List<String> get quickReplies => _quickReplies;
   WsState _wsState = WsState.disconnected;
   String _emotion = 'calm';
   double _emotionIntensity = 0.0;
@@ -99,6 +101,9 @@ class ChatProvider extends ChangeNotifier {
           );
         }
         break;
+      case 'quick_replies':
+        _quickReplies = (msg.data['replies'] as List?)?.cast<String>() ?? [];
+        break;
       case 'emotion_update':
         _emotion = msg.data['emotion'] as String? ?? 'calm';
         _emotionIntensity = (msg.data['intensity'] as num?)?.toDouble() ?? 0.0;
@@ -114,6 +119,7 @@ class ChatProvider extends ChangeNotifier {
         }
         _isProcessing = false;
         currentSkill = null;
+        _quickReplies = [];
         if (msg.data['conversation_id'] != null) {
           _conversationId = msg.data['conversation_id'] as String;
           _ws.conversationId = _conversationId;

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 # import base64  # VOICE FEATURE DISABLED
@@ -179,7 +180,11 @@ class ChatOrchestrator:
         conv.updated_at = datetime.now(timezone.utc)
         await db.commit()
 
-        # 5. Done — send immediately, don't wait for TTS
+        # 5. Quick reply suggestions (fire-and-forget)
+        if intent == "chat" and response_text and len(response_text) > 20:
+            asyncio.create_task(self._suggest_replies(text, response_text, send_message))
+
+        # 6. Done — send immediately
         await send_message(
             {"type": "done", "conversation_id": str(conv.id)}
         )
@@ -359,6 +364,29 @@ class ChatOrchestrator:
         # Step 3: Consolidate
         consolidated = "\n".join(results) if results else "已完成所有步骤"
         return consolidated
+
+    async def _suggest_replies(self, user_msg: str, ai_response: str, send_message) -> None:
+        """Generate 2-3 quick reply suggestions based on conversation context."""
+        try:
+            prompt = (
+                f"基于以下对话，生成2-3个用户可以快速回复的选项（每个不超过15字）。"
+                f"用JSON数组返回：[\"选项1\", \"选项2\"]\n\n"
+                f"用户: {user_msg[:100]}\nAI: {ai_response[:200]}\n\nJSON:"
+            )
+            raw = await llm_router.chat([{"role": "user", "content": prompt}])
+            if raw:
+                import json
+                try:
+                    suggestions = json.loads(raw.strip())
+                    if isinstance(suggestions, list) and len(suggestions) > 0:
+                        await send_message({
+                            "type": "quick_replies",
+                            "replies": suggestions[:3],
+                        })
+                except (json.JSONDecodeError, ValueError):
+                    pass
+        except Exception:
+            pass  # suggestions are optional, never fail the main flow
 
     async def _get_or_create_conv(
         self,

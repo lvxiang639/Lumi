@@ -425,6 +425,37 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: LinearProgressIndicator(
                       minHeight: 2, backgroundColor: Colors.transparent),
                 ),
+              // Quick reply chips
+              if (chat.quickReplies.isNotEmpty)
+                Positioned(
+                  bottom: 56,
+                  left: 8, right: 8,
+                  child: SizedBox(
+                    height: 36,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      itemCount: chat.quickReplies.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) => GestureDetector(
+                        onTap: () {
+                          _textCtrl.text = chat.quickReplies[i];
+                          _send();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(chat.quickReplies[i],
+                              style: const TextStyle(color: AppColors.accent, fontSize: 13)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
           bottomSheet: _InputBar(

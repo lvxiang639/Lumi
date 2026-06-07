@@ -17,7 +17,6 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   Set<String> _pinnedIds = {};
-  bool _pinsLoaded = false;
 
   @override
   void initState() {
@@ -33,7 +32,6 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         _pinnedIds = Set<String>.from(json.decode(raw) as List);
       }
     } catch (_) {}
-    _pinsLoaded = true;
   }
 
   Future<void> _savePins() async {
@@ -118,8 +116,11 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
           final all = provider.conversations;
           // Filter
           var filtered = _query.isNotEmpty
-              ? all.where((c) => (c.title as String).contains(_query) ||
-                  (c.lastMessage as String? ?? '').contains(_query)).toList()
+              ? all.where((c) {
+                  final t = c.title.toString();
+                  final lm = (c.lastMessage ?? '').toString();
+                  return t.contains(_query) || lm.contains(_query);
+                }).toList()
               : List.from(all);
           // Sort: pinned first
           filtered.sort((a, b) {
