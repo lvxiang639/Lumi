@@ -85,12 +85,16 @@ class _EmailPageState extends State<EmailPage> {
                                 const Icon(Icons.email_outlined,
                                     color: AppColors.accent, size: 16),
                                 const SizedBox(width: 8),
-                                Text(e['conv_title'] as String? ?? '',
-                                    style: TextStyle(
-                                        color: AppColors.text(brightness),
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500)),
-                                const Spacer(),
+                                Expanded(
+                                  child: Text(e['conv_title'] as String? ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          color: AppColors.text(brightness),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500)),
+                                ),
+                                const SizedBox(width: 8),
                                 Text(_formatTime(e['sent_at']),
                                     style: TextStyle(
                                         color: AppColors.textSecondary(
