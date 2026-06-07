@@ -6,6 +6,8 @@ import 'providers/conversation_provider.dart';
 import 'providers/calendar_provider.dart';
 import 'providers/expense_provider.dart';
 import 'providers/character_provider.dart';
+import 'providers/theme_provider.dart';
+import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
 
@@ -22,19 +24,24 @@ class LingxiApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CalendarProvider()),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => CharacterProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
-      child: MaterialApp(
-        title: '灵犀',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-          useMaterial3: true,
-        ),
-        home: Consumer<AuthProvider>(
-          builder: (context, auth, _) {
-            if (auth.isAuthenticated) return const MainScreen();
-            return const LoginScreen();
-          },
-        ),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            title: '灵犀',
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: themeProvider.themeMode,
+            debugShowCheckedModeBanner: false,
+            home: Consumer<AuthProvider>(
+              builder: (context, auth, _) {
+                if (auth.isAuthenticated) return const MainScreen();
+                return const LoginScreen();
+              },
+            ),
+          );
+        },
       ),
     );
   }

@@ -1,18 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../providers/conversation_provider.dart';
 import '../providers/character_provider.dart';
-import '../widgets/sci_fi_bg.dart';
 import 'conversation_list_screen.dart';
-import 'discover_screen.dart';
+import 'tools/tools_center_screen.dart';
 import 'profile_screen.dart';
-
-// ── Palette ──
-const _surface = Color(0xFF0F1229);
-const _accent = Color(0xFF818CF8);
-const _textMain = Color(0xFFE2E8F0);
-const _textDim = Color(0xFF94A3B8);
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -26,7 +18,7 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _pages = const [
     ConversationListScreen(),
-    DiscoverScreen(),
+    ToolsCenterScreen(),
     ProfileScreen(),
   ];
 
@@ -41,51 +33,29 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        const SciFiBackground(),
-        Scaffold(
-          backgroundColor: Colors.transparent,
-          body: IndexedStack(
-            index: _currentIndex,
-            children: _pages,
-          ),
-          bottomNavigationBar: _bottomNav(),
-        ),
-      ],
-    );
-  }
-
-  Widget _bottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: _accent.withValues(alpha: 0.15), width: 0.5),
-        ),
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _pages,
       ),
-      child: BottomNavigationBar(
+      bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (i) => setState(() => _currentIndex = i),
-        backgroundColor: _surface.withValues(alpha: 0.95),
-        selectedItemColor: _accent,
-        unselectedItemColor: _textDim.withValues(alpha: 0.5),
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.chat_bubble_outline),
             activeIcon: Icon(Icons.chat_bubble),
-            label: '对话',
+            label: '聊天',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.explore_outlined),
-            activeIcon: Icon(Icons.explore),
-            label: '发现',
+            icon: Icon(Icons.apps_outlined),
+            activeIcon: Icon(Icons.apps),
+            label: '工具',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
             activeIcon: Icon(Icons.person),
-            label: '我的',
+            label: '我',
           ),
         ],
       ),
