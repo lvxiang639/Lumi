@@ -133,7 +133,8 @@ async def download_file(
     if not content:
         raise HTTPException(500, "文件下载失败")
 
-    encoded_name = record.target_name
+    from urllib.parse import quote
+    encoded_name = quote(record.target_name, safe='')
     return Response(
         content=content,
         media_type=record.content_type,
