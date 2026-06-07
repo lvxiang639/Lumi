@@ -74,6 +74,16 @@ class ProactiveService:
             except Exception:
                 logger.exception("proactive check failed for user=%s", uid[:8])
 
+    async def _check_water(self, user_id: str, now: datetime) -> str | None:
+        """Remind to drink water every 2 hours during daytime (8-22)."""
+        if now.hour < 8 or now.hour > 22:
+            return None
+        last = self._last_push.get(user_id)
+        if last and (now - last).total_seconds() < 7200:
+            return None
+        hour = now.hour
+        return f"💧 已经{hour}点了，记得喝杯水哦~ 今天也要元气满满！"
+
     async def _check_user(self, user_id: str, now: datetime):
         """Consolidated check — build one combined message (max 1 push per cycle)."""
         if not self._can_push(user_id, now):
@@ -101,6 +111,10 @@ class ProactiveService:
             # Idle greeting
             idle = await self._check_idle(user_id, now, db)
             if idle: parts.append(idle)
+
+            # Water reminder
+            water = await self._check_water(user_id, now)
+            if water: parts.append(water)
 
             # Emotion care
             emo = await self._check_emotion(user_id, now, db)

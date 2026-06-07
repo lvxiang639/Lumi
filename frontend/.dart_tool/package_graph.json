@@ -22,6 +22,7 @@
         "record",
         "rive",
         "shared_preferences",
+        "speech_to_text",
         "sqflite",
         "url_launcher",
         "uuid",
@@ -1199,6 +1200,37 @@
         "collection",
         "meta",
         "pub_semver"
+      ]
+    },
+    {
+      "name": "speech_to_text",
+      "version": "7.4.0",
+      "dependencies": [
+        "clock",
+        "flutter",
+        "flutter_web_plugins",
+        "json_annotation",
+        "meta",
+        "speech_to_text_platform_interface",
+        "speech_to_text_windows",
+        "web"
+      ]
+    },
+    {
+      "name": "speech_to_text_windows",
+      "version": "1.0.1",
+      "dependencies": [
+        "flutter",
+        "speech_to_text_platform_interface"
+      ]
+    },
+    {
+      "name": "speech_to_text_platform_interface",
+      "version": "2.4.0",
+      "dependencies": [
+        "flutter",
+        "meta",
+        "plugin_platform_interface"
       ]
     }
   ],

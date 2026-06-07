@@ -13,6 +13,7 @@ from app.api.sync import router as sync_router
 from app.api.tools import router as tools_router
 from app.api.notes import router as notes_router
 from app.api.ws_chat import router as ws_router
+from app.api.countdown import router as countdown_router
 
 app = FastAPI(title="灵犀 API", version="0.1.0")
 
@@ -34,6 +35,7 @@ app.include_router(sync_router)
 app.include_router(tools_router)
 app.include_router(notes_router)
 app.include_router(ws_router)
+app.include_router(countdown_router)
 
 
 @app.on_event("startup")

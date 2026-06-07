@@ -17,6 +17,7 @@ import '../services/conversation_service.dart';
 import '../widgets/chat_bg_painter.dart';
 import '../widgets/assistant_menu.dart';
 import '../widgets/pet_cat.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
@@ -32,6 +33,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final _textCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   bool _showField = false;
+  final _stt = stt.SpeechToText();
+  bool _listening = false;
 
   @override
   void initState() {
@@ -56,6 +59,30 @@ class _ChatScreenState extends State<ChatScreen> {
     _textCtrl.clear();
     context.read<ChatProvider>().sendText(t);
     setState(() => _showField = false);
+  }
+
+  Future<void> _startVoice() async {
+    if (_listening) {
+      await _stt.stop();
+      setState(() => _listening = false);
+      return;
+    }
+    final available = await _stt.initialize();
+    if (!available) {
+      _snack('语音识别不可用');
+      return;
+    }
+    setState(() => _listening = true);
+    await _stt.listen(
+      onResult: (result) {
+        if (result.finalResult) {
+          _textCtrl.text = result.recognizedWords;
+          setState(() => _listening = false);
+          if (_textCtrl.text.isNotEmpty) _send();
+        }
+      },
+      localeId: 'zh_CN',
+    );
   }
 
   void _showAssistantMenu() {
@@ -403,6 +430,8 @@ class _ChatScreenState extends State<ChatScreen> {
           bottomSheet: _InputBar(
             ctrl: _textCtrl,
             showField: _showField,
+            listening: _listening,
+            onVoice: _startVoice,
             onToggle: () => setState(() => _showField = !_showField),
             onSend: _send,
             onFile: _pickFile,
@@ -785,9 +814,10 @@ class _TypingIndicatorState extends State<_TypingIndicator>
 class _InputBar extends StatelessWidget {
   final TextEditingController ctrl;
   final bool showField;
-  final VoidCallback onToggle, onSend, onFile;
+  final VoidCallback onToggle, onSend, onFile, onVoice;
   final Brightness brightness;
   final String emotion;
+  final bool listening;
 
   const _InputBar({
     required this.ctrl,
@@ -795,7 +825,9 @@ class _InputBar extends StatelessWidget {
     required this.onToggle,
     required this.onSend,
     required this.onFile,
+    required this.onVoice,
     required this.brightness,
+    this.listening = false,
     this.emotion = 'calm',
   });
 
@@ -813,19 +845,19 @@ class _InputBar extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Voice toggle
+          // Voice input
           GestureDetector(
-            onTap: onToggle,
+            onTap: onVoice,
             child: Container(
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.08),
+                color: listening ? AppColors.danger.withValues(alpha: 0.15) : AppColors.accent.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Icon(
-                showField ? Icons.keyboard : Icons.mic_none,
-                color: AppColors.accent,
+                listening ? Icons.mic : Icons.mic_none,
+                color: listening ? AppColors.danger : AppColors.accent,
                 size: 20,
               ),
             ),

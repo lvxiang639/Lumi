@@ -12,6 +12,7 @@ import 'package:permission_handler_html/permission_handler_html.dart';
 import 'package:record_web/record_web.dart';
 import 'package:rive_native/rive_native_plugin_web.dart';
 import 'package:shared_preferences_web/shared_preferences_web.dart';
+import 'package:speech_to_text/speech_to_text_web.dart';
 import 'package:url_launcher_web/url_launcher_web.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 
@@ -23,6 +24,7 @@ void registerPlugins([final Registrar? pluginRegistrar]) {
   RecordPluginWeb.registerWith(registrar);
   RiveNativePlugin.registerWith(registrar);
   SharedPreferencesPlugin.registerWith(registrar);
+  SpeechToTextPlugin.registerWith(registrar);
   UrlLauncherPlugin.registerWith(registrar);
   registrar.registerMessageHandler();
 }
