@@ -88,12 +88,12 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     final updatedAt = conv.updatedAt as DateTime;
     final emoji = ['🐱', '🤖', '📝', '💡', '🎯', '🌟'][id.hashCode.abs() % 6];
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        leading: CircleAvatar(
+    return Column(
+      children: [
+        ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          leading: CircleAvatar(
           radius: 22,
           backgroundColor: AppColors.accent.withValues(alpha: 0.1),
           child: Text(emoji, style: const TextStyle(fontSize: 20)),
@@ -127,7 +127,12 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
-    );
+      Divider(
+        height: 1,
+        indent: 72,
+        color: AppColors.border(b).withValues(alpha: 0.5),
+      ),
+    ]);
   }
 
   void _showContextMenu(String id, String title) {

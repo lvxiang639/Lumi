@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/character_provider.dart';
 import '../providers/theme_provider.dart';
+import '../screens/summary_page.dart';
 import '../theme/app_colors.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -157,11 +158,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _settingItem(Icons.auto_awesome, '角色管理', b,
               () => _showCharacterSheet()),
           _divider(b),
-          _settingItem(Icons.email_outlined, '邮箱设置', b, () {}),
+          _settingItem(Icons.email_outlined, '邮箱设置', b, () {
+            _showEmailDialog();
+          }),
           _divider(b),
-          _settingItem(Icons.summarize_outlined, '对话摘要', b, () {}),
+          _settingItem(Icons.summarize_outlined, '对话摘要列表', b, () {
+            _showSummaryList();
+          }),
           _divider(b),
-          _settingItem(Icons.info_outline, '关于灵犀', b, () {}),
+          _settingItem(Icons.info_outline, '关于灵犀', b, () {
+            _showAboutDialog();
+          }),
         ],
       ),
     );
@@ -200,6 +207,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: AppColors.textSecondary(b)
                     .withValues(alpha: 0.5),
                 fontSize: 14)),
+      ),
+    );
+  }
+
+  void _showEmailDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('邮箱设置'),
+        content: const Text('请前往"设置"页面完善邮箱信息，用于接收对话摘要邮件。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSummaryList() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SummaryPage()),
+    );
+  }
+
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('关于灵犀'),
+        content: const Text('灵犀 — 你的 AI 陪伴伙伴\n\n版本 2.0\n\n基于大语言模型技术，提供智能对话、日程管理、记账、笔记等贴心功能。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('好的'),
+          ),
+        ],
       ),
     );
   }

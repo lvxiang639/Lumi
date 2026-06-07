@@ -694,6 +694,7 @@ class _InputBar extends StatelessWidget {
                 textInputAction: TextInputAction.newline,
                 onChanged: (_) =>
                     (ctx as Element).markNeedsBuild(),
+                onSubmitted: (_) => onSend(),
                 style: TextStyle(
                     color: AppColors.text(brightness),
                     fontSize: 15),

@@ -1,12 +1,5 @@
 import 'package:flutter/material.dart';
-
-// ── Palette ──
-const _surface = Color(0xFF0F1229);
-const _accent = Color(0xFF818CF8);
-const _accentWarm = Color(0xFFF0ABFC);
-const _textMain = Color(0xFFE2E8F0);
-const _textDim = Color(0xFF94A3B8);
-const _border = Color(0x1AFFFFFF);
+import '../theme/app_colors.dart';
 
 class AssistantMenu extends StatelessWidget {
   final String? conversationId;
@@ -24,27 +17,37 @@ class AssistantMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+
     return Container(
       decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border(top: BorderSide(color: _accent.withValues(alpha: 0.2))),
+        color: AppColors.card(brightness),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
             Container(
               margin: const EdgeInsets.only(top: 8, bottom: 4),
-              width: 32, height: 3,
-              decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(2)),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border(brightness),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 10),
-              child: Text('助手', style: TextStyle(color: _textMain, fontSize: 16, fontWeight: FontWeight.w600)),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text('助手',
+                  style: TextStyle(
+                      color: AppColors.text(brightness),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600)),
             ),
-            const Divider(color: _border, height: 1),
+            Divider(
+                height: 1, color: AppColors.border(brightness)),
             _menuItem(
               icon: Icons.email_outlined,
               title: '总结发送邮件',
@@ -54,6 +57,7 @@ class AssistantMenu extends StatelessWidget {
                 Navigator.pop(context);
                 onEmailSummary();
               },
+              brightness: brightness,
             ),
             _menuItem(
               icon: Icons.note_alt_outlined,
@@ -64,6 +68,7 @@ class AssistantMenu extends StatelessWidget {
                 Navigator.pop(context);
                 onNotes();
               },
+              brightness: brightness,
             ),
             _menuItem(
               icon: Icons.summarize_outlined,
@@ -74,6 +79,7 @@ class AssistantMenu extends StatelessWidget {
                 Navigator.pop(context);
                 onExtractSummary();
               },
+              brightness: brightness,
             ),
             const SizedBox(height: 12),
           ],
@@ -88,19 +94,22 @@ class AssistantMenu extends StatelessWidget {
     required String subtitle,
     required Color color,
     required VoidCallback onTap,
+    required Brightness brightness,
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          padding: const EdgeInsets.symmetric(
+              horizontal: 20, vertical: 14),
           child: Row(
             children: [
               Container(
-                width: 38, height: 38,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 20),
@@ -109,9 +118,17 @@ class AssistantMenu extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(color: _textMain, fontSize: 14, fontWeight: FontWeight.w500)),
+                  Text(title,
+                      style: TextStyle(
+                          color: AppColors.text(brightness),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(color: _textDim, fontSize: 11)),
+                  Text(subtitle,
+                      style: TextStyle(
+                          color:
+                              AppColors.textSecondary(brightness),
+                          fontSize: 12)),
                 ],
               ),
             ],

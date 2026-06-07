@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/email_service.dart';
-
-const _surface = Color(0xFF0F1229);
-const _accent = Color(0xFF818CF8);
-const _textMain = Color(0xFFE2E8F0);
-const _textDim = Color(0xFF94A3B8);
-const _glass = Color(0x1AFFFFFF);
-const _border = Color(0x1AFFFFFF);
+import '../theme/app_colors.dart';
 
 class EmailPage extends StatefulWidget {
   const EmailPage({super.key});
@@ -38,25 +32,39 @@ class _EmailPageState extends State<EmailPage> {
     try {
       final d = DateTime.parse(dt as String);
       return '${d.month}/${d.day} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-    } catch (_) { return ''; }
+    } catch (_) {
+      return '';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: PreferredSize(preferredSize: const Size.fromHeight(44), child: AppBar(
-        backgroundColor: Colors.transparent, elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, color: _textDim, size: 18),
-          onPressed: () => Navigator.pop(context)),
-        title: const Text('邮件记录', style: TextStyle(color: _textMain, fontSize: 16, fontWeight: FontWeight.w600)),
-      )),
+      backgroundColor: AppColors.bg(brightness),
+      appBar: AppBar(
+        leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new,
+                size: 18, color: AppColors.textSecondary(brightness)),
+            onPressed: () => Navigator.pop(context)),
+        title: Text('邮件记录',
+            style: TextStyle(
+                color: AppColors.text(brightness),
+                fontSize: 16,
+                fontWeight: FontWeight.w600)),
+      ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: _accent))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.accent))
           : _emails.isEmpty
-              ? Center(child: Text('还没有发送过邮件', style: TextStyle(color: _textDim)))
+              ? Center(
+                  child: Text('还没有发送过邮件',
+                      style: TextStyle(
+                          color: AppColors.textSecondary(brightness))))
               : RefreshIndicator(
-                  color: _accent, backgroundColor: _surface,
+                  color: AppColors.accent,
+                  backgroundColor: AppColors.card(brightness),
                   onRefresh: _load,
                   child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -64,24 +72,51 @@ class _EmailPageState extends State<EmailPage> {
                     itemBuilder: (ctx, i) {
                       final e = _emails[i];
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 6),
+                        margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(color: _glass, borderRadius: BorderRadius.circular(12), border: Border.all(color: _border)),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Row(children: [
-                            Icon(Icons.email_outlined, color: _accent, size: 16),
-                            const SizedBox(width: 8),
-                            Text(e['conv_title'] as String? ?? '', style: const TextStyle(color: _textMain, fontSize: 13, fontWeight: FontWeight.w500)),
-                            const Spacer(),
-                            Text(_formatTime(e['sent_at']), style: TextStyle(color: _textDim.withValues(alpha: 0.5), fontSize: 10)),
-                          ]),
-                          const SizedBox(height: 4),
-                          Text(e['recipient'] as String? ?? '', style: TextStyle(color: _textDim, fontSize: 11)),
-                          if ((e['summary_preview'] as String? ?? '').isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(e['summary_preview'] as String, style: TextStyle(color: _textDim.withValues(alpha: 0.6), fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
-                          ],
-                        ]),
+                        decoration: BoxDecoration(
+                          color: AppColors.card(brightness),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                const Icon(Icons.email_outlined,
+                                    color: AppColors.accent, size: 16),
+                                const SizedBox(width: 8),
+                                Text(e['conv_title'] as String? ?? '',
+                                    style: TextStyle(
+                                        color: AppColors.text(brightness),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500)),
+                                const Spacer(),
+                                Text(_formatTime(e['sent_at']),
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary(
+                                                brightness)
+                                            .withValues(alpha: 0.5),
+                                        fontSize: 10)),
+                              ]),
+                              const SizedBox(height: 4),
+                              Text(e['recipient'] as String? ?? '',
+                                  style: TextStyle(
+                                      color: AppColors.textSecondary(
+                                          brightness),
+                                      fontSize: 11)),
+                              if ((e['summary_preview'] as String? ?? '')
+                                  .isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(e['summary_preview'] as String,
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary(
+                                                brightness)
+                                            .withValues(alpha: 0.6),
+                                        fontSize: 11),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis),
+                              ],
+                            ]),
                       );
                     },
                   ),

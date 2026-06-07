@@ -5,13 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config.dart';
 import '../services/file_service.dart';
-
-const _surface = Color(0xFF0F1229);
-const _accent = Color(0xFF818CF8);
-const _textMain = Color(0xFFE2E8F0);
-const _textDim = Color(0xFF94A3B8);
-const _glass = Color(0x1AFFFFFF);
-const _border = Color(0x1AFFFFFF);
+import '../theme/app_colors.dart';
 
 class FilePage extends StatefulWidget {
   const FilePage({super.key});
@@ -95,66 +89,121 @@ class _FilePageState extends State<FilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: PreferredSize(preferredSize: const Size.fromHeight(44), child: AppBar(
-        backgroundColor: Colors.transparent, elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, color: _textDim, size: 18),
-          onPressed: () => Navigator.pop(context)),
-        title: const Text('文件转换', style: TextStyle(color: _textMain, fontSize: 16, fontWeight: FontWeight.w600)),
-      )),
+      backgroundColor: AppColors.bg(brightness),
+      appBar: AppBar(
+        leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new,
+                size: 18, color: AppColors.textSecondary(brightness)),
+            onPressed: () => Navigator.pop(context)),
+        title: Text('文件转换',
+            style: TextStyle(
+                color: AppColors.text(brightness),
+                fontSize: 16,
+                fontWeight: FontWeight.w600)),
+      ),
       body: Column(
         children: [
-          // File list / empty state
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: _accent))
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.accent))
                 : _files.isEmpty && !_uploading
                     ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.insert_drive_file_outlined, size: 48,
-                              color: _textDim.withValues(alpha: 0.3)),
+                            Icon(Icons.insert_drive_file_outlined,
+                                size: 48,
+                                color: AppColors.textSecondary(brightness)
+                                    .withValues(alpha: 0.3)),
                             const SizedBox(height: 12),
-                            Text('还没有转换过文件', style: TextStyle(color: _textDim)),
+                            Text('还没有转换过文件',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary(
+                                        brightness))),
                             const SizedBox(height: 4),
-                            Text('支持 PDF ↔ DOCX', style: TextStyle(color: _textDim.withValues(alpha: 0.5), fontSize: 12)),
+                            Text('支持 PDF ↔ DOCX',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary(
+                                            brightness)
+                                        .withValues(alpha: 0.5),
+                                    fontSize: 12)),
                           ],
                         ),
                       )
                     : RefreshIndicator(
-                        color: _accent, backgroundColor: _surface,
+                        color: AppColors.accent,
+                        backgroundColor: AppColors.card(brightness),
                         onRefresh: _load,
                         child: ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                          padding: const EdgeInsets.fromLTRB(
+                              16, 8, 16, 16),
                           itemCount: _files.length,
                           itemBuilder: (ctx, i) {
                             final f = _files[i];
                             return Container(
-                              margin: const EdgeInsets.only(bottom: 6),
+                              margin:
+                                  const EdgeInsets.only(bottom: 8),
                               padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(color: _glass, borderRadius: BorderRadius.circular(12), border: Border.all(color: _border)),
+                              decoration: BoxDecoration(
+                                color: AppColors.card(brightness),
+                                borderRadius:
+                                    BorderRadius.circular(12),
+                              ),
                               child: Row(children: [
-                                Container(width: 36, height: 36,
-                                  decoration: BoxDecoration(color: _accent.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-                                  child: const Icon(Icons.insert_drive_file, color: _accent, size: 18)),
+                                Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent
+                                          .withValues(alpha: 0.1),
+                                      borderRadius:
+                                          BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                        Icons.insert_drive_file,
+                                        color: AppColors.accent,
+                                        size: 18)),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                    Text(f['original_name'] as String? ?? '', style: const TextStyle(color: _textMain, fontSize: 13)),
-                                    Text('${f['target_name'] as String? ?? ''}  ·  ${_formatSize(f['file_size'])}',
-                                      style: TextStyle(color: _textDim.withValues(alpha: 0.6), fontSize: 10)),
-                                  ]),
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                            f['original_name']
+                                                    as String? ??
+                                                '',
+                                            style: TextStyle(
+                                                color: AppColors.text(
+                                                    brightness),
+                                                fontSize: 13)),
+                                        Text(
+                                            '${f['target_name'] as String? ?? ''}  ·  ${_formatSize(f['file_size'])}',
+                                            style: TextStyle(
+                                                color: AppColors
+                                                    .textSecondary(
+                                                        brightness)
+                                                    .withValues(
+                                                        alpha: 0.6),
+                                                fontSize: 10)),
+                                      ]),
                                 ),
-                                Text('→', style: TextStyle(color: _textDim, fontSize: 13)),
+                                Text('→',
+                                    style: TextStyle(
+                                        color: AppColors.textSecondary(
+                                            brightness),
+                                        fontSize: 13)),
                               ]),
                             );
                           },
                         ),
                       ),
           ),
-          // Bottom upload button
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
             child: SizedBox(
@@ -163,13 +212,20 @@ class _FilePageState extends State<FilePage> {
               child: ElevatedButton.icon(
                 onPressed: _uploading ? null : _uploadFile,
                 icon: _uploading
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.upload_file, size: 18),
-                label: Text(_uploading ? '转换中...' : '选择文件转换 (PDF ↔ Word)'),
+                label: Text(_uploading
+                    ? '转换中...'
+                    : '选择文件转换 (PDF ↔ Word)'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _accent,
+                  backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(23)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(23)),
                   elevation: 0,
                 ),
               ),
