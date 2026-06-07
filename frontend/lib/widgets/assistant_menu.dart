@@ -6,6 +6,7 @@ class AssistantMenu extends StatelessWidget {
   final VoidCallback onEmailSummary;
   final VoidCallback onNotes;
   final VoidCallback onExtractSummary;
+  final VoidCallback? onExport;
 
   const AssistantMenu({
     super.key,
@@ -13,6 +14,7 @@ class AssistantMenu extends StatelessWidget {
     required this.onEmailSummary,
     required this.onNotes,
     required this.onExtractSummary,
+    this.onExport,
   });
 
   @override
@@ -81,6 +83,18 @@ class AssistantMenu extends StatelessWidget {
               },
               brightness: brightness,
             ),
+            if (onExport != null)
+              _menuItem(
+                icon: Icons.picture_as_pdf_outlined,
+                title: '导出文档',
+                subtitle: '将对话导出为 PDF 或 Word',
+                color: const Color(0xFFEF4444),
+                onTap: () {
+                  Navigator.pop(context);
+                  onExport!();
+                },
+                brightness: brightness,
+              ),
             const SizedBox(height: 12),
           ],
         ),

@@ -323,3 +323,104 @@ async def list_sent_emails(
             for r in records
         ]
     }
+
+
+@router.post("/{conv_id}/export")
+async def export_conversation(
+    conv_id: UUID,
+    format: str = Query("pdf", regex="^(pdf|docx)$"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export conversation as PDF or DOCX file."""
+    conv_result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conv_id,
+            Conversation.user_id == current_user.id,
+        )
+    )
+    conv = conv_result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(404, "Conversation not found")
+
+    msgs_result = await db.execute(
+        select(Message)
+        .where(Message.conv_id == conv_id)
+        .order_by(Message.created_at)
+    )
+    messages = msgs_result.scalars().all()
+    if not messages:
+        raise HTTPException(400, "对话内容为空")
+
+    lines = []
+    for m in messages:
+        role = "用户" if m.role.value == "user" else "灵犀"
+        lines.append(f"{role}: {m.content or ''}")
+    dialogue = "\n\n".join(lines)
+    title = conv.title or "对话"
+
+    import io as io_mod, uuid as uuid_mod
+    from app.services.minio_service import upload_file, get_download_url
+
+    file_bytes = io_mod.BytesIO()
+    filename = f"{title}.{format}"
+
+    if format == "pdf":
+        from fpdf import FPDF
+        pdf = FPDF()
+        pdf.add_page()
+        # Try CJK font on macOS
+        font_path = "/System/Library/Fonts/PingFang.ttc"
+        try:
+            pdf.add_font("cjk", "", font_path, uni=True)
+            font_name = "cjk"
+        except Exception:
+            font_name = "Helvetica"
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.set_font(font_name, "", 12)
+        pdf.cell(0, 10, title, new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.ln(6)
+        for line in dialogue.split("\n"):
+            pdf.set_font(font_name, "", 9)
+            pdf.multi_cell(0, 5.5, line)
+        pdf.output(file_bytes)
+    else:
+        from docx import Document
+        doc = Document()
+        doc.add_heading(title, 0)
+        for line in dialogue.split("\n"):
+            doc.add_paragraph(line)
+        doc.save(file_bytes)
+
+    file_bytes.seek(0)
+    file_size = len(file_bytes.getvalue())
+
+    object_name = await upload_file(
+        file_bytes.getvalue(), filename,
+        content_type="application/pdf" if format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    if not object_name:
+        raise HTTPException(500, "文件上传失败")
+
+    download_url_val = await get_download_url(object_name)
+    if not download_url_val:
+        raise HTTPException(500, "文件上传失败")
+
+    from app.models import ConvertedFile
+    target_name = f"{title}.{format}"
+    cf = ConvertedFile(
+        user_id=current_user.id,
+        original_name=f"{title}.txt",
+        target_name=target_name,
+        object_name=object_name,
+        file_size=file_size,
+    )
+    db.add(cf)
+    await db.commit()
+    await db.refresh(cf)
+
+    return {
+        "id": str(cf.id),
+        "target_name": target_name,
+        "download_url": download_url_val,
+    }

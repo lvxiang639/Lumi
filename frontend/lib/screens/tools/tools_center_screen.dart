@@ -18,7 +18,7 @@ class ToolsCenterScreen extends StatelessWidget {
     _Tool('心情', Icons.mood, Color(0xFFEC4899)),
     _Tool('邮件', Icons.email, Color(0xFF8B5CF6)),
     _Tool('转换', Icons.swap_horiz, Color(0xFF14B8A6)),
-    _Tool('搜索', Icons.search, Color(0xFF6366F1)),
+    _Tool('文档', Icons.folder_outlined, Color(0xFF6366F1)),
     _Tool('摘要', Icons.summarize, Color(0xFFF97316)),
     _Tool('OCR', Icons.document_scanner, Color(0xFF06B6D4)),
   ];
@@ -42,6 +42,9 @@ class ToolsCenterScreen extends StatelessWidget {
         page = const EmailPage();
         break;
       case '转换':
+        page = const FilePage();
+        break;
+      case '文档':
         page = const FilePage();
         break;
       case '摘要':

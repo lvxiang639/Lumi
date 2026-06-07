@@ -70,6 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
         onEmailSummary: _onEmailSummary,
         onNotes: _onSaveNote,
         onExtractSummary: _onExtractSummary,
+        onExport: _onExport,
       ),
     );
   }
@@ -105,6 +106,75 @@ class _ChatScreenState extends State<ChatScreen> {
       chat.sendText('📝 已保存为笔记');
     } catch (_) {
       chat.sendText('❌ 笔记保存失败');
+    }
+  }
+
+  Future<void> _onExport() async {
+    final chat = context.read<ChatProvider>();
+    final convId = chat.conversationId;
+    if (convId == null) {
+      _snack('请先发送一条消息');
+      return;
+    }
+
+    // Show format picker
+    final format = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 8, bottom: 12),
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('导出格式', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+              title: const Text('PDF 文档'),
+              subtitle: const Text('适合打印和分享'),
+              onTap: () => Navigator.pop(ctx, 'pdf'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description, color: Color(0xFF3B82F6)),
+              title: const Text('Word 文档'),
+              subtitle: const Text('可编辑的 .docx 格式'),
+              onTap: () => Navigator.pop(ctx, 'docx'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (format == null) return;
+    chat.sendText('📄 正在生成${format == 'pdf' ? 'PDF' : 'Word'}文档...');
+
+    try {
+      final tok = (await SharedPreferences.getInstance()).getString('access_token') ?? '';
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/conversations/$convId/export?format=$format');
+      final resp = await http.post(uri, headers: {
+        'Authorization': 'Bearer $tok',
+        'Content-Type': 'application/json',
+      });
+      if (resp.statusCode == 200) {
+        final d = jsonDecode(resp.body) as Map<String, dynamic>;
+        chat.sendText('✅ 文档已生成: ${d['target_name']}');
+      } else {
+        chat.sendText('❌ 导出失败');
+      }
+    } catch (_) {
+      chat.sendText('❌ 导出失败');
     }
   }
 
