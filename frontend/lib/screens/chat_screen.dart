@@ -260,8 +260,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: CustomPaint(
                   painter: ChatBgPainter(
                     dotColor: brightness == Brightness.light
-                        ? const Color(0xFFD0D0D0)
-                        : const Color(0xFF30363D),
+                        ? const Color(0xFFA0A0A0)
+                        : const Color(0xFF484F58),
                   ),
                 ),
               ),
@@ -761,7 +761,7 @@ class _InputBar extends StatelessWidget {
                 autofocus: showField,
                 minLines: 1,
                 maxLines: 4,
-                textInputAction: TextInputAction.newline,
+                textInputAction: TextInputAction.send,
                 onChanged: (_) =>
                     (ctx as Element).markNeedsBuild(),
                 onSubmitted: (_) => onSend(),

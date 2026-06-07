@@ -367,20 +367,23 @@ async def export_conversation(
 
     if format == "pdf":
         from fpdf import FPDF
+        from app.services.conversion_service import _find_cjk_font
         pdf = FPDF()
         pdf.add_page()
-        # Try CJK font on macOS
-        font_path = "/System/Library/Fonts/PingFang.ttc"
-        try:
+        font_path = _find_cjk_font()
+        if font_path:
             pdf.add_font("cjk", "", font_path, uni=True)
             font_name = "cjk"
-        except Exception:
-            font_name = "Helvetica"
+        else:
+            font_name = "Courier"
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.set_font(font_name, "", 12)
         pdf.cell(0, 10, title, new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.ln(6)
         for line in dialogue.split("\n"):
+            if not line.strip():
+                pdf.ln(3)
+                continue
             pdf.set_font(font_name, "", 9)
             pdf.multi_cell(0, 5.5, line)
         pdf.output(file_bytes)

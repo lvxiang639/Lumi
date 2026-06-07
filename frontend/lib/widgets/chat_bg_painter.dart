@@ -34,7 +34,7 @@ class ChatBgPainter extends CustomPainter {
     final rng = Random(seed);
 
     final count = rng.nextInt(4) + 2; // 2-5 doodles per tile
-    final alpha = 0.07 + rng.nextDouble() * 0.06;
+    final alpha = 0.15 + rng.nextDouble() * 0.12;
 
     paint.color = dotColor.withValues(alpha: alpha);
     strokePaint.color = dotColor.withValues(alpha: alpha);
