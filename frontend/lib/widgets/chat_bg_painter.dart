@@ -13,7 +13,7 @@ class ChatBgPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.7;
 
-    const tileSize = 72.0;
+    const tileSize = 96.0;
     final cols = (size.width / tileSize).ceil() + 1;
     final rows = (size.height / tileSize).ceil() + 1;
 
@@ -34,12 +34,12 @@ class ChatBgPainter extends CustomPainter {
     fill.color = dotColor.withValues(alpha: alpha);
     stroke.color = dotColor.withValues(alpha: alpha);
 
-    final count = rng.nextInt(3) + 1; // 1-3 doodles per tile
+    final count = rng.nextInt(2) + 1; // 1-2 larger doodles per tile
 
     for (int i = 0; i < count; i++) {
       final cx = ox + 10 + rng.nextDouble() * (size - 20);
       final cy = oy + 10 + rng.nextDouble() * (size - 20);
-      final s = 3.0 + rng.nextDouble() * 5.0; // scale
+      final s = 6.0 + rng.nextDouble() * 10.0; // scale (2x larger)
       final kind = rng.nextInt(14);
 
       switch (kind) {
