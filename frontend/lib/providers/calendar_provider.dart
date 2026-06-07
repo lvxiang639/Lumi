@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/calendar_event.dart';
 import '../services/calendar_service.dart';
+import '../services/calendar_sync_service.dart';
 
 class CalendarProvider extends ChangeNotifier {
   final CalendarService _service = CalendarService();
+  final CalendarSyncService _syncService = CalendarSyncService();
   List<CalendarEvent> _events = [];
   bool _loading = false;
   String? _error;
@@ -27,6 +29,12 @@ class CalendarProvider extends ChangeNotifier {
 
   Future<void> createEvent(CalendarEvent event) async {
     await _service.createEvent(event);
+    // Sync to system calendar
+    _syncService.addEvent(
+      title: event.title,
+      time: event.time,
+      repeatRule: event.repeatRule,
+    );
     await loadEvents();
   }
 

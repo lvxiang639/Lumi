@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/message.dart';
 import '../services/ws_service.dart';
 import '../services/api_client.dart';
+import '../services/calendar_sync_service.dart';
 
 class ChatProvider extends ChangeNotifier {
   final WsService _ws = WsService();
@@ -112,7 +112,33 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _onSkillCall(Map<String, dynamic> data) {
-    // Skill calls are handled by the backend — frontend only displays them
+    final skill = data['skill'] as String?;
+    // Sync calendar events to system calendar
+    if (skill == 'calendar') {
+      final eventData = data['data'] as Map<String, dynamic>?;
+      if (eventData != null) {
+        _syncCalendarEvent(eventData);
+      }
+    }
+  }
+
+  void _syncCalendarEvent(Map<String, dynamic> data) {
+    final title = data['title'] as String?;
+    final timeStr = data['time'] as String?;
+    final repeatRule = data['repeat_rule'] as String? ?? 'none';
+    if (title == null || timeStr == null) return;
+
+    try {
+      final time = DateTime.parse(timeStr);
+      final syncService = CalendarSyncService();
+      syncService.addEvent(
+        title: title,
+        time: time,
+        repeatRule: repeatRule,
+      );
+    } catch (_) {
+      // Silently ignore sync failures
+    }
   }
 
   Future<void> endConversation() async {
