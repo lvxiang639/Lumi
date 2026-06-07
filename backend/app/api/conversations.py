@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from app.database import get_db
-from app.models import Conversation, Message, User, SentEmail
+from app.models import Conversation, Message, User, SentEmail, ConvMemory
 from app.api.deps import get_current_user
 from app.schemas.conversation import ConversationItem, MessageItem, UpdateTitleRequest
 from app.services.llm_service import llm_router
@@ -45,10 +45,39 @@ async def list_conversations(
         .offset(offset).limit(page_size)
     )
     convs = result.scalars().all()
+
+    # Fetch last message for each conversation
+    conv_ids = [c.id for c in convs]
+    if conv_ids:
+        # Subquery: get newest message per conversation
+        subq = (
+            select(
+                Message.conv_id,
+                Message.content,
+                func.row_number().over(
+                    partition_by=Message.conv_id,
+                    order_by=desc(Message.created_at),
+                ).label("rn")
+            )
+            .where(Message.conv_id.in_(conv_ids))
+            .subquery()
+        )
+        last_msgs = await db.execute(
+            select(subq.c.conv_id, subq.c.content).where(subq.c.rn == 1)
+        )
+        last_msg_map = {row.conv_id: row.content for row in last_msgs}
+    else:
+        last_msg_map = {}
+
     return {
         "items": [
-            ConversationItem(id=str(c.id), title=c.title,
-                           created_at=c.created_at, updated_at=c.updated_at)
+            ConversationItem(
+                id=str(c.id),
+                title=c.title,
+                last_message=last_msg_map.get(c.id),
+                created_at=c.created_at,
+                updated_at=c.updated_at,
+            )
             for c in convs
         ],
         "total": total,
@@ -84,6 +113,60 @@ async def list_messages(
             for m in reversed(msgs)
         ],
         "next_cursor": str(msgs[-1].created_at) if len(msgs) == limit else None,
+    }
+
+
+@router.get("/{conv_id}/memory")
+async def get_conv_memory(
+    conv_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """获取对话级记忆摘要"""
+    conv_result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conv_id,
+            Conversation.user_id == current_user.id,
+        )
+    )
+    if not conv_result.scalar_one_or_none():
+        raise HTTPException(404, "Conversation not found")
+
+    result = await db.execute(
+        select(ConvMemory.summary_text)
+        .where(ConvMemory.conv_id == conv_id)
+        .order_by(ConvMemory.updated_at.desc())
+        .limit(1)
+    )
+    row = result.scalar_one_or_none()
+    return {"summary_text": row or ""}
+
+
+@router.get("/summaries-all")
+async def list_summaries(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """List all conversation summaries (conv_memories) for the current user."""
+    result = await db.execute(
+        select(ConvMemory, Conversation.title)
+        .join(Conversation, ConvMemory.conv_id == Conversation.id)
+        .where(ConvMemory.user_id == current_user.id)
+        .where(ConvMemory.summary_text != "")
+        .order_by(desc(ConvMemory.updated_at))
+        .limit(50)
+    )
+    rows = result.all()
+    return {
+        "items": [
+            {
+                "conv_id": str(row.ConvMemory.conv_id),
+                "conv_title": row.title,
+                "summary_text": row.ConvMemory.summary_text,
+                "updated_at": row.ConvMemory.updated_at.isoformat(),
+            }
+            for row in rows
+        ]
     }
 
 
@@ -125,29 +208,8 @@ async def update_title(
     return {"status": "ok"}
 
 
-@router.post("/{conv_id}/email-summary")
-async def email_summary(
-    conv_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Summarize the conversation via LLM and send it to the user's email."""
-    # 1. Check conversation belongs to user
-    conv_result = await db.execute(
-        select(Conversation).where(
-            Conversation.id == conv_id,
-            Conversation.user_id == current_user.id,
-        )
-    )
-    conv = conv_result.scalar_one_or_none()
-    if not conv:
-        raise HTTPException(404, "Conversation not found")
-
-    # 2. Check user has an email address
-    if not current_user.email:
-        raise HTTPException(400, "请先在个人资料中设置邮箱地址")
-
-    # 3. Fetch messages
+async def _generate_summary(conv_id: UUID, db: AsyncSession):
+    """Shared helper: fetch messages and generate LLM summary, returns summary text."""
     msgs_result = await db.execute(
         select(Message)
         .where(Message.conv_id == conv_id)
@@ -157,14 +219,12 @@ async def email_summary(
     if not messages:
         raise HTTPException(400, "对话内容为空")
 
-    # 4. Format messages for LLM
     lines = []
     for m in messages:
         role = "用户" if m.role.value == "user" else "AI"
         lines.append(f"{role}: {m.content or ''}")
     dialogue = "\n".join(lines)
 
-    # 5. Summarize via LLM
     prompt = SUMMARY_PROMPT.format(messages=dialogue)
     try:
         summary = await llm_router.chat([
@@ -177,18 +237,61 @@ async def email_summary(
     if not summary.strip():
         raise HTTPException(500, "摘要为空")
 
-    # 6. Send email
+    return summary.strip()
+
+
+@router.post("/{conv_id}/summary")
+async def get_conversation_summary(
+    conv_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Summarize the conversation via LLM and return the summary text (no email sent)."""
+    conv_result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conv_id,
+            Conversation.user_id == current_user.id,
+        )
+    )
+    if not conv_result.scalar_one_or_none():
+        raise HTTPException(404, "Conversation not found")
+
+    summary = await _generate_summary(conv_id, db)
+    return {"summary": summary}
+
+
+@router.post("/{conv_id}/email-summary")
+async def email_summary(
+    conv_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Summarize the conversation via LLM and send it to the user's email."""
+    conv_result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conv_id,
+            Conversation.user_id == current_user.id,
+        )
+    )
+    conv = conv_result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(404, "Conversation not found")
+
+    if not current_user.email:
+        raise HTTPException(400, "请先在个人资料中设置邮箱地址")
+
+    summary = await _generate_summary(conv_id, db)
+
     subject = f"对话摘要: {conv.title}"
-    success = await send_email(current_user.email, subject, summary.strip())
+    success = await send_email(current_user.email, subject, summary)
     if not success:
         raise HTTPException(500, "邮件发送失败，请检查邮箱配置")
 
-    # 7. Save sent email record
     db.add(SentEmail(
         user_id=current_user.id,
         conv_title=conv.title,
         recipient=current_user.email,
-        summary_preview=summary.strip()[:200],
+        summary_preview=summary[:200],
     ))
     await db.commit()
 

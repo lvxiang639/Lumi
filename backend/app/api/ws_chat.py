@@ -68,14 +68,17 @@ async def websocket_chat(ws: WebSocket):
                             db,
                             send_message,
                         )
-                    elif msg_type == "voice":
-                        await chat_orchestrator.process_voice(
-                            user_id,
-                            data["audio"],
-                            data.get("conversation_id"),
-                            db,
-                            send_message,
-                        )
+                    # ============================================================
+                    # VOICE FEATURE DISABLED — 语音功能已注释，后续可恢复
+                    # ============================================================
+                    # elif msg_type == "voice":
+                    #     await chat_orchestrator.process_voice(
+                    #         user_id,
+                    #         data["audio"],
+                    #         data.get("conversation_id"),
+                    #         db,
+                    #         send_message,
+                    #     )
                     else:
                         await send_message(
                             {

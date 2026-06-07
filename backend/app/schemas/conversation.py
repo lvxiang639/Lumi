@@ -5,6 +5,7 @@ from datetime import datetime
 class ConversationItem(BaseModel):
     id: str
     title: str
+    last_message: str | None = None
     created_at: datetime
     updated_at: datetime
 

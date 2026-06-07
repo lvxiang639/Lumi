@@ -8,6 +8,7 @@ from app.models.emotion_state import UserEmotionState
 # Chat domain
 from app.models.conversation import Conversation
 from app.models.message import Message, MessageRole, MessageType
+from app.models.conv_memory import ConvMemory
 
 # Calendar domain
 from app.models.calendar_event import CalendarEvent
@@ -33,7 +34,7 @@ __all__ = [
     # User
     "User", "UserMemory", "UserEmotionState",
     # Chat
-    "Conversation", "Message", "MessageRole", "MessageType",
+    "Conversation", "ConvMemory", "Message", "MessageRole", "MessageType",
     # Calendar
     "CalendarEvent",
     # Expense

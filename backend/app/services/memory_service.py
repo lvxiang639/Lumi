@@ -203,6 +203,70 @@ async def get_memory_summary(user_id: UUID) -> str:
     return "\n".join(lines)
 
 
+# ── ConvMemory (对话级记忆) ──
+
+CONV_SUMMARY_PROMPT = """为以下对话生成一句简短的摘要（30字以内），概括用户和AI聊了些什么：
+
+对话内容:
+{dialogue}
+
+摘要（30字以内）:"""
+
+
+async def extract_conv_summary(user_id: UUID, conv_id: UUID, dialogue: str) -> None:
+    """Async: extract a summary of this conversation and save to conv_memories."""
+    if not dialogue.strip():
+        return
+
+    try:
+        summary = await llm_router.chat([
+            {"role": "user", "content": CONV_SUMMARY_PROMPT.format(dialogue=dialogue)},
+        ])
+    except Exception:
+        logger.exception("conv memory extraction LLM failed")
+        return
+
+    if not summary or not summary.strip():
+        return
+
+    summary = summary.strip()[:200]  # cap length
+
+    async with async_session() as db:
+        from app.models import ConvMemory
+
+        # Check if a conv_memory already exists for this conv
+        result = await db.execute(
+            select(ConvMemory).where(
+                ConvMemory.conv_id == conv_id,
+            )
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            existing.summary_text = summary
+        else:
+            db.add(ConvMemory(
+                user_id=user_id,
+                conv_id=conv_id,
+                summary_text=summary,
+            ))
+        await db.commit()
+
+
+async def get_conv_memory_summary(conv_id: UUID) -> str:
+    """Get conversation-level memory summary for a given conversation."""
+    async with async_session() as db:
+        from app.models import ConvMemory
+        result = await db.execute(
+            select(ConvMemory.summary_text)
+            .where(ConvMemory.conv_id == conv_id)
+            .order_by(ConvMemory.updated_at.desc())
+            .limit(1)
+        )
+        row = result.scalar_one_or_none()
+    return row or ""
+
+
 def schedule_extraction(user_id: UUID, conv_id: UUID, dialogue: str) -> None:
     """Fire-and-forget memory extraction after conversation ends."""
     asyncio.create_task(extract_memories(user_id, conv_id, dialogue))
+    asyncio.create_task(extract_conv_summary(user_id, conv_id, dialogue))

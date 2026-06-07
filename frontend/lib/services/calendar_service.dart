@@ -14,12 +14,12 @@ class CalendarService {
 
   Future<CalendarEvent> createEvent(CalendarEvent event) async {
     final data =
-        await _api.post('/api/calendar/events', body: event.toJson());
+        await _api.post('/api/calendar', body: event.toJson());
     return CalendarEvent.fromJson(data);
   }
 
   Future<void> updateEvent(String id, CalendarEvent event) async {
-    await _api.put('/api/calendar/events/$id', body: event.toJson());
+    await _api.put('/api/calendar/$id', body: event.toJson());
   }
 
   Future<void> deleteEvent(String id) async {

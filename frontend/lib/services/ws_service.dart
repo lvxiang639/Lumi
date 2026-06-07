@@ -92,13 +92,17 @@ class WsService {
     }));
   }
 
-  void sendVoice(String base64Audio) {
-    _channel?.sink.add(jsonEncode({
-      'type': 'voice',
-      'audio': base64Audio,
-      'conversation_id': conversationId,
-    }));
-  }
+  // ============================================================
+  // VOICE FEATURE DISABLED — 语音功能已注释，后续可恢复
+  // ============================================================
+  // void sendVoice(String base64Audio) {
+  //   _channel?.sink.add(jsonEncode({
+  //     'type': 'voice',
+  //     'audio': base64Audio,
+  //     'conversation_id': conversationId,
+  //   }));
+  // }
+  // ============================================================
 
   Future<void> disconnect() async {
     _intentionalClose = true;

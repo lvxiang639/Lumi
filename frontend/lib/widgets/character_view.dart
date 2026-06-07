@@ -2,18 +2,17 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// Character view with smooth animation, backdrop, and programmatic mouth sync.
+/// Character view with smooth animation, backdrop.
+/// Simplified — no mouth/talk animation.
 ///
 /// Works with a single transparent PNG — no layered images needed.
 class CharacterView extends StatefulWidget {
-  final double mouthOpen; // 0.0–1.0 from TTS energy envelope
   final String animState; // idle | talking | dancing
   final String emotion; // joy/sad/angry/calm/surprised/worried
   final double emotionIntensity; // 0.0-1.0
 
   const CharacterView({
     super.key,
-    this.mouthOpen = 0.0,
     this.animState = 'idle',
     this.emotion = 'calm',
     this.emotionIntensity = 0.0,
@@ -31,7 +30,6 @@ class _CharacterViewState extends State<CharacterView>
   late final AnimationController _blinkCtrl;
   late final AnimationController _particleCtrl;
 
-  double _mouthValue = 0.0;
   double _bounceEnergy = 0.0;
   Timer? _blinkTimer;
 
@@ -109,11 +107,10 @@ class _CharacterViewState extends State<CharacterView>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final targetMouth = widget.mouthOpen.clamp(0.0, 1.0);
-    _mouthValue += (targetMouth - _mouthValue) * 0.35;
-    final energyTarget =
-        widget.animState == 'dancing' ? 1.0 : targetMouth;
-    _bounceEnergy += (energyTarget - _bounceEnergy) * 0.25;
+    _bounceEnergy += (0.0 - _bounceEnergy) * 0.25;
+    if (widget.animState == 'talking' || widget.animState == 'dancing') {
+      _bounceEnergy += 0.08;
+    }
 
     return AnimatedBuilder(
       animation: Listenable.merge([
@@ -149,7 +146,6 @@ class _CharacterViewState extends State<CharacterView>
         final tilt = tiltCurve * 0.03 * (1.0 + effectiveBounce);
         final bounceCurve = math.sin(bounce * 2 * math.pi);
         final bounceY = bounceCurve * 3 * effectiveBounce;
-        final mouthScale = _mouthValue;
 
         final blinkScaleY = blink < 0.5
             ? 1.0 - blink * 0.12
@@ -172,7 +168,7 @@ class _CharacterViewState extends State<CharacterView>
                     width: 200,
                     height: 30,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle, // Will be ellipse due to w≠h
+                      shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
                           color: theme.colorScheme.primary
@@ -209,25 +205,6 @@ class _CharacterViewState extends State<CharacterView>
                   ),
                 ),
               ),
-
-              // ---- mouth indicator (talking glow) ----
-              if (widget.animState == 'talking')
-                Positioned(
-                  bottom: 95,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 100),
-                    opacity: mouthScale * 0.6,
-                    child: Container(
-                      width: 40 + mouthScale * 20,
-                      height: 8 + mouthScale * 6,
-                      decoration: BoxDecoration(
-                        color:
-                            theme.colorScheme.primary.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
         );

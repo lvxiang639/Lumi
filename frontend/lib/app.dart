@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/chat_provider.dart';
+import 'providers/conversation_provider.dart';
 import 'providers/calendar_provider.dart';
 import 'providers/expense_provider.dart';
 import 'providers/character_provider.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_screen.dart';
 
 class LingxiApp extends StatelessWidget {
   const LingxiApp({super.key});
@@ -17,6 +18,7 @@ class LingxiApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => ConversationProvider()),
         ChangeNotifierProvider(create: (_) => CalendarProvider()),
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => CharacterProvider()),
@@ -29,7 +31,7 @@ class LingxiApp extends StatelessWidget {
         ),
         home: Consumer<AuthProvider>(
           builder: (context, auth, _) {
-            if (auth.isAuthenticated) return const HomeScreen();
+            if (auth.isAuthenticated) return const MainScreen();
             return const LoginScreen();
           },
         ),
