@@ -79,6 +79,19 @@ class _FilePageState extends State<FilePage> {
     setState(() => _uploading = false);
   }
 
+  Future<void> _download(String fileId, String fileName) async {
+    final ok = await _service.downloadAndOpen(fileId, fileName);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? '已打开 $fileName' : '下载失败'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   String _formatSize(dynamic size) {
     if (size == null) return '';
     final s = (size as num).toDouble();
@@ -145,60 +158,67 @@ class _FilePageState extends State<FilePage> {
                           itemCount: _files.length,
                           itemBuilder: (ctx, i) {
                             final f = _files[i];
-                            return Container(
-                              margin:
-                                  const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: AppColors.card(brightness),
-                                borderRadius:
-                                    BorderRadius.circular(12),
-                              ),
-                              child: Row(children: [
-                                Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.accent
-                                          .withValues(alpha: 0.1),
-                                      borderRadius:
-                                          BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(
-                                        Icons.insert_drive_file,
-                                        color: AppColors.accent,
-                                        size: 18)),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                            f['original_name']
-                                                    as String? ??
-                                                '',
-                                            style: TextStyle(
-                                                color: AppColors.text(
-                                                    brightness),
-                                                fontSize: 13)),
-                                        Text(
-                                            '${f['target_name'] as String? ?? ''}  ·  ${_formatSize(f['file_size'])}',
-                                            style: TextStyle(
-                                                color: AppColors
-                                                    .textSecondary(
-                                                        brightness)
-                                                    .withValues(
-                                                        alpha: 0.6),
-                                                fontSize: 10)),
-                                      ]),
+                            final fileId = f['id'] as String? ?? '';
+                            final targetName = f['target_name'] as String? ?? 'file';
+                            return GestureDetector(
+                              onTap: () => _download(fileId, targetName),
+                              child: Container(
+                                margin:
+                                    const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: AppColors.card(brightness),
+                                  borderRadius:
+                                      BorderRadius.circular(12),
                                 ),
-                                Text('→',
-                                    style: TextStyle(
-                                        color: AppColors.textSecondary(
-                                            brightness),
-                                        fontSize: 13)),
-                              ]),
+                                child: Row(children: [
+                                  Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.accent
+                                            .withValues(alpha: 0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                          targetName.endsWith('.pdf')
+                                              ? Icons.picture_as_pdf
+                                              : Icons.description,
+                                          color: targetName.endsWith('.pdf')
+                                              ? Colors.red
+                                              : const Color(0xFF3B82F6),
+                                          size: 18)),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                              f['original_name']
+                                                      as String? ??
+                                                  '',
+                                              style: TextStyle(
+                                                  color: AppColors.text(
+                                                      brightness),
+                                                  fontSize: 13)),
+                                          Text(
+                                              '$targetName  ·  ${_formatSize(f['file_size'])}',
+                                              style: TextStyle(
+                                                  color: AppColors
+                                                      .textSecondary(
+                                                          brightness)
+                                                      .withValues(
+                                                          alpha: 0.6),
+                                                  fontSize: 10)),
+                                        ]),
+                                  ),
+                                  Icon(Icons.download_outlined,
+                                      size: 18,
+                                      color: AppColors.accent),
+                                ]),
+                              ),
                             );
                           },
                         ),
