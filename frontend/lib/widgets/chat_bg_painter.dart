@@ -30,16 +30,16 @@ class ChatBgPainter extends CustomPainter {
     final seed = ((ox * 7919 + oy * 6271).toInt() & 0x7FFFFFFF);
     final rng = Random(seed);
 
-    final alpha = 0.16 + rng.nextDouble() * 0.10;
+    final alpha = 0.14 + rng.nextDouble() * 0.08;
     fill.color = dotColor.withValues(alpha: alpha);
     stroke.color = dotColor.withValues(alpha: alpha);
 
-    final count = rng.nextInt(2) + 1; // 1-2 larger doodles per tile
+    final count = rng.nextInt(2) + 2; // 2-3 doodles per tile
 
     for (int i = 0; i < count; i++) {
       final cx = ox + 10 + rng.nextDouble() * (size - 20);
       final cy = oy + 10 + rng.nextDouble() * (size - 20);
-      final s = 6.0 + rng.nextDouble() * 10.0; // scale (2x larger)
+      final s = 12.0 + rng.nextDouble() * 20.0; // scale (4x original)
       final kind = rng.nextInt(14);
 
       switch (kind) {
