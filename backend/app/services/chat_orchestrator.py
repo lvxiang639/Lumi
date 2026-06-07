@@ -32,16 +32,26 @@ class ChatOrchestrator:
         conv = await self._get_or_create_conv(user_id, conversation_id, db, text)
         user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
 
-        # 2. Classify intent (skip for system-generated display messages)
+        # 2. Detect multi-step agent requests
+        _AGENT_KEYWORDS = ("并", "然后", "顺便", "同时", "再帮我", "也帮我", "还有")
+        is_agent = any(kw in text for kw in _AGENT_KEYWORDS)
+
+        # 3. Classify intent (skip for system messages)
         _SYSTEM_PREFIXES = ('📋', '✅', '❌', '📝', '📧', '📎', '📄')
         if text.strip().startswith(_SYSTEM_PREFIXES):
-            intent = "chat"  # system display msg — no skill, just save + echo
+            intent = "chat"
+        elif is_agent:
+            intent = "agent"
         else:
             intent = await llm_router.classify_intent(text)
         logger.info("user=%s conv=%s intent=%s text=%s", user_id[:8], str(conv.id)[:8], intent, text[:60])
 
-        # 3. Execute skill or chat
-        if intent != "chat" and skill_registry.has(intent):
+        # 4. Execute: agent (multi-step) → skill → chat
+        if intent == "agent":
+            response_text = await self._execute_agent(
+                user_id, text, conv, db, send_message, user_uuid
+            )
+        elif intent != "chat" and skill_registry.has(intent):
             skill = skill_registry.get(intent)
 
             # Load conversation history for context-aware skill responses
@@ -294,6 +304,61 @@ class ChatOrchestrator:
         except Exception:
             logger.exception("failed to get character voice")
         return None
+
+    async def _execute_agent(
+        self, user_id, text, conv, db, send_message, user_uuid
+    ) -> str:
+        """Execute multi-step agent: plan → run skills → consolidate."""
+        # Step 1: Plan
+        await send_message({"type": "llm_stream", "delta": "🤖 分析中...\n"})
+        plan_prompt = (
+            f"用户请求: {text}\n\n"
+            f"请将以上请求分解为2-4个简单步骤，每步一行，格式:\n"
+            f"[动作]: [简短描述]\n"
+            f"动作可选: search(搜索), weather(天气), calendar(添加日程), "
+            f"expense(记账), chat(直接回答)\n\n"
+            f"分步计划:"
+        )
+        plan_raw = await llm_router.chat([{"role": "user", "content": plan_prompt}])
+        await send_message({"type": "llm_stream", "delta": f"📋 计划:\n{plan_raw}\n\n"})
+
+        # Step 2: Execute each step
+        results = []
+        for line in plan_raw.strip().split("\n"):
+            line = line.strip()
+            if not line or ":" not in line:
+                continue
+            action, _, desc = line.partition(":")
+            action = action.strip().lower()
+            desc = desc.strip()
+            if not desc:
+                continue
+
+            await send_message({"type": "llm_stream", "delta": f"⚡ {desc}...\n"})
+
+            if action in ("search", "weather", "calendar", "expense", "convert", "briefing", "email"):
+                skill = skill_registry.get(action)
+                if skill:
+                    try:
+                        result = await skill.execute(user_id, desc, db)
+                        results.append(f"[{action}] {desc}: {result.text[:200]}")
+                        await send_message({"type": "llm_stream", "delta": f"✅ {result.text[:150]}\n"})
+                    except Exception:
+                        results.append(f"[{action}] {desc}: 执行失败")
+                else:
+                    results.append(f"[{action}] {desc}: 未找到技能")
+            else:
+                # chat step — ask LLM
+                try:
+                    ans = await llm_router.chat([{"role": "user", "content": desc}])
+                    results.append(f"[chat] {desc}: {ans[:200]}")
+                    await send_message({"type": "llm_stream", "delta": f"💬 {ans[:150]}\n"})
+                except Exception:
+                    results.append(f"[chat] {desc}: 回答失败")
+
+        # Step 3: Consolidate
+        consolidated = "\n".join(results) if results else "已完成所有步骤"
+        return consolidated
 
     async def _get_or_create_conv(
         self,
