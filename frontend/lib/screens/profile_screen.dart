@@ -153,23 +153,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
         color: AppColors.card(b),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        children: [
-          _settingItem(Icons.auto_awesome, '角色管理', b,
-              () => _showCharacterSheet()),
-          _divider(b),
-          _settingItem(Icons.email_outlined, '邮箱设置', b, () {
-            _showEmailDialog();
-          }),
-          _divider(b),
-          _settingItem(Icons.summarize_outlined, '对话摘要列表', b, () {
-            _showSummaryList();
-          }),
-          _divider(b),
-          _settingItem(Icons.info_outline, '关于灵犀', b, () {
-            _showAboutDialog();
-          }),
-        ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            children: [
+              _settingItem(Icons.auto_awesome, '角色管理', b,
+                  () => _showCharacterSheet()),
+              _divider(b),
+              _settingItem(Icons.email_outlined, '邮箱设置', b, () {
+                _showEmailDialog();
+              }),
+              _divider(b),
+              _settingItem(Icons.summarize_outlined, '对话摘要列表', b, () {
+                _showSummaryList();
+              }),
+              _divider(b),
+              _settingItem(Icons.info_outline, '关于灵犀', b, () {
+                _showAboutDialog();
+              }),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -359,36 +365,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _charItem(String name, bool active, Brightness b,
       VoidCallback onTap,
       {String? sub}) {
-    return ListTile(
-      title: Text(name,
-          style:
-              TextStyle(color: AppColors.text(b), fontSize: 13)),
-      subtitle: sub != null
-          ? Text(sub,
-              style: TextStyle(
-                  color: AppColors.textSecondary(b),
-                  fontSize: 11))
-          : null,
-      dense: true,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12),
-      trailing: active
-          ? const Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.check_circle,
-                  size: 14, color: AppColors.accent),
-              SizedBox(width: 4),
-              Text('使用中',
-                  style: TextStyle(
-                      fontSize: 11, color: AppColors.accent)),
-            ])
-          : TextButton(
-              onPressed: onTap,
-              style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12)),
-              child: const Text('使用',
-                  style: TextStyle(fontSize: 11)),
-            ),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        title: Text(name,
+            style:
+                TextStyle(color: AppColors.text(b), fontSize: 13)),
+        subtitle: sub != null
+            ? Text(sub,
+                style: TextStyle(
+                    color: AppColors.textSecondary(b),
+                    fontSize: 11))
+            : null,
+        dense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12),
+        trailing: active
+            ? const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.check_circle,
+                    size: 14, color: AppColors.accent),
+                SizedBox(width: 4),
+                Text('使用中',
+                    style: TextStyle(
+                        fontSize: 11, color: AppColors.accent)),
+              ])
+            : TextButton(
+                onPressed: onTap,
+                style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12)),
+                child: const Text('使用',
+                    style: TextStyle(fontSize: 11)),
+              ),
+      ),
     );
   }
 }
