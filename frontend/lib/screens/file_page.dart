@@ -80,11 +80,11 @@ class _FilePageState extends State<FilePage> {
   }
 
   Future<void> _download(String fileId, String fileName) async {
-    final ok = await _service.downloadAndOpen(fileId, fileName);
+    final error = await _service.downloadAndOpen(fileId, fileName);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(ok ? '已打开 $fileName' : '下载失败'),
+          content: Text(error ?? '已打开 $fileName'),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
