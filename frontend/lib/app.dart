@@ -7,6 +7,7 @@ import 'providers/calendar_provider.dart';
 import 'providers/expense_provider.dart';
 import 'providers/character_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/discover_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
@@ -25,6 +26,7 @@ class LingxiApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => CharacterProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => DiscoverProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {

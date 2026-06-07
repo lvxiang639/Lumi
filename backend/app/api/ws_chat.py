@@ -45,8 +45,7 @@ async def websocket_chat(ws: WebSocket):
             from app.services.proactive_service import send_memory_greeting
             msg = await send_memory_greeting(user_id)
             if msg:
-                await send_message({"type": "llm_stream", "delta": msg})
-                await send_message({"type": "done"})
+                await send_message({"type": "proactive", "delta": msg, "skill": "greeting"})
         except Exception:
             pass
 

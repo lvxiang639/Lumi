@@ -88,9 +88,9 @@ class ProactiveService:
             msg = await self._check_weather(user_id, now)
             if msg:
                 await send_to_user(user_id, {
-                    "type": "llm_stream", "delta": msg,
+                    "type": "proactive", "delta": msg,
                 })
-                await send_to_user(user_id, {"type": "done"})
+                # proactive msg — no "done" needed
                 logger.info("proactive weather sent to %s", user_id[:8])
                 return
 
@@ -98,9 +98,9 @@ class ProactiveService:
             msg = await self._check_calendar(user_id, now, db)
             if msg:
                 await send_to_user(user_id, {
-                    "type": "llm_stream", "delta": msg,
+                    "type": "proactive", "delta": msg,
                 })
-                await send_to_user(user_id, {"type": "done"})
+                # proactive msg — no "done" needed
                 logger.info("proactive calendar sent to %s", user_id[:8])
                 return
 
@@ -108,36 +108,36 @@ class ProactiveService:
             msg = await self._check_expense(user_id, now, db)
             if msg:
                 await send_to_user(user_id, {
-                    "type": "llm_stream", "delta": msg,
+                    "type": "proactive", "delta": msg,
                 })
-                await send_to_user(user_id, {"type": "done"})
+                # proactive msg — no "done" needed
                 return
 
             # ── Check 4: Long idle ──
             msg = await self._check_idle(user_id, now, db)
             if msg:
                 await send_to_user(user_id, {
-                    "type": "llm_stream", "delta": msg,
+                    "type": "proactive", "delta": msg,
                 })
-                await send_to_user(user_id, {"type": "done"})
+                # proactive msg — no "done" needed
                 return
 
             # ── Check 5: Memory topic ──
             msg = await self._check_memory(user_id, now, db)
             if msg:
                 await send_to_user(user_id, {
-                    "type": "llm_stream", "delta": msg,
+                    "type": "proactive", "delta": msg,
                 })
-                await send_to_user(user_id, {"type": "done"})
+                # proactive msg — no "done" needed
                 return
 
             # ── Check 6: Emotion care ──
             msg = await self._check_emotion(user_id, now, db)
             if msg:
                 await send_to_user(user_id, {
-                    "type": "llm_stream", "delta": msg,
+                    "type": "proactive", "delta": msg,
                 })
-                await send_to_user(user_id, {"type": "done"})
+                # proactive msg — no "done" needed
                 return
 
     async def _check_weather(self, user_id: str, now: datetime) -> str | None:

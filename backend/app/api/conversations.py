@@ -417,6 +417,7 @@ async def export_conversation(
         target_name=target_name,
         object_name=object_name,
         file_size=file_size,
+        content_type="application/pdf" if format == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
     db.add(cf)
     await db.commit()

@@ -4,6 +4,7 @@ import '../models/message.dart';
 import '../services/ws_service.dart';
 import '../services/api_client.dart';
 import '../services/calendar_sync_service.dart';
+import 'discover_provider.dart';
 
 class ChatProvider extends ChangeNotifier {
   final WsService _ws = WsService();
@@ -87,6 +88,13 @@ class ChatProvider extends ChangeNotifier {
         currentSkill = msg.data['skill'] as String?;
         _onSkillCall(msg.data);
         break;
+      case 'proactive':
+        // Route to Discover tab — don't show in chat
+        final discoverText = msg.data['delta'] as String? ?? '';
+        if (discoverText.isNotEmpty) {
+          _routeToDiscover(discoverText, msg.data['skill'] as String?);
+        }
+        break;
       case 'emotion_update':
         _emotion = msg.data['emotion'] as String? ?? 'calm';
         _emotionIntensity = (msg.data['intensity'] as num?)?.toDouble() ?? 0.0;
@@ -109,6 +117,10 @@ class ChatProvider extends ChangeNotifier {
         break;
     }
     notifyListeners();
+  }
+
+  void _routeToDiscover(String text, String? skill) {
+    DiscoverProvider.add(text, skill: skill);
   }
 
   void _onSkillCall(Map<String, dynamic> data) {
