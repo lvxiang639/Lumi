@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from openai import AsyncOpenAI
 from app.config import settings
@@ -7,6 +8,9 @@ logger = logging.getLogger("llm")
 DEEPSEEK_MODEL = settings.deepseek_model_name
 QWEN_MODEL = settings.qwen_model_name
 CHAT_MODEL = settings.chat_model_name
+
+# Rate limiter: max 8 concurrent LLM calls
+_llm_semaphore = asyncio.Semaphore(8)
 
 
 class LLMRouter:
@@ -27,25 +31,26 @@ class LLMRouter:
         else:
             client = self.deepseek
             model = force_model or CHAT_MODEL
-        try:
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                stream=False,
-                temperature=0.6,
-                top_p=0.9,
-                max_tokens=512,
-                frequency_penalty=0.3,
-            )
-            choices = response.choices
-            if not choices:
-                logger.warning("LLM returned empty choices, model=%s", model)
-                return ""
-            content = choices[0].message.content
-            return content or ""
-        except Exception:
-            logger.exception("LLM chat failed, model=%s", model)
-            raise
+        async with _llm_semaphore:
+            try:
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    stream=False,
+                    temperature=0.6,
+                    top_p=0.9,
+                    max_tokens=512,
+                    frequency_penalty=0.3,
+                )
+                choices = response.choices
+                if not choices:
+                    logger.warning("LLM returned empty choices, model=%s", model)
+                    return ""
+                content = choices[0].message.content
+                return content or ""
+            except Exception:
+                logger.exception("LLM chat failed, model=%s", model)
+                raise
 
     async def chat_stream(
         self, messages: list[dict], force_model: str | None = None
@@ -56,27 +61,28 @@ class LLMRouter:
         else:
             client = self.deepseek
             model = force_model or CHAT_MODEL
-        try:
-            stream = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                stream=True,
-                temperature=0.7,
-                top_p=0.92,
-                max_tokens=1024,
-                frequency_penalty=0.3,
-                presence_penalty=0.2,
-            )
-            async for chunk in stream:
-                choices = chunk.choices
-                if not choices:
-                    continue
-                delta = choices[0].delta
-                if delta and delta.content:
-                    yield delta.content
-        except Exception:
-            logger.exception("LLM stream failed, model=%s", model)
-            raise
+        async with _llm_semaphore:
+            try:
+                stream = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    stream=True,
+                    temperature=0.7,
+                    top_p=0.92,
+                    max_tokens=1024,
+                    frequency_penalty=0.3,
+                    presence_penalty=0.2,
+                )
+                async for chunk in stream:
+                    choices = chunk.choices
+                    if not choices:
+                        continue
+                    delta = choices[0].delta
+                    if delta and delta.content:
+                        yield delta.content
+            except Exception:
+                logger.exception("LLM stream failed, model=%s", model)
+                raise
 
     async def classify_intent(self, text: str) -> str:
         """Returns: chat, search, weather, calendar, expense, convert"""

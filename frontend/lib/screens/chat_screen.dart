@@ -16,6 +16,7 @@ import '../services/notes_service.dart';
 import '../services/conversation_service.dart';
 import '../widgets/chat_bg_painter.dart';
 import '../widgets/assistant_menu.dart';
+import '../widgets/pet_cat.dart';
 
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
@@ -800,6 +801,9 @@ class _InputBar extends StatelessWidget {
               ),
             ),
           ),
+          // Pet cat resting on input bar
+          const SizedBox(width: 4),
+          petCatResting(isThinking: ctrl.text.isEmpty),
         ],
       ),
     );
