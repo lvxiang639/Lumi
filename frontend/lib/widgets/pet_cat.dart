@@ -110,7 +110,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
                 color: AppColors.accent.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(petEmoji(widget.emotion), style: TextStyle(fontSize: 22)),
               ),
             ),
@@ -132,7 +132,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
           color: AppColors.accent.withValues(alpha: 0.08),
           borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
         ),
-        child: const Center(
+        child: Center(
           child: Text(petEmoji('calm'), style: const TextStyle(fontSize: 14)),
         ),
       ),
@@ -192,7 +192,7 @@ class _ChatRestingCatState extends State<_ChatRestingCat>
               color: AppColors.accent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Center(
+            child: Center(
               child: Text(petEmoji(widget.emotion), style: const TextStyle(fontSize: 18)),
             ),
           ),
