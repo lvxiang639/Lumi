@@ -321,9 +321,6 @@ class ProactiveService:
 
 proactive_service = ProactiveService()
 
-# In-memory tracker: user_id → last greeting time
-_last_greeting: dict[str, datetime] = {}
-
 GREETING_PROMPT = """你是一只关心主人的小猫灵犀。根据以下用户信息和当前时间，想一个简短温暖的欢迎语（不超过35字）。
 要自然、可爱，不要刻意复述记忆。如果没有特别的信息就返回空。
 
@@ -335,13 +332,14 @@ GREETING_PROMPT = """你是一只关心主人的小猫灵犀。根据以下用�
 
 
 async def send_memory_greeting(user_id: str) -> str | None:
-    """Generate a personalized greeting on connect. One per 6 hours."""
+    """Generate a personalized greeting on connect. Shares cache with periodic _check_memory."""
     now = datetime.now(BEIJING_TZ)
-    last = _last_greeting.get(user_id)
-    if last and (now - last).total_seconds() < 21600:  # 6 hours
-        return None
-
-    _last_greeting[user_id] = now
+    # Share cache with proactive_service._check_memory to prevent duplicates
+    cached = proactive_service._memory_cache.get(user_id)
+    if cached:
+        _, ts = cached
+        if (now - ts).total_seconds() < 21600:  # 6 hours
+            return None
 
     async with async_session() as db:
         r = await db.execute(
@@ -352,6 +350,7 @@ async def send_memory_greeting(user_id: str) -> str | None:
         )
         memories = r.scalars().all()
         if len(memories) < 2:
+            proactive_service._memory_cache[user_id] = ("__NONE__", now)
             return None
 
         mem_text = "\n".join(f"- {m.key}: {m.value}" for m in memories)
@@ -361,6 +360,7 @@ async def send_memory_greeting(user_id: str) -> str | None:
         try:
             result = await llm_router.chat([{"role": "user", "content": prompt}])
             result = (result or "").strip()
+            proactive_service._memory_cache[user_id] = (result or "__NONE__", now)
             return result if result else None
         except Exception:
             return None
