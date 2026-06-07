@@ -260,8 +260,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: CustomPaint(
                   painter: ChatBgPainter(
                     dotColor: brightness == Brightness.light
-                        ? const Color(0xFFA0A0A0)
-                        : const Color(0xFF484F58),
+                        ? const Color(0xFF808080)
+                        : const Color(0xFF586069),
                   ),
                 ),
               ),

@@ -11,7 +11,7 @@ class ChatBgPainter extends CustomPainter {
     final fillPaint = Paint()..style = PaintingStyle.fill;
     final strokePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.7;
+      ..strokeWidth = 0.9;
 
     const tileSize = 96.0;
     final cols = (size.width / tileSize).ceil() + 1;
@@ -30,7 +30,7 @@ class ChatBgPainter extends CustomPainter {
     final seed = ((ox * 7919 + oy * 6271).toInt() & 0x7FFFFFFF);
     final rng = Random(seed);
 
-    final alpha = 0.14 + rng.nextDouble() * 0.08;
+    final alpha = 0.20 + rng.nextDouble() * 0.12;
     fill.color = dotColor.withValues(alpha: alpha);
     stroke.color = dotColor.withValues(alpha: alpha);
 
