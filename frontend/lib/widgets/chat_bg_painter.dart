@@ -8,231 +8,251 @@ class ChatBgPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
+    final fillPaint = Paint()..style = PaintingStyle.fill;
     final strokePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8;
-    // Draw WhatsApp-style repeating doodle wallpaper
-    const tileSize = 80.0;
+      ..strokeWidth = 0.7;
+
+    const tileSize = 72.0;
     final cols = (size.width / tileSize).ceil() + 1;
     final rows = (size.height / tileSize).ceil() + 1;
 
     for (int row = 0; row < rows; row++) {
       for (int col = 0; col < cols; col++) {
-        final ox = col * tileSize;
-        final oy = row * tileSize;
-        _drawTile(canvas, ox, oy, tileSize, paint, strokePaint);
+        _drawTile(canvas, col * tileSize, row * tileSize, tileSize,
+            fillPaint, strokePaint);
       }
     }
   }
 
   void _drawTile(Canvas canvas, double ox, double oy, double size,
-      Paint paint, Paint strokePaint) {
+      Paint fill, Paint stroke) {
     final seed = ((ox * 7919 + oy * 6271).toInt() & 0x7FFFFFFF);
     final rng = Random(seed);
 
-    final count = rng.nextInt(4) + 2; // 2-5 doodles per tile
-    final alpha = 0.15 + rng.nextDouble() * 0.12;
+    final alpha = 0.16 + rng.nextDouble() * 0.10;
+    fill.color = dotColor.withValues(alpha: alpha);
+    stroke.color = dotColor.withValues(alpha: alpha);
 
-    paint.color = dotColor.withValues(alpha: alpha);
-    strokePaint.color = dotColor.withValues(alpha: alpha);
+    final count = rng.nextInt(3) + 1; // 1-3 doodles per tile
 
     for (int i = 0; i < count; i++) {
-      final cx = ox + 8 + rng.nextDouble() * (size - 16);
-      final cy = oy + 8 + rng.nextDouble() * (size - 16);
-      final s = 3.0 + rng.nextDouble() * 6.0;
-      final shape = rng.nextInt(10);
+      final cx = ox + 10 + rng.nextDouble() * (size - 20);
+      final cy = oy + 10 + rng.nextDouble() * (size - 20);
+      final s = 3.0 + rng.nextDouble() * 5.0; // scale
+      final kind = rng.nextInt(14);
 
-      switch (shape) {
-        case 0: // Chat bubble with tail
-          _drawChatBubble(canvas, cx, cy, s, strokePaint);
-          break;
-        case 1: // Heart
-          _drawHeart(canvas, cx, cy, s, paint);
-          break;
-        case 2: // Star
-          _drawStar(canvas, cx, cy, s, strokePaint);
-          break;
-        case 3: // Circle cluster
-          _drawCircleCluster(canvas, cx, cy, s, paint, rng);
-          break;
-        case 4: // Phone handset
-          _drawPhone(canvas, cx, cy, s, strokePaint);
-          break;
-        case 5: // Smiley face
-          _drawSmiley(canvas, cx, cy, s, strokePaint);
-          break;
-        case 6: // Paper plane
-          _drawPaperPlane(canvas, cx, cy, s, strokePaint);
-          break;
-        case 7: // Camera
-          _drawCamera(canvas, cx, cy, s, strokePaint);
-          break;
-        case 8: // Music note
-          _drawNote(canvas, cx, cy, s, strokePaint);
-          break;
-        case 9: // Sparkle
-          _drawSparkle(canvas, cx, cy, s, strokePaint);
-          break;
+      switch (kind) {
+        case 0: _cat(canvas, cx, cy, s, stroke); break;
+        case 1: _dog(canvas, cx, cy, s, stroke); break;
+        case 2: _bird(canvas, cx, cy, s, stroke); break;
+        case 3: _fish(canvas, cx, cy, s, stroke); break;
+        case 4: _bottle(canvas, cx, cy, s, stroke); break;
+        case 5: _cup(canvas, cx, cy, s, stroke); break;
+        case 6: _heart(canvas, cx, cy, s, fill); break;
+        case 7: _star(canvas, cx, cy, s, stroke); break;
+        case 8: _flower(canvas, cx, cy, s, stroke); break;
+        case 9: _leaf(canvas, cx, cy, s, stroke); break;
+        case 10: _jar(canvas, cx, cy, s, stroke); break;
+        case 11: _moon(canvas, cx, cy, s, stroke); break;
+        case 12: _book(canvas, cx, cy, s, stroke); break;
+        case 13: _key(canvas, cx, cy, s, stroke); break;
       }
     }
   }
 
-  // --- Doodle shapes ---
+  // ── Animals ──
 
-  void _drawChatBubble(
-      Canvas canvas, double cx, double cy, double s, Paint paint) {
+  void _cat(Canvas canvas, double cx, double cy, double s, Paint p) {
     final path = Path();
-    final w = s * 1.3, h = s * 0.85;
-    final r = s * 0.4;
-    // Rounded rectangle
-    path.addRRect(RRect.fromLTRBR(cx - w / 2, cy - h / 2, cx + w / 2,
-        cy + h / 2, Radius.circular(r)));
+    // Head — round
+    path.addOval(Rect.fromCenter(center: Offset(cx, cy - s * 0.15), width: s * 0.7, height: s * 0.65));
+    // Ears — two triangles
+    path.moveTo(cx - s * 0.25, cy - s * 0.35);
+    path.lineTo(cx - s * 0.4, cy - s * 0.65);
+    path.lineTo(cx - s * 0.1, cy - s * 0.4);
+    path.moveTo(cx + s * 0.25, cy - s * 0.35);
+    path.lineTo(cx + s * 0.4, cy - s * 0.65);
+    path.lineTo(cx + s * 0.1, cy - s * 0.4);
+    // Body
+    path.addOval(Rect.fromCenter(center: Offset(cx, cy + s * 0.3), width: s * 0.55, height: s * 0.4));
     // Tail
-    path.moveTo(cx - w / 2 + r, cy + h / 2);
-    path.lineTo(cx - w / 2, cy + h / 2 + s * 0.5);
-    path.lineTo(cx - w / 2 + r + s * 0.3, cy + h / 2);
-    canvas.drawPath(path, paint);
+    path.moveTo(cx + s * 0.15, cy + s * 0.35);
+    path.quadraticBezierTo(cx + s * 0.5, cy + s * 0.15, cx + s * 0.25, cy - s * 0.1);
+    canvas.drawPath(path, p);
   }
 
-  void _drawHeart(
-      Canvas canvas, double cx, double cy, double s, Paint paint) {
+  void _dog(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    // Head
+    path.addOval(Rect.fromCenter(center: Offset(cx, cy - s * 0.2), width: s * 0.65, height: s * 0.6));
+    // Floppy ears
+    path.addOval(Rect.fromCenter(center: Offset(cx - s * 0.35, cy - s * 0.15), width: s * 0.2, height: s * 0.45));
+    path.addOval(Rect.fromCenter(center: Offset(cx + s * 0.35, cy - s * 0.15), width: s * 0.2, height: s * 0.45));
+    // Body
+    path.addOval(Rect.fromCenter(center: Offset(cx, cy + s * 0.3), width: s * 0.5, height: s * 0.35));
+    // Short tail
+    path.moveTo(cx + s * 0.15, cy + s * 0.3);
+    path.quadraticBezierTo(cx + s * 0.45, cy + s * 0.0, cx + s * 0.35, cy - s * 0.15);
+    canvas.drawPath(path, p);
+  }
+
+  void _bird(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    // Body
+    path.addOval(Rect.fromCenter(center: Offset(cx - s * 0.05, cy + s * 0.05), width: s * 0.55, height: s * 0.45));
+    // Head
+    path.addOval(Rect.fromCenter(center: Offset(cx + s * 0.2, cy - s * 0.15), width: s * 0.3, height: s * 0.3));
+    // Beak
+    path.moveTo(cx + s * 0.35, cy - s * 0.18);
+    path.lineTo(cx + s * 0.55, cy - s * 0.15);
+    path.lineTo(cx + s * 0.35, cy - s * 0.1);
+    // Wing
+    path.moveTo(cx - s * 0.1, cy - s * 0.05);
+    path.quadraticBezierTo(cx + s * 0.0, cy - s * 0.4, cx - s * 0.2, cy - s * 0.35);
+    canvas.drawPath(path, p);
+  }
+
+  void _fish(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    // Body — oval
+    path.addOval(Rect.fromCenter(center: Offset(cx, cy), width: s * 0.75, height: s * 0.4));
+    // Tail
+    path.moveTo(cx - s * 0.35, cy);
+    path.lineTo(cx - s * 0.6, cy - s * 0.3);
+    path.lineTo(cx - s * 0.6, cy + s * 0.3);
+    path.close();
+    // Eye
+    canvas.drawCircle(Offset(cx + s * 0.2, cy - s * 0.05), s * 0.06, p);
+  }
+
+  // ── Containers (瓶瓶罐罐) ──
+
+  void _bottle(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    final w = s * 0.25, h = s * 0.5;
+    // Neck
+    path.addRect(Rect.fromCenter(center: Offset(cx, cy - h * 0.6), width: w * 0.5, height: h * 0.35));
+    // Body — rounded rectangle
+    path.addRRect(RRect.fromLTRBR(
+        cx - w, cy - h * 0.2, cx + w, cy + h,
+        Radius.circular(s * 0.15)));
+    canvas.drawPath(path, p);
+  }
+
+  void _cup(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    final w = s * 0.3, h = s * 0.45;
+    // Cup body
+    path.addRRect(RRect.fromLTRBR(
+        cx - w, cy - h * 0.1, cx + w, cy + h,
+        Radius.circular(s * 0.1)));
+    // Handle
+    path.addArc(
+        Rect.fromCenter(center: Offset(cx + w * 0.8, cy + h * 0.1), width: w * 0.7, height: h * 0.6),
+        4.0, 4.2);
+    canvas.drawPath(path, p);
+  }
+
+  void _jar(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    final w = s * 0.28;
+    // Lid
+    path.addRRect(RRect.fromLTRBR(
+        cx - w * 0.7, cy - s * 0.5, cx + w * 0.7, cy - s * 0.3,
+        Radius.circular(s * 0.06)));
+    // Body
+    path.addRRect(RRect.fromLTRBR(
+        cx - w, cy - s * 0.3, cx + w, cy + s * 0.45,
+        Radius.circular(s * 0.12)));
+    // Label line
+    path.addRect(Rect.fromCenter(center: Offset(cx, cy + s * 0.05), width: w * 1.2, height: s * 0.04));
+    canvas.drawPath(path, p);
+  }
+
+  // ── Nature ──
+
+  void _heart(Canvas canvas, double cx, double cy, double s, Paint p) {
     final path = Path();
     path.moveTo(cx, cy + s * 0.35);
-    path.cubicTo(cx - s * 0.5, cy - s * 0.1, cx - s * 0.5, cy - s * 0.5,
-        cx, cy - s * 0.2);
-    path.cubicTo(cx + s * 0.5, cy - s * 0.5, cx + s * 0.5, cy - s * 0.1,
-        cx, cy + s * 0.35);
-    canvas.drawPath(path, paint);
+    path.cubicTo(cx - s * 0.5, cy - s * 0.1, cx - s * 0.5, cy - s * 0.5, cx, cy - s * 0.2);
+    path.cubicTo(cx + s * 0.5, cy - s * 0.5, cx + s * 0.5, cy - s * 0.1, cx, cy + s * 0.35);
+    canvas.drawPath(path, p);
   }
 
-  void _drawStar(
-      Canvas canvas, double cx, double cy, double s, Paint paint) {
+  void _star(Canvas canvas, double cx, double cy, double s, Paint p) {
     final path = Path();
-    final outerR = s * 0.5, innerR = s * 0.2;
-    const points = 5;
-    for (int i = 0; i < points * 2; i++) {
-      final angle = -3.1416 / 2 + i * 3.1416 / points;
+    final outerR = s * 0.45, innerR = s * 0.18;
+    for (int i = 0; i < 10; i++) {
+      final angle = -1.5708 + i * 0.31416;
       final r = i.isEven ? outerR : innerR;
       final x = cx + r * cos(angle);
       final y = cy + r * sin(angle);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
+      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
     }
     path.close();
-    canvas.drawPath(path, paint);
+    canvas.drawPath(path, p);
   }
 
-  void _drawCircleCluster(
-      Canvas canvas, double cx, double cy, double s, Paint paint, Random rng) {
-    for (int j = 0; j < 4; j++) {
-      final dx = cx + (rng.nextDouble() - 0.5) * s * 1.2;
-      final dy = cy + (rng.nextDouble() - 0.5) * s * 1.2;
-      final rr = s * (0.15 + rng.nextDouble() * 0.2);
-      canvas.drawCircle(Offset(dx, dy), rr, paint);
+  void _flower(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    // 5 petals
+    for (int i = 0; i < 5; i++) {
+      final angle = i * 1.25664; // 2π/5
+      final px = cx + cos(angle) * s * 0.22;
+      final py = cy + sin(angle) * s * 0.22;
+      path.addOval(Rect.fromCenter(center: Offset(px, py), width: s * 0.28, height: s * 0.22));
     }
+    // Center
+    canvas.drawCircle(Offset(cx, cy), s * 0.1, p);
+    canvas.drawPath(path, p);
   }
 
-  void _drawPhone(
-      Canvas canvas, double cx, double cy, double s, Paint paint) {
+  void _leaf(Canvas canvas, double cx, double cy, double s, Paint p) {
     final path = Path();
-    final w = s * 0.5, h = s * 0.8;
-    // Handset body
-    path.addRRect(RRect.fromLTRBR(
-        cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2,
-        Radius.circular(s * 0.2)));
-    // Earpiece arc
-    path.addArc(
-        Rect.fromCenter(
-            center: Offset(cx, cy - h * 0.2), width: w * 0.6, height: w * 0.6),
-        3.14 * 1.2,
-        3.14 * 0.6);
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawSmiley(
-      Canvas canvas, double cx, double cy, double s, Paint paint) {
-    // Face circle
-    canvas.drawCircle(Offset(cx, cy), s * 0.45, paint);
-    // Eyes (two small dots)
-    paint.style = PaintingStyle.fill;
-    canvas.drawCircle(
-        Offset(cx - s * 0.15, cy - s * 0.1), s * 0.06, paint);
-    canvas.drawCircle(
-        Offset(cx + s * 0.15, cy - s * 0.1), s * 0.06, paint);
-    // Smile arc
-    paint.style = PaintingStyle.stroke;
-    canvas.drawArc(
-        Rect.fromCenter(
-            center: Offset(cx, cy + s * 0.05),
-            width: s * 0.4,
-            height: s * 0.25),
-        0.2,
-        3.14 - 0.4,
-        false,
-        paint);
-    paint.style = PaintingStyle.fill;
-  }
-
-  void _drawPaperPlane(
-      Canvas canvas, double cx, double cy, double s, Paint paint) {
-    final path = Path();
-    final hw = s * 0.5;
-    path.moveTo(cx - hw, cy + s * 0.4);
-    path.lineTo(cx + hw * 0.3, cy - s * 0.1);
-    path.lineTo(cx + hw, cy + s * 0.4);
-    path.lineTo(cx, cy);
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawCamera(
-      Canvas canvas, double cx, double cy, double s, Paint paint) {
-    final path = Path();
-    final w = s * 0.6, h = s * 0.45;
-    path.addRRect(RRect.fromLTRBR(
-        cx - w / 2, cy - h / 2 + s * 0.1,
-        cx + w / 2, cy + h / 2,
-        Radius.circular(s * 0.15)));
-    // Lens circle
-    canvas.drawCircle(Offset(cx, cy), s * 0.2, paint);
-    // Flash
-    canvas.drawCircle(Offset(cx + w * 0.3, cy - h * 0.15), s * 0.07, paint);
-  }
-
-  void _drawNote(
-      Canvas canvas, double cx, double cy, double s, Paint paint) {
-    final path = Path();
-    // Note circle
-    canvas.drawCircle(Offset(cx - s * 0.2, cy + s * 0.3), s * 0.2, paint);
+    path.moveTo(cx, cy - s * 0.45);
+    path.quadraticBezierTo(cx + s * 0.35, cy - s * 0.1, cx, cy + s * 0.4);
+    path.quadraticBezierTo(cx - s * 0.15, cy + s * 0.1, cx, cy - s * 0.45);
     // Stem
-    path.moveTo(cx, cy + s * 0.3);
-    path.lineTo(cx, cy - s * 0.4);
-    path.lineTo(cx + s * 0.35, cy - s * 0.2);
-    canvas.drawPath(path, paint);
+    path.moveTo(cx, cy + s * 0.35);
+    path.lineTo(cx, cy + s * 0.5);
+    canvas.drawPath(path, p);
   }
 
-  void _drawSparkle(
-      Canvas canvas, double cx, double cy, double s, Paint paint) {
+  void _moon(Canvas canvas, double cx, double cy, double s, Paint p) {
     final path = Path();
-    const points = 4;
-    final outerR = s * 0.45, innerR = s * 0.1;
-    for (int i = 0; i < points * 2; i++) {
-      final angle = i * 3.1416 / points;
-      final r = i.isEven ? outerR : innerR;
-      final x = cx + r * cos(angle);
-      final y = cy + r * sin(angle);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, paint);
+    path.addOval(Rect.fromCenter(center: Offset(cx, cy), width: s * 0.55, height: s * 0.55));
+    // Cutout for crescent
+    path.addOval(Rect.fromCenter(center: Offset(cx + s * 0.18, cy - s * 0.05), width: s * 0.45, height: s * 0.5));
+    path.fillType = PathFillType.evenOdd;
+    canvas.drawPath(path, p);
+  }
+
+  // ── Objects ──
+
+  void _book(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    final w = s * 0.3, h = s * 0.4;
+    // Left page
+    path.addRRect(RRect.fromLTRBR(cx - w, cy - h, cx, cy + h, Radius.circular(s * 0.04)));
+    // Right page
+    path.addRRect(RRect.fromLTRBR(cx, cy - h, cx + w, cy + h, Radius.circular(s * 0.04)));
+    // Spine line
+    path.moveTo(cx, cy - h);
+    path.lineTo(cx, cy + h);
+    canvas.drawPath(path, p);
+  }
+
+  void _key(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    // Head — circle
+    path.addOval(Rect.fromCenter(center: Offset(cx - s * 0.25, cy), width: s * 0.3, height: s * 0.3));
+    // Shaft
+    path.addRect(Rect.fromCenter(center: Offset(cx + s * 0.12, cy), width: s * 0.4, height: s * 0.08));
+    // Teeth
+    path.addRect(Rect.fromCenter(center: Offset(cx + s * 0.3, cy + s * 0.1), width: s * 0.06, height: s * 0.15));
+    path.addRect(Rect.fromCenter(center: Offset(cx + s * 0.2, cy + s * 0.1), width: s * 0.06, height: s * 0.12));
+    canvas.drawPath(path, p);
   }
 
   @override
