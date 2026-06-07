@@ -72,6 +72,7 @@ class _ChatScreenState extends State<ChatScreen> {
         onNotes: _onSaveNote,
         onExtractSummary: _onExtractSummary,
         onExport: _onExport,
+        onShare: _onShare,
       ),
     );
   }
@@ -108,6 +109,89 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (_) {
       chat.sendText('❌ 笔记保存失败');
     }
+  }
+
+  void _onShare() {
+    final chat = context.read<ChatProvider>();
+    final msgs = chat.messages;
+    if (msgs.isEmpty) {
+      _snack('请先发送消息');
+      return;
+    }
+    // Build share text from last 6 messages
+    final recent = msgs.length > 6 ? msgs.sublist(msgs.length - 6) : msgs;
+    final buf = StringBuffer();
+    buf.writeln('💬 灵犀对话分享');
+    buf.writeln('━━━━━━━━━━━━━━');
+    for (final m in recent) {
+      final role = m.role == 'user' ? '🧑 我' : '🐱 灵犀';
+      buf.writeln('$role: ${m.content}');
+    }
+    buf.writeln('━━━━━━━━━━━━━━');
+    buf.writeln('📱 来自灵犀 AI 伴侣');
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final brightness = Theme.of(context).brightness;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+                const Text('分享对话', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: brightness == Brightness.light ? Colors.white : const Color(0xFF1C2129),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      const Text('🐱', style: TextStyle(fontSize: 24)),
+                      const SizedBox(width: 8),
+                      const Text('灵犀 AI 伴侣', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                    ]),
+                    const SizedBox(height: 12),
+                    const Divider(),
+                    ...recent.map((m) => Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '${m.role == 'user' ? "🧑" : "🐱"} ${m.content}',
+                        style: const TextStyle(fontSize: 13, height: 1.5),
+                        maxLines: 3, overflow: TextOverflow.ellipsis,
+                      ),
+                    )),
+                  ]),
+                ),
+                const SizedBox(height: 20),
+                Row(children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: buf.toString()));
+                        Navigator.pop(ctx);
+                        _snack('已复制分享内容');
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: const Text('复制文字'),
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _onExport() async {
@@ -323,6 +407,7 @@ class _ChatScreenState extends State<ChatScreen> {
             onSend: _send,
             onFile: _pickFile,
             brightness: brightness,
+            emotion: chat.emotion,
           ),
         );
       },
@@ -702,6 +787,7 @@ class _InputBar extends StatelessWidget {
   final bool showField;
   final VoidCallback onToggle, onSend, onFile;
   final Brightness brightness;
+  final String emotion;
 
   const _InputBar({
     required this.ctrl,
@@ -710,6 +796,7 @@ class _InputBar extends StatelessWidget {
     required this.onSend,
     required this.onFile,
     required this.brightness,
+    this.emotion = 'calm',
   });
 
   @override
@@ -803,7 +890,7 @@ class _InputBar extends StatelessWidget {
           ),
           // Pet cat resting on input bar
           const SizedBox(width: 4),
-          petCatResting(isThinking: ctrl.text.isEmpty),
+          petCatResting(isThinking: ctrl.text.isEmpty, emotion: emotion),
         ],
       ),
     );

@@ -7,6 +7,7 @@ class AssistantMenu extends StatelessWidget {
   final VoidCallback onNotes;
   final VoidCallback onExtractSummary;
   final VoidCallback? onExport;
+  final VoidCallback? onShare;
 
   const AssistantMenu({
     super.key,
@@ -15,6 +16,7 @@ class AssistantMenu extends StatelessWidget {
     required this.onNotes,
     required this.onExtractSummary,
     this.onExport,
+    this.onShare,
   });
 
   @override
@@ -83,6 +85,18 @@ class AssistantMenu extends StatelessWidget {
               },
               brightness: brightness,
             ),
+            if (onShare != null)
+              _menuItem(
+                icon: Icons.share_outlined,
+                title: '分享对话',
+                subtitle: '生成精美卡片分享给朋友',
+                color: const Color(0xFFF97316),
+                onTap: () {
+                  Navigator.pop(context);
+                  onShare!();
+                },
+                brightness: brightness,
+              ),
             if (onExport != null)
               _menuItem(
                 icon: Icons.picture_as_pdf_outlined,

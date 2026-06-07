@@ -4,16 +4,29 @@ import '../theme/app_colors.dart';
 
 enum PetPosition { bottomBar, chatInput, sidebar }
 
+String petEmoji(String emotion) {
+  switch (emotion) {
+    case 'joy': return '😸';
+    case 'sad': return '😿';
+    case 'angry': return '😾';
+    case 'surprised': return '🙀';
+    case 'worried': return '😿';
+    default: return '🐱'; // calm
+  }
+}
+
 class PetCat extends StatefulWidget {
   final PetPosition position;
   final VoidCallback? onTap;
-  final bool isThinking; // wag head when user should type
+  final bool isThinking;
+  final String emotion; // joy, sad, angry, calm, surprised, worried
 
   const PetCat({
     super.key,
     this.position = PetPosition.bottomBar,
     this.onTap,
     this.isThinking = false,
+    this.emotion = 'calm',
   });
 
   @override
@@ -98,7 +111,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(18),
               ),
               child: const Center(
-                child: Text('🐱', style: TextStyle(fontSize: 22)),
+                child: Text(petEmoji(widget.emotion), style: TextStyle(fontSize: 22)),
               ),
             ),
           ),
@@ -120,7 +133,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
           borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
         ),
         child: const Center(
-          child: Text('🐱', style: TextStyle(fontSize: 14)),
+          child: Text(petEmoji('calm'), style: const TextStyle(fontSize: 14)),
         ),
       ),
     );
@@ -130,15 +143,16 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
 
 // ── Convenience factory ──
 
-Widget petCatResting({bool isThinking = false}) {
-  return _ChatRestingCat(isThinking: isThinking);
+Widget petCatResting({bool isThinking = false, String emotion = 'calm'}) {
+  return _ChatRestingCat(isThinking: isThinking, emotion: emotion);
 }
 
 // ── Resting cat on chat input bar ──
 
 class _ChatRestingCat extends StatefulWidget {
   final bool isThinking;
-  const _ChatRestingCat({required this.isThinking});
+  final String emotion;
+  const _ChatRestingCat({required this.isThinking, this.emotion = 'calm'});
 
   @override
   State<_ChatRestingCat> createState() => _ChatRestingCatState();
@@ -179,7 +193,7 @@ class _ChatRestingCatState extends State<_ChatRestingCat>
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Center(
-              child: Text('🐱', style: TextStyle(fontSize: 18)),
+              child: Text(petEmoji(widget.emotion), style: const TextStyle(fontSize: 18)),
             ),
           ),
         );
