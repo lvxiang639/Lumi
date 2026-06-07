@@ -49,10 +49,9 @@ MEMORY_PROMPT = """你是一只关心主人的小猫。根据以下关于用户�
 class ProactiveService:
     def __init__(self):
         self._task: asyncio.Task | None = None
-        self._interval = settings.notification_check_interval * 45  # ~45 min (was 30)
-        self._last_emotion_care: dict[str, datetime] = {}  # user_id → last
-        self._weather_cache: dict[str, tuple[str, datetime]] = {}  # city → (msg, time)
-        self._memory_cache: dict[str, tuple[str, datetime]] = {}  # user_id → (msg, time)
+        self._interval = settings.notification_check_interval * 180  # ~3 hours
+        self._last_push: dict[str, datetime] = {}      # user_id → last push time
+        self._push_count: dict[str, tuple[int, datetime]] = {}  # user_id → (count, day)
         self._news_cache: dict[str, tuple[list[dict], datetime]] = {}  # city → (items, time)
 
     async def _poll(self):
@@ -76,80 +75,80 @@ class ProactiveService:
                 logger.exception("proactive check failed for user=%s", uid[:8])
 
     async def _check_user(self, user_id: str, now: datetime):
-        """Run all checks for one user. Only send ONE message (first hit)."""
+        """Consolidated check — build one combined message (max 1 push per cycle)."""
+        if not self._can_push(user_id, now):
+            return
 
         async with async_session() as db:
-            # Get user
             r = await db.execute(select(User).where(User.id == user_id))
-            user = r.scalar_one_or_none()
-            if not user:
+            if not r.scalar_one_or_none():
                 return
 
-            # ── Check 1: Weather alert ──
-            msg = await self._check_weather(user_id, now)
-            if msg:
-                await send_to_user(user_id, {
-                    "type": "proactive", "delta": msg,
-                })
-                # proactive msg — no "done" needed
-                logger.info("proactive weather sent to %s", user_id[:8])
-                return
+            parts = []
 
-            # ── Check 2: Upcoming calendar event ──
-            msg = await self._check_calendar(user_id, now, db)
-            if msg:
-                await send_to_user(user_id, {
-                    "type": "proactive", "delta": msg,
-                })
-                # proactive msg — no "done" needed
-                logger.info("proactive calendar sent to %s", user_id[:8])
-                return
+            # Weather
+            w = await self._check_weather(user_id, now)
+            if w: parts.append(w)
 
-            # ── Check 3: Missing expense log ──
-            msg = await self._check_expense(user_id, now, db)
-            if msg:
-                await send_to_user(user_id, {
-                    "type": "proactive", "delta": msg,
-                })
-                # proactive msg — no "done" needed
-                return
+            # Calendar
+            c = await self._check_calendar(user_id, now, db)
+            if c: parts.append(c)
 
-            # ── Check 4: Long idle ──
-            msg = await self._check_idle(user_id, now, db)
-            if msg:
-                await send_to_user(user_id, {
-                    "type": "proactive", "delta": msg,
-                })
-                # proactive msg — no "done" needed
-                return
+            # Expense reminder
+            e = await self._check_expense(user_id, now, db)
+            if e: parts.append(e)
 
-            # ── Check 5: Memory topic ──
-            msg = await self._check_memory(user_id, now, db)
-            if msg:
-                await send_to_user(user_id, {
-                    "type": "proactive", "delta": msg,
-                })
-                # proactive msg — no "done" needed
-                return
+            # Idle greeting
+            idle = await self._check_idle(user_id, now, db)
+            if idle: parts.append(idle)
 
-            # ── Check 6: Emotion care ──
-            msg = await self._check_emotion(user_id, now, db)
-            if msg:
-                await send_to_user(user_id, {
-                    "type": "proactive", "delta": msg,
-                })
-                return
+            # Emotion care
+            emo = await self._check_emotion(user_id, now, db)
+            if emo: parts.append(emo)
 
-            # ── Check 7: Local news ──
-            news_data = await self._check_news(user_id, now)
-            if news_data:
-                await send_to_user(user_id, {
-                    "type": "proactive",
-                    "delta": "📰 本地资讯更新",
-                    "skill": "news",
-                    "data": news_data,
-                })
-                return
+            # Memory topic
+            mem = await self._check_memory(user_id, now, db)
+            if mem: parts.append(mem)
+
+            if parts:
+                msg = "\n".join(parts)
+                await self._do_push(user_id, now, msg, skill=None)
+
+            # News (low priority, separate)
+            news = await self._check_news(user_id, now)
+            if news and self._can_push(user_id, now):
+                await self._do_push(user_id, now, "📰 本地资讯更新", skill="news", data=news)
+
+    def _can_push(self, user_id: str, now: datetime) -> bool:
+        """Throttle: max 1 push per 2 hours, max 3 per day."""
+        # 2-hour cooldown
+        last = self._last_push.get(user_id)
+        if last and (now - last).total_seconds() < 7200:
+            return False
+        # Daily limit
+        today = now.date()
+        count, day = self._push_count.get(user_id, (0, today))
+        if day != today:
+            count = 0
+        if count >= 3:
+            return False
+        return True
+
+    async def _do_push(self, user_id: str, now: datetime, msg: str,
+                       skill: str | None = None, data: dict | None = None):
+        """Send push and update throttles."""
+        payload = {"type": "proactive", "delta": msg}
+        if skill: payload["skill"] = skill
+        if data: payload["data"] = data
+        await send_to_user(user_id, payload)
+
+        self._last_push[user_id] = now
+        today = now.date()
+        count, day = self._push_count.get(user_id, (0, today))
+        if day != today:
+            count = 0
+        self._push_count[user_id] = (count + 1, today)
+        logger.info("proactive push #%d to %s: %s", count + 1, user_id[:8], msg[:50])
 
     async def _check_weather(self, user_id: str, now: datetime) -> str | None:
         """Check weather with 2-hour cache per city to reduce LLM cost."""
@@ -403,17 +402,23 @@ GREETING_PROMPT = """你是一只关心主人的小猫灵犀。根据以下用�
 小猫灵犀的欢迎语:"""
 
 
-async def send_memory_greeting(user_id: str) -> str | None:
-    """Generate a personalized greeting on connect. Shares cache with periodic _check_memory."""
+async def send_connect_greeting(user_id: str) -> str | None:
+    """One consolidated greeting on app open — weather + calendar + memory."""
     now = datetime.now(BEIJING_TZ)
-    # Share cache with proactive_service._check_memory to prevent duplicates
-    cached = proactive_service._memory_cache.get(user_id)
-    if cached:
-        _, ts = cached
-        if (now - ts).total_seconds() < 21600:  # 6 hours
-            return None
+    if not proactive_service._can_push(user_id, now):
+        return None
 
+    parts = []
     async with async_session() as db:
+        # Weather
+        w = await proactive_service._check_weather(user_id, now)
+        if w: parts.append(w)
+
+        # Calendar
+        c = await proactive_service._check_calendar(user_id, now, db)
+        if c: parts.append(c)
+
+        # Memory
         r = await db.execute(
             select(UserMemory)
             .where(UserMemory.user_id == user_id)
@@ -421,18 +426,18 @@ async def send_memory_greeting(user_id: str) -> str | None:
             .limit(8)
         )
         memories = r.scalars().all()
-        if len(memories) < 2:
-            proactive_service._memory_cache[user_id] = ("__NONE__", now)
-            return None
+        if len(memories) >= 2:
+            mem_text = "\n".join(f"- {m.key}: {m.value}" for m in memories)
+            prompt = GREETING_PROMPT.format(now=now.strftime("%H:%M"), memories=mem_text)
+            try:
+                mem = await llm_router.chat([{"role": "user", "content": prompt}])
+                mem = (mem or "").strip()
+                if mem: parts.append(mem)
+            except Exception:
+                pass
 
-        mem_text = "\n".join(f"- {m.key}: {m.value}" for m in memories)
-        prompt = GREETING_PROMPT.format(
-            now=now.strftime("%H:%M"), memories=mem_text
-        )
-        try:
-            result = await llm_router.chat([{"role": "user", "content": prompt}])
-            result = (result or "").strip()
-            proactive_service._memory_cache[user_id] = (result or "__NONE__", now)
-            return result if result else None
-        except Exception:
-            return None
+    if parts:
+        msg = "\n".join(parts)
+        await proactive_service._do_push(user_id, now, msg, skill="greeting")
+        return msg
+    return None

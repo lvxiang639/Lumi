@@ -42,8 +42,8 @@ async def websocket_chat(ws: WebSocket):
     # Send memory-driven greeting on connect
     async def _send_greeting():
         try:
-            from app.services.proactive_service import send_memory_greeting
-            msg = await send_memory_greeting(user_id)
+            from app.services.proactive_service import send_connect_greeting
+            msg = await send_connect_greeting(user_id)
             if msg:
                 await send_message({"type": "proactive", "delta": msg, "skill": "greeting"})
         except Exception:
