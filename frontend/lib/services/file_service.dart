@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../config.dart';
 import 'api_client.dart';
 
@@ -26,31 +27,24 @@ class FileService {
         return '下载失败 (状态码: ${resp.statusCode})';
       }
 
-      // Save to Downloads folder for persistent access
+      // Save to persistent location
       final dir = Platform.isMacOS
           ? Directory('${Platform.environment['HOME']}/Downloads')
-          : await getTemporaryDirectory();
+          : await getApplicationDocumentsDirectory();
 
-      // Ensure unique filename
       String safeName = fileName.replaceAll(RegExp(r'[\/:*?"<>|]'), '_');
       final file = File('${dir.path}/$safeName');
       await file.writeAsBytes(resp.bodyBytes);
 
-      // Verify file was written
       if (!await file.exists() || await file.length() == 0) {
         return '文件写入失败';
       }
 
-      // Open with system default app
-      final result = await Process.run(
-        Platform.isMacOS ? 'open' : 'xdg-open',
-        [file.path],
-      );
-
-      if (result.exitCode == 0) {
-        return null; // success — null means no error
-      }
-      return '已保存到: ${file.path}';
+      // Open — url_launcher works on all platforms
+      final fileUri = Uri.file(file.path);
+      final ok = await launchUrl(fileUri,
+          mode: LaunchMode.externalApplication);
+      return ok ? null : '已保存到: ${file.path}';
     } catch (e) {
       return '打开失败: $e';
     }
