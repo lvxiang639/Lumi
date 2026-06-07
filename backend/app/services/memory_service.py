@@ -205,22 +205,41 @@ async def get_memory_summary(user_id: UUID) -> str:
 
 # ── ConvMemory (对话级记忆) ──
 
-CONV_SUMMARY_PROMPT = """为以下对话生成一句简短的摘要（30字以内），概括用户和AI聊了些什么：
+CONV_SUMMARY_PROMPT = """为以下对话生成简短的累积摘要（50字以内），概括用户和AI聊了些什么。如果已有之前的摘要，请合并新旧内容，避免信息丢失。
+
+之前的摘要: {previous}
 
 对话内容:
 {dialogue}
 
-摘要（30字以内）:"""
+累积摘要（50字以内）:"""
 
 
 async def extract_conv_summary(user_id: UUID, conv_id: UUID, dialogue: str) -> None:
-    """Async: extract a summary of this conversation and save to conv_memories."""
+    """Async: extract a cumulative summary of this conversation and save to conv_memories."""
     if not dialogue.strip():
         return
 
+    # Load previous summary for cumulative merging
+    previous_summary = ""
+    async with async_session() as db:
+        from app.models import ConvMemory
+        result = await db.execute(
+            select(ConvMemory.summary_text)
+            .where(ConvMemory.conv_id == conv_id)
+            .order_by(ConvMemory.updated_at.desc())
+            .limit(1)
+        )
+        row = result.scalar_one_or_none()
+        if row:
+            previous_summary = row
+
     try:
         summary = await llm_router.chat([
-            {"role": "user", "content": CONV_SUMMARY_PROMPT.format(dialogue=dialogue)},
+            {"role": "user", "content": CONV_SUMMARY_PROMPT.format(
+                dialogue=dialogue,
+                previous=previous_summary or "(无)",
+            )},
         ])
     except Exception:
         logger.exception("conv memory extraction LLM failed")
@@ -234,7 +253,7 @@ async def extract_conv_summary(user_id: UUID, conv_id: UUID, dialogue: str) -> N
     async with async_session() as db:
         from app.models import ConvMemory
 
-        # Check if a conv_memory already exists for this conv
+        # Upsert conv_memory
         result = await db.execute(
             select(ConvMemory).where(
                 ConvMemory.conv_id == conv_id,

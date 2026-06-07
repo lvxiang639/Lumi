@@ -10,6 +10,7 @@ from app.services.llm_service import llm_router
 logger = logging.getLogger("calendar_skill")
 
 EXTRACTION_PROMPT = """从用户输入中提取日历事件信息，以JSON格式返回。
+如果输入包含对话上下文（以"【对话上下文"开头），请结合上下文理解用户意图，但只提取"用户最新输入"中的事件。
 - time: ISO8601格式的日期时间字符串。如果用户说的是相对时间（如"明天下午3点"、"下周一下午2点"），请基于当前时间推算。
 - repeat_rule: 严格从 none/daily/weekly/monthly/yearly 中选择。
 - 如果某个字段无法确定，对应值设为null。

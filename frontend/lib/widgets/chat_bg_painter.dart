@@ -12,8 +12,6 @@ class ChatBgPainter extends CustomPainter {
     final strokePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
-    final rng = Random(42);
-
     // Draw WhatsApp-style repeating doodle wallpaper
     const tileSize = 80.0;
     final cols = (size.width / tileSize).ceil() + 1;
@@ -100,7 +98,6 @@ class ChatBgPainter extends CustomPainter {
   void _drawHeart(
       Canvas canvas, double cx, double cy, double s, Paint paint) {
     final path = Path();
-    final r = s * 0.35;
     path.moveTo(cx, cy + s * 0.35);
     path.cubicTo(cx - s * 0.5, cy - s * 0.1, cx - s * 0.5, cy - s * 0.5,
         cx, cy - s * 0.2);

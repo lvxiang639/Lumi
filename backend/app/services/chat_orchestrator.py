@@ -33,7 +33,7 @@ class ChatOrchestrator:
         user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
 
         # 2. Classify intent (skip for system-generated display messages)
-        _SYSTEM_PREFIXES = ('📋', '✅', '❌', '📝', '📧', '📎')
+        _SYSTEM_PREFIXES = ('📋', '✅', '❌', '📝', '📧', '📎', '📄')
         if text.strip().startswith(_SYSTEM_PREFIXES):
             intent = "chat"  # system display msg — no skill, just save + echo
         else:

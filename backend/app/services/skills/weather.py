@@ -9,6 +9,7 @@ from app.services.llm_service import llm_router
 logger = logging.getLogger("weather_skill")
 
 CITY_PROMPT = """从用户输入中提取城市名称，以JSON格式返回。如果用户没有指定具体城市，返回null。
+如果输入包含对话上下文（以"【对话上下文"开头），请从"用户最新输入"部分提取城市。
 
 返回格式: {{"city": "城市名"}}
 
@@ -22,6 +23,7 @@ LLM_WEATHER_PROMPT = """当前时间：{current_time}。请根据你的知识提
 请直接提供天气数据，格式清晰。如果无法提供实时数据，请说明这是气候概况。"""
 
 SUMMARIZE_PROMPT = """根据以下多来源信息，简洁地报告天气。综合API数据和大模型信息，以API数据为准。1-2句话即可。
+如果用户输入包含对话上下文，请忽略上下文，只关注天气查询本身。
 
 用户问题: {user_input}
 

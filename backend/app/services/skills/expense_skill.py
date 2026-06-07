@@ -10,6 +10,7 @@ from app.services.llm_service import llm_router
 logger = logging.getLogger("expense_skill")
 
 EXTRACTION_PROMPT = """从用户输入中提取记账信息，以JSON格式返回。
+如果输入包含对话上下文（以"【对话上下文"开头），请结合上下文理解用户意图，但只提取"用户最新输入"中的记账信息。
 - amount: 金额数字。支出用正数（如50），收入用负数（如-100）。如果用户说的是"花了""用了""买了"等为支出，"收了""赚了""入账"为收入。
 - category: 严格从以下选择：餐饮、交通、购物、娱乐、住房、医疗、教育、其他
 - remark: 简短备注（≤20字）

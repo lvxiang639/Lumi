@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../providers/conversation_provider.dart';
 import '../providers/character_provider.dart';
 import '../providers/discover_provider.dart';
-import '../theme/app_colors.dart';
 import 'conversation_list_screen.dart';
 import 'tools/tools_center_screen.dart';
 import 'discover_screen.dart';
