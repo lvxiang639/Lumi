@@ -53,6 +53,7 @@ class ProactiveService:
         self._last_emotion_care: dict[str, datetime] = {}  # user_id → last
         self._weather_cache: dict[str, tuple[str, datetime]] = {}  # city → (msg, time)
         self._memory_cache: dict[str, tuple[str, datetime]] = {}  # user_id → (msg, time)
+        self._news_cache: dict[str, tuple[list[dict], datetime]] = {}  # city → (items, time)
 
     async def _poll(self):
         while True:
@@ -137,7 +138,17 @@ class ProactiveService:
                 await send_to_user(user_id, {
                     "type": "proactive", "delta": msg,
                 })
-                # proactive msg — no "done" needed
+                return
+
+            # ── Check 7: Local news ──
+            news_data = await self._check_news(user_id, now)
+            if news_data:
+                await send_to_user(user_id, {
+                    "type": "proactive",
+                    "delta": "📰 本地资讯更新",
+                    "skill": "news",
+                    "data": news_data,
+                })
                 return
 
     async def _check_weather(self, user_id: str, now: datetime) -> str | None:
@@ -303,6 +314,67 @@ class ProactiveService:
             "worried": "喵~ 你好像有点焦虑，需要我帮你做点什么吗？",
         }
         return messages.get(state.current_emotion)
+
+    async def _check_news(self, user_id: str, now: datetime) -> list[dict] | None:
+        """Fetch local news headlines. Cache per city for 3 hours."""
+        city = await self._get_city(user_id)
+        cache_key = f"news_{city or 'default'}"
+        cached = self._news_cache.get(cache_key)
+        if cached:
+            data, ts = cached
+            if (now - ts).total_seconds() < 10800:  # 3 hours
+                return data if data else None
+
+        try:
+            import httpx
+            from app.config import settings
+            query = f"{city} 新闻" if city else "今日热点新闻"
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    f"{settings.searxng_url}/search",
+                    params={
+                        "q": query, "format": "json",
+                        "categories": "news",
+                        "engines": settings.searxng_engines,
+                    },
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                results = resp.json().get("results", [])[:3]
+        except Exception:
+            logger.exception("news fetch failed")
+            results = []
+
+        if not results:
+            self._news_cache[cache_key] = ([], now)
+            return None
+
+        news_items = [
+            {
+                "title": r.get("title", ""),
+                "summary": (r.get("content", "") or "")[:150],
+                "link": r.get("url", ""),
+                "time": now.strftime("%m/%d %H:%M"),
+            }
+            for r in results
+        ]
+        self._news_cache[cache_key] = (news_items, now)
+        return news_items
+
+    async def _get_city(self, user_id: str) -> str | None:
+        """Get user's city from memory."""
+        try:
+            async with async_session() as db:
+                r = await db.execute(
+                    select(UserMemory).where(
+                        UserMemory.user_id == user_id,
+                        UserMemory.key == "city",
+                    )
+                )
+                mem = r.scalar_one_or_none()
+                return mem.value if mem else None
+        except Exception:
+            return None
 
     def start(self):
         if self._task is None:

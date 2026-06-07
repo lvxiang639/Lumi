@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/discover_provider.dart';
 import '../theme/app_colors.dart';
@@ -98,62 +99,172 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   itemCount: provider.items.length,
                   itemBuilder: (ctx, i) {
                     final item = provider.items[i];
-                    final color = _skillColor(item.skill);
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.card(brightness),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(_skillIcon(item.skill), color: color, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(_skillLabel(item.skill),
-                                        style: TextStyle(
-                                            color: color,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600)),
-                                    const Spacer(),
-                                    Text(_formatTime(item.createdAt),
-                                        style: TextStyle(
-                                            color: AppColors.textSecondary(brightness)
-                                                .withValues(alpha: 0.5),
-                                            fontSize: 11)),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(item.text,
-                                    style: TextStyle(
-                                        color: AppColors.text(brightness),
-                                        fontSize: 14,
-                                        height: 1.5)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
+                    // News items get special multi-card rendering
+                    if (item.skill == 'news' && item.newsItems.isNotEmpty) {
+                      return _newsCard(item, brightness);
+                    }
+                    return _normalCard(item, brightness);
                   },
                 ),
         );
       },
+    );
+  }
+
+  Widget _normalCard(DiscoverItem item, Brightness b) {
+    final color = _skillColor(item.skill);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card(b),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(_skillIcon(item.skill), color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Text(_skillLabel(item.skill),
+                      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  Text(_formatTime(item.createdAt),
+                      style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
+                ]),
+                const SizedBox(height: 4),
+                Text(item.text,
+                    style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.5)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _newsCard(DiscoverItem item, Brightness b) {
+    final newsItems = item.newsItems;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.card(b),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+            child: Row(children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF97316).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.newspaper, color: Color(0xFFF97316), size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Text('📰 本地资讯',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Text(_formatTime(item.createdAt),
+                  style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
+            ]),
+          ),
+          const Divider(height: 1),
+          // News items
+          ...newsItems.asMap().entries.map((e) {
+            final n = e.value;
+            final title = n['title'] as String? ?? '';
+            final summary = n['summary'] as String? ?? '';
+            final link = n['link'] as String? ?? '';
+            final isLast = e.key == newsItems.length - 1;
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w600)),
+                      if (summary.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(summary,
+                            style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12, height: 1.4),
+                            maxLines: 3, overflow: TextOverflow.ellipsis),
+                      ],
+                      const SizedBox(height: 6),
+                      Row(children: [
+                        GestureDetector(
+                          onTap: () => _copyText('$title\n$summary\n$link'),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.copy, size: 12, color: AppColors.accent),
+                              const SizedBox(width: 4),
+                              Text('复制', style: TextStyle(color: AppColors.accent, fontSize: 11)),
+                            ]),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () => _openLink(link),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.open_in_new, size: 12, color: const Color(0xFF3B82F6)),
+                              const SizedBox(width: 4),
+                              const Text('打开', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 11)),
+                            ]),
+                          ),
+                        ),
+                      ]),
+                    ],
+                  ),
+                ),
+                if (!isLast) const Divider(height: 1, indent: 14, endIndent: 14),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  void _copyText(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  void _openLink(String url) {
+    if (url.isEmpty) return;
+    Clipboard.setData(ClipboardData(text: url));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('链接已复制: $url'), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating),
     );
   }
 

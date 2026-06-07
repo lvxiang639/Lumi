@@ -92,7 +92,11 @@ class ChatProvider extends ChangeNotifier {
         // Route to Discover tab — don't show in chat
         final discoverText = msg.data['delta'] as String? ?? '';
         if (discoverText.isNotEmpty) {
-          _routeToDiscover(discoverText, msg.data['skill'] as String?);
+          _routeToDiscover(
+            discoverText,
+            msg.data['skill'] as String?,
+            data: msg.data['data'] as Map<String, dynamic>?,
+          );
         }
         break;
       case 'emotion_update':
@@ -119,8 +123,8 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _routeToDiscover(String text, String? skill) {
-    DiscoverProvider.add(text, skill: skill);
+  void _routeToDiscover(String text, String? skill, {Map<String, dynamic>? data}) {
+    DiscoverProvider.add(text, skill: skill, data: data);
   }
 
   void _onSkillCall(Map<String, dynamic> data) {
