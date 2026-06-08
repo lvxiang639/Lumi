@@ -17,6 +17,7 @@ import '../services/conversation_service.dart';
 import '../widgets/chat_bg_painter.dart';
 import '../widgets/assistant_menu.dart';
 import '../widgets/pet_cat.dart';
+import '../services/logger.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class ChatScreen extends StatefulWidget {
@@ -62,26 +63,37 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _startVoice() async {
+    AppLogger.voice('按钮点击 listening=$_listening');
     if (_listening) {
+      AppLogger.voice('停止监听');
       await _stt.stop();
       setState(() => _listening = false);
       return;
     }
     try {
+      AppLogger.voice('开始初始化...');
       final available = await _stt.initialize(
         onStatus: (status) {
+          AppLogger.voice('状态: $status');
           if (status == 'done' || status == 'notListening') {
             setState(() => _listening = false);
           }
         },
+        onError: (error) {
+          AppLogger.error('语音初始化错误', error);
+        },
       );
+      AppLogger.voice('初始化结果: $available');
       if (!available) {
-        _snack('语音识别不可用（请检查麦克风权限）');
+        AppLogger.error('语音不可用 — 可能原因: 模拟器不支持 / 无权限 / 无网络');
+        _snack('语音识别不可用（模拟器不支持，请用真机测试）');
         return;
       }
       setState(() => _listening = true);
+      AppLogger.voice('开始监听 zh_CN...');
       await _stt.listen(
         onResult: (result) {
+          AppLogger.voice('识别结果: final=${result.finalResult} text="${result.recognizedWords}"');
           if (result.finalResult && result.recognizedWords.isNotEmpty) {
             _textCtrl.text = result.recognizedWords;
             setState(() => _listening = false);
@@ -94,9 +106,11 @@ class _ChatScreenState extends State<ChatScreen> {
           autoPunctuation: true,
         ),
       );
-    } catch (e) {
+      AppLogger.voice('监听已启动');
+    } catch (e, st) {
+      AppLogger.error('语音崩溃', e, st);
       setState(() => _listening = false);
-      _snack('语音识别出错');
+      _snack('语音识别出错: $e');
     }
   }
 

@@ -11,6 +11,7 @@ import 'providers/discover_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
+import 'widgets/debug_overlay.dart';
 
 class LingxiApp extends StatelessWidget {
   const LingxiApp({super.key});
@@ -36,12 +37,12 @@ class LingxiApp extends StatelessWidget {
             darkTheme: AppTheme.dark,
             themeMode: themeProvider.themeMode,
             debugShowCheckedModeBanner: false,
-            home: Consumer<AuthProvider>(
+            home: DebugOverlay(child: Consumer<AuthProvider>(
               builder: (context, auth, _) {
                 if (auth.isAuthenticated) return const MainScreen();
                 return const LoginScreen();
               },
-            ),
+            )),
           );
         },
       ),
