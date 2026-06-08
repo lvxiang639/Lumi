@@ -34,6 +34,7 @@ import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart' as web
 import 'package:file_picker/file_picker.dart' as file_picker;
 import 'package:path_provider_windows/path_provider_windows.dart' as path_provider_windows;
 import 'package:shared_preferences_windows/shared_preferences_windows.dart' as shared_preferences_windows;
+import 'package:speech_to_text_windows/speech_to_text_windows.dart' as speech_to_text_windows;
 import 'package:url_launcher_windows/url_launcher_windows.dart' as url_launcher_windows;
 
 @pragma('vm:entry-point')
@@ -294,6 +295,15 @@ class _PluginRegistrant {
       } catch (err) {
         print(
           '`shared_preferences_windows` threw an error: $err. '
+          'The app may not function as expected until you remove this plugin from pubspec.yaml'
+        );
+      }
+
+      try {
+        speech_to_text_windows.SpeechToTextWindows.registerWith();
+      } catch (err) {
+        print(
+          '`speech_to_text_windows` threw an error: $err. '
           'The app may not function as expected until you remove this plugin from pubspec.yaml'
         );
       }

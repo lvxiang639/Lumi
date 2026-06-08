@@ -303,8 +303,8 @@ class ProactiveService:
         self, user_id: str, now: datetime, db
     ) -> str | None:
         """Check if user has been sad/angry and needs care."""
-        # Don't spam — once per 4 hours
-        last = self._last_emotion_care.get(user_id)
+        # Throttle via global push system
+        last = self._last_push.get(user_id)
         if last and (now - last).total_seconds() < 14400:
             return None
 
@@ -318,8 +318,6 @@ class ProactiveService:
             return None
         if state.current_emotion not in ("sad", "angry", "worried"):
             return None
-
-        self._last_emotion_care[user_id] = now
 
         messages = {
             "sad": "喵~ 感觉你心情不太好，要聊聊吗？我一直在这里陪你 🐱",

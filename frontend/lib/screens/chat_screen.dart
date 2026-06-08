@@ -67,22 +67,37 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() => _listening = false);
       return;
     }
-    final available = await _stt.initialize();
-    if (!available) {
-      _snack('语音识别不可用');
-      return;
+    try {
+      final available = await _stt.initialize(
+        onStatus: (status) {
+          if (status == 'done' || status == 'notListening') {
+            setState(() => _listening = false);
+          }
+        },
+      );
+      if (!available) {
+        _snack('语音识别不可用（请检查麦克风权限）');
+        return;
+      }
+      setState(() => _listening = true);
+      await _stt.listen(
+        onResult: (result) {
+          if (result.finalResult && result.recognizedWords.isNotEmpty) {
+            _textCtrl.text = result.recognizedWords;
+            setState(() => _listening = false);
+            _send();
+          }
+        },
+        localeId: 'zh_CN',
+        listenOptions: stt.SpeechListenOptions(
+          partialResults: false,
+          autoPunctuation: true,
+        ),
+      );
+    } catch (e) {
+      setState(() => _listening = false);
+      _snack('语音识别出错');
     }
-    setState(() => _listening = true);
-    await _stt.listen(
-      onResult: (result) {
-        if (result.finalResult) {
-          _textCtrl.text = result.recognizedWords;
-          setState(() => _listening = false);
-          if (_textCtrl.text.isNotEmpty) _send();
-        }
-      },
-      localeId: 'zh_CN',
-    );
   }
 
   void _showAssistantMenu() {
