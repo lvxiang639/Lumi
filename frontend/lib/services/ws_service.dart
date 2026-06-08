@@ -42,6 +42,8 @@ class WsService {
   }
 
   Future<void> _doConnect() async {
+    // Guard against double connection
+    if (_state == WsState.connecting || _state == WsState.connected) return;
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token') ?? '';
     _setState(WsState.connecting);
