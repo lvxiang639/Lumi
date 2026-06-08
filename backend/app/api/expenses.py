@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 from app.database import get_db
 from app.models import ExpenseRecord, User
+from app.models.emotion_state import UserEmotionState
+from app.models.user_memory import UserMemory
 from app.api.deps import get_current_user
 from app.schemas.expense import ExpenseItem, CreateExpense, UpdateExpense, ExpenseStats
 
