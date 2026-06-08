@@ -13,7 +13,8 @@ class User(Base):
     phone: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
     nickname: Mapped[str] = mapped_column(String(50), default="")
     avatar: Mapped[str] = mapped_column(String(500), default="")
-    email: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(200), nullable=True, index=True)
+    hashed_password: Mapped[str | None] = mapped_column(String(200), nullable=True)
     last_briefing_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

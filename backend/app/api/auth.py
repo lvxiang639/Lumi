@@ -5,7 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.models import User
-from app.schemas.auth import LoginRequest, LoginResponse, RefreshResponse, UserProfile, UpdateProfileRequest
+from app.schemas.auth import (
+    LoginRequest, LoginResponse, RefreshResponse, UserProfile,
+    UpdateProfileRequest, EmailRegisterRequest, EmailLoginRequest,
+)
 from app.core.security import create_access_token
 from app.api.deps import get_current_user
 
@@ -51,6 +54,56 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
                 raise HTTPException(500, "Registration failed")
     token = create_access_token({"sub": str(user.id)})
     return LoginResponse(access_token=token, is_new_user=is_new)
+
+# ── Email auth ──
+
+import bcrypt
+
+def _hash_pw(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+def _verify_pw(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode(), hashed.encode())
+
+
+@router.post("/register", response_model=LoginResponse)
+async def register(req: EmailRegisterRequest, db: AsyncSession = Depends(get_db)):
+    # Check email uniqueness
+    existing = await db.execute(select(User).where(User.email == req.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(409, "该邮箱已注册")
+
+    nickname = req.nickname or f"用户{req.email[:4]}"
+    user = User(
+        phone=f"em_{req.email[:30]}",  # placeholder phone for email users
+        email=req.email,
+        nickname=nickname,
+        hashed_password=_hash_pw(req.password),
+    )
+    db.add(user)
+    try:
+        await db.commit()
+        await db.refresh(user)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(409, "注册失败，请重试")
+
+    token = create_access_token({"sub": str(user.id)})
+    return LoginResponse(access_token=token, is_new_user=True)
+
+
+@router.post("/email-login", response_model=LoginResponse)
+async def email_login(req: EmailLoginRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == req.email))
+    user = result.scalar_one_or_none()
+    if not user or not user.hashed_password:
+        raise HTTPException(401, "邮箱或密码错误")
+    if not _verify_pw(req.password, user.hashed_password):
+        raise HTTPException(401, "邮箱或密码错误")
+
+    token = create_access_token({"sub": str(user.id)})
+    return LoginResponse(access_token=token, is_new_user=False)
+
 
 @router.post("/refresh", response_model=RefreshResponse)
 async def refresh_token(current_user: User = Depends(get_current_user)):

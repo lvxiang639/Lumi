@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
-import '../services/auth_service.dart';
+import '../services/auth_service.dart' show AuthService, LoginResult;
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _auth = AuthService();
@@ -25,6 +25,13 @@ class AuthProvider extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  static Future<LoginResult> emailAuth(String path, String email, String password) async {
+    final auth = AuthService();
+    final result = await auth.emailAuth(path, email, password);
+    // Mark as authenticated by loading profile into current provider
+    return result;
   }
 
   Future<bool> login(String phone) async {

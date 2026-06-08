@@ -27,6 +27,16 @@ class AuthService {
     await _api.put('/api/auth/profile', body: body);
   }
 
+  Future<LoginResult> emailAuth(String path, String email, String password) async {
+    final data = await _api.post(path, body: {'email': email, 'password': password});
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('access_token', data['access_token'] as String);
+    return LoginResult(
+      accessToken: data['access_token'] as String,
+      isNewUser: data['is_new_user'] as bool,
+    );
+  }
+
   Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.containsKey('access_token');
