@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
+import 'logger.dart';
 
 enum WsState { disconnected, connecting, connected }
 
@@ -59,12 +60,14 @@ class WsService {
       await _channel!.ready;
       _setState(WsState.connected);
       _reconnectAttempts = 0;
+      AppLogger.ws('已连接');
     } catch (_) {
       _onDisconnected();
     }
   }
 
   void _onDisconnected() {
+    AppLogger.ws('已断开');
     _setState(WsState.disconnected);
     _subscription?.cancel();
     _subscription = null;
@@ -80,7 +83,7 @@ class WsService {
     final jitter = Duration(milliseconds: Random().nextInt(1000));
     _reconnectAttempts++;
 
-    debugPrint('WS reconnect in ${delay + jitter} (attempt $_reconnectAttempts)');
+    AppLogger.ws('重连 ${delay + jitter} (第 $_reconnectAttempts 次)');
     _reconnectTimer = Timer(delay + jitter, _doConnect);
   }
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
+import 'logger.dart';
 
 class ApiClient {
   final http.Client _client = http.Client();
@@ -41,10 +42,12 @@ class ApiClient {
   }
 
   Map<String, dynamic> _handleResponse(http.Response resp) {
+    AppLogger.api('${resp.request?.method} ${resp.request?.url.path} → ${resp.statusCode}');
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       if (resp.body.isEmpty) return {'status': 'ok'};
       return jsonDecode(resp.body) as Map<String, dynamic>;
     }
+    AppLogger.error('API ${resp.statusCode}: ${resp.body.length > 200 ? resp.body.substring(0, 200) : resp.body}');
     throw ApiException(resp.statusCode, resp.body);
   }
 }
