@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/character_provider.dart';
 import '../theme/app_colors.dart';
+import '../widgets/app_logo.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -99,28 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(flex: 2),
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: const Center(
-                  child: Text('🐱', style: TextStyle(fontSize: 40)),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text('灵犀',
-                  style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textLight)),
-              const SizedBox(height: 6),
-              const Text('你的 AI 陪伴伙伴',
-                  style: TextStyle(
-                      fontSize: 15,
-                      color: AppColors.textLightSecondary)),
+              const AppLogo(size: 100),
               const Spacer(),
               Container(
                 decoration: BoxDecoration(
