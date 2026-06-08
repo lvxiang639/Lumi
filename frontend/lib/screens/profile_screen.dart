@@ -162,6 +162,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _settingItem(Icons.auto_awesome, '角色管理', b,
                   () => _showCharacterSheet()),
               _divider(b),
+              _settingItem(Icons.psychology_outlined, 'AI 人格', b,
+                  () => _showPersonaSheet()),
+              _divider(b),
               _settingItem(Icons.email_outlined, '邮箱设置', b, () {
                 _showEmailDialog();
               }),
@@ -252,6 +255,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('好的'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showPersonaSheet() {
+    final brightness = Theme.of(context).brightness;
+    final personas = [
+      {'name': '默认', 'desc': '贴心的AI助手灵犀', 'icon': '🐱'},
+      {'name': '温柔姐姐', 'desc': '轻声细语的温暖大姐姐', 'icon': '🌸'},
+      {'name': '毒舌损友', 'desc': '犀利吐槽但真心为你', 'icon': '😏'},
+      {'name': '学霸老师', 'desc': '博学耐心，冷知识达人', 'icon': '📚'},
+      {'name': '二次元', 'desc': '萌系元气娘，喵~的说', 'icon': '🎀'},
+      {'name': '小猫', 'desc': '猫视角看世界，喵~', 'icon': '🐈'},
+    ];
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card(brightness),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(color: AppColors.border(brightness), borderRadius: BorderRadius.circular(2))),
+            const Text('选择 AI 人格', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+            ...personas.map((p) => ListTile(
+              leading: Text(p['icon']!, style: const TextStyle(fontSize: 24)),
+              title: Text(p['name']!, style: const TextStyle(fontWeight: FontWeight.w500)),
+              subtitle: Text(p['desc']!, style: const TextStyle(fontSize: 12)),
+              onTap: () {
+                final prov = context.read<AuthProvider>();
+                prov.updateProfile(persona: p['name']);
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('已切换为: ${p['name']}'), duration: const Duration(seconds: 1), behavior: SnackBarBehavior.floating));
+              },
+            )),
+            const SizedBox(height: 8),
+          ]),
+        ),
       ),
     );
   }

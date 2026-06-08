@@ -20,11 +20,8 @@ class AuthService {
     return User.fromJson(data);
   }
 
-  Future<void> updateProfile({String? nickname, String? avatar}) async {
-    final body = <String, dynamic>{};
-    if (nickname != null) body['nickname'] = nickname;
-    if (avatar != null) body['avatar'] = avatar;
-    await _api.put('/api/auth/profile', body: body);
+  Future<void> updateProfile({Map<String, dynamic>? body}) async {
+    await _api.put('/api/auth/profile', body: body ?? {});
   }
 
   Future<LoginResult> emailAuth(String path, String email, String password) async {

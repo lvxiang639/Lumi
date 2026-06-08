@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+from uuid import UUID
 # import base64  # VOICE FEATURE DISABLED
 from datetime import datetime, timezone
 
@@ -134,7 +135,12 @@ class ChatOrchestrator:
 
             # Build LLM messages with memory + history
             llm_messages = []
-            system_prefix = "你是一个贴心的AI助手，名叫灵犀。"
+            # AI Persona
+            persona = (
+                await self._load_persona(user_uuid)
+                or "你是一个贴心的AI助手，名叫灵犀。"
+            )
+            system_prefix = persona
             if memory_summary:
                 system_prefix += (
                     "\n\n以下是关于你正在对话的用户的信息，"
@@ -308,6 +314,33 @@ class ChatOrchestrator:
                 }
         except Exception:
             logger.exception("failed to get character voice")
+        return None
+
+    async def _load_persona(self, user_id: UUID) -> str | None:
+        """Load user's selected AI persona from memory."""
+        try:
+            from app.database import async_session
+            from app.models import UserMemory
+            from sqlalchemy import select
+            async with async_session() as db:
+                r = await db.execute(
+                    select(UserMemory).where(
+                        UserMemory.user_id == user_id,
+                        UserMemory.key == "ai_persona",
+                    )
+                )
+                mem = r.scalar_one_or_none()
+                if mem and mem.value:
+                    personas = {
+                        "温柔姐姐": "你是一个温柔体贴的大姐姐，名叫小暖。说话轻声细语，喜欢用'呀''呢''哦'，会主动关心对方的情绪和健康。",
+                        "毒舌损友": "你是一个毒舌但讲义气的损友，名叫阿怼。说话直白犀利，爱吐槽但真心为对方好。偶尔用'啧''行吧'，但从不说教。",
+                        "学霸老师": "你是一个博学耐心的学霸老师，名叫小知。喜欢用数据和逻辑说话，但也会用简单比喻解释复杂概念。偶尔冒出一句冷知识。",
+                        "二次元": "你是一个萌系二次元角色，名叫小萌。说话带'喵~''的说''捏'，元气满满，偶尔中二。热爱动漫游戏。",
+                        "小猫": "你是一只关心主人的小猫灵犀。用'喵~'开头，语气可爱温暖，会蹭蹭主人。喜欢用猫的视角看世界。",
+                    }
+                    return personas.get(mem.value)
+        except Exception:
+            pass
         return None
 
     async def _execute_agent(

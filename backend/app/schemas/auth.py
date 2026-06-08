@@ -32,3 +32,4 @@ class UpdateProfileRequest(BaseModel):
     nickname: str | None = None
     avatar: str | None = None
     email: str | None = None
+    persona: str | None = None

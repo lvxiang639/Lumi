@@ -34,6 +34,15 @@ class AuthProvider extends ChangeNotifier {
     return result;
   }
 
+  Future<void> updateProfile({String? nickname, String? avatar, String? email, String? persona}) async {
+    final body = <String, dynamic>{};
+    if (nickname != null) body['nickname'] = nickname;
+    if (avatar != null) body['avatar'] = avatar;
+    if (email != null) body['email'] = email;
+    if (persona != null) body['persona'] = persona;
+    await _auth.updateProfile(body: body);
+  }
+
   Future<bool> login(String phone) async {
     _loading = true;
     _error = null;

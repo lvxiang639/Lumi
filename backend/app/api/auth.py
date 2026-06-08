@@ -126,6 +126,17 @@ async def update_profile(req: UpdateProfileRequest, current_user: User = Depends
         current_user.avatar = req.avatar
     if req.email is not None:
         current_user.email = req.email
+    if req.persona is not None:
+        # Save persona preference as user memory
+        from app.models.user_memory import UserMemory
+        from sqlalchemy import select as sa_select
+        r = await db.execute(sa_select(UserMemory).where(
+            UserMemory.user_id == current_user.id, UserMemory.key == "ai_persona"))
+        mem = r.scalar_one_or_none()
+        if mem:
+            mem.value = req.persona
+        else:
+            db.add(UserMemory(user_id=current_user.id, key="ai_persona", value=req.persona))
     await db.commit()
     await db.refresh(current_user)
     return UserProfile(
