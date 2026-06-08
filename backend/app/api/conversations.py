@@ -298,6 +298,62 @@ async def email_summary(
     return {"status": "sent", "email": current_user.email}
 
 
+@router.post("/{conv_id}/diary")
+async def generate_diary(
+    conv_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate an AI diary entry from the day's conversation."""
+    conv_result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conv_id,
+            Conversation.user_id == current_user.id,
+        )
+    )
+    conv = conv_result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(404, "Conversation not found")
+
+    msgs_result = await db.execute(
+        select(Message)
+        .where(Message.conv_id == conv_id)
+        .order_by(Message.created_at)
+    )
+    messages = msgs_result.scalars().all()
+    if len(messages) < 2:
+        raise HTTPException(400, "对话内容太少，多聊几句吧")
+
+    dialogue = "\n".join(
+        f"{'🧑' if m.role.value == 'user' else '🐱'}: {m.content or ''}"
+        for m in messages
+    )
+
+    prompt = (
+        f"把以下对话写成一段温暖的日记（100-150字，第一人称）。"
+        f"像写给自己看的，自然不做作。包含：今天聊了什么、心情如何、有什么收获。\n\n"
+        f"对话:\n{dialogue}\n\n日记:"
+    )
+    try:
+        diary = await llm_router.chat([{"role": "user", "content": prompt}])
+        diary = (diary or "").strip()
+    except Exception:
+        raise HTTPException(500, "生成失败")
+
+    from app.models.note import Note
+    note = Note(
+        user_id=current_user.id,
+        title=f"📔 {conv.title}",
+        content=diary,
+        note_type="diary",
+    )
+    db.add(note)
+    await db.commit()
+    await db.refresh(note)
+
+    return {"id": str(note.id), "title": note.title, "content": diary}
+
+
 @router.get("/sent-emails")
 async def list_sent_emails(
     current_user: User = Depends(get_current_user),
