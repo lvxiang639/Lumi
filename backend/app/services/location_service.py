@@ -58,6 +58,23 @@ async def _geo_lookup(client_ip: str | None) -> str | None:
     return None
 
 
+async def get_timezone(client_ip: str | None = None) -> str | None:
+    """Get timezone string from IP address (e.g. 'Asia/Dubai', 'Asia/Shanghai')."""
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{GEO_API_URL}/{client_ip}" if client_ip else GEO_API_URL
+            resp = await client.get(url, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                tz = data.get("timezone", "")
+                if tz:
+                    logger.debug("IP timezone: %s", tz)
+                    return tz
+    except Exception:
+        pass
+    return None
+
+
 async def _from_user_memory(user_id: str) -> str | None:
     """Check if the user has mentioned their city in past conversations."""
     try:
