@@ -1,9 +1,62 @@
 import 'dart:math';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_colors.dart';
 
 enum PetPosition { bottomBar, sidebar }
+
+// Simple elegant SVG cat — standing/walking pose
+const _catSvg = '''
+<svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+  <!-- Tail -->
+  <path d="M15 45 Q5 35 8 25 Q10 18 18 30 Q20 35 22 42" stroke="#E0960C" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <!-- Back left leg -->
+  <line id="leg-bl" x1="30" y1="50" x2="30" y2="68" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="30" cy="70" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
+  <!-- Back right leg -->
+  <line id="leg-br" x1="42" y1="50" x2="42" y2="66" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="42" cy="68" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
+  <!-- Body -->
+  <ellipse cx="48" cy="44" rx="22" ry="11" fill="#F5A623"/>
+  <ellipse cx="48" cy="44" rx="22" ry="11" fill="none" stroke="#D4891A" stroke-width="1.5"/>
+  <!-- Belly -->
+  <ellipse cx="50" cy="47" rx="12" ry="6" fill="white" opacity="0.8"/>
+  <!-- Body stripes -->
+  <line x1="35" y1="36" x2="35" y2="52" stroke="#E0960C" stroke-width="2.5" opacity="0.6"/>
+  <line x1="45" y1="34" x2="45" y2="54" stroke="#E0960C" stroke-width="2.5" opacity="0.6"/>
+  <line x1="55" y1="34" x2="55" y2="54" stroke="#E0960C" stroke-width="2.5" opacity="0.6"/>
+  <!-- Front left leg -->
+  <line id="leg-fl" x1="58" y1="52" x2="58" y2="67" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="58" cy="69" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
+  <!-- Front right leg -->
+  <line id="leg-fr" x1="65" y1="52" x2="65" y2="65" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="65" cy="67" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
+  <!-- Neck -->
+  <ellipse cx="68" cy="36" rx="5" ry="8" fill="#F5A623"/>
+  <!-- Head -->
+  <ellipse cx="76" cy="28" rx="12" ry="10" fill="#F5A623"/>
+  <ellipse cx="76" cy="28" rx="12" ry="10" fill="none" stroke="#D4891A" stroke-width="1.2"/>
+  <!-- Left ear -->
+  <polygon points="70,20 65,8 76,18" fill="#F5A623" stroke="#D4891A" stroke-width="1"/>
+  <polygon points="71,19 67,10 75,18" fill="#FFB6C1" opacity="0.7"/>
+  <!-- Right ear -->
+  <polygon points="80,19 84,7 87,18" fill="#F5A623" stroke="#D4891A" stroke-width="1"/>
+  <polygon points="81,18 84,9 86,18" fill="#FFB6C1" opacity="0.7"/>
+  <!-- Eyes -->
+  <ellipse cx="73" cy="27" rx="2.5" ry="3" fill="#4A3520"/>
+  <ellipse cx="80" cy="27" rx="2.5" ry="3" fill="#4A3520"/>
+  <circle cx="73.5" cy="26" r="0.8" fill="white"/>
+  <circle cx="80.5" cy="26" r="0.8" fill="white"/>
+  <!-- Nose -->
+  <ellipse cx="76" cy="31" rx="2" ry="1.2" fill="#FF6B8A"/>
+  <!-- Mouth -->
+  <path d="M76 32 L74 34 M76 32 L78 34" stroke="#D4891A" stroke-width="0.6" fill="none"/>
+  <!-- Whiskers -->
+  <line x1="68" y1="30" x2="56" y2="28" stroke="white" stroke-width="0.5" opacity="0.8"/>
+  <line x1="68" y1="31" x2="56" y2="31" stroke="white" stroke-width="0.5" opacity="0.8"/>
+  <line x1="84" y1="30" x2="96" y2="28" stroke="white" stroke-width="0.5" opacity="0.8"/>
+  <line x1="84" y1="31" x2="96" y2="31" stroke="white" stroke-width="0.5" opacity="0.8"/>
+</svg>''';
 
 class PetCat extends StatefulWidget {
   final PetPosition position;
@@ -25,7 +78,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _walkCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
+    _walkCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
   }
 
   @override
@@ -41,9 +94,10 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
 
   void _startWalking() {
     if (!mounted) return;
-    final start = _walkX;
-    final end = _movingRight ? _screenW - 40.0 : 40.0;
-    final duration = ((end - start).abs() / 60 * 1000).toInt().clamp(5000, 15000);
+    final end = _movingRight ? _screenW - 80.0 : 80.0;
+    final dist = (end - _walkX).abs();
+    // Slow walk: 15-30 seconds per screen width
+    final duration = (dist / _screenW * 25000).toInt().clamp(8000, 30000);
 
     _walkCtrl.duration = Duration(milliseconds: duration);
     _walkCtrl.forward(from: 0).then((_) {
@@ -73,19 +127,27 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
       builder: (_, __) {
         final t = _walkCtrl.value;
         _walkX = _movingRight
-            ? ui.lerpDouble(_walkX, _screenW - 40, t)!
-            : ui.lerpDouble(_walkX, 40, t)!;
+            ? lerpDouble(_walkX, _screenW - 80, t)!
+            : lerpDouble(_walkX, 80, t)!;
+
+        // Walking bob effect
+        final bob = sin(t * 3.14 * 4) * 3;
+        final isWalking = _walkCtrl.isAnimating;
 
         return Positioned(
           left: _walkX,
           bottom: 2,
           child: GestureDetector(
             onTap: widget.onTap,
-            child: SizedBox(
-              width: 64, height: 48,
-              child: CustomPaint(
-                size: const Size(64, 48),
-                painter: _WalkingCatPainter(walkPhase: _walkCtrl.value * 3.14 * 2, movingRight: _movingRight),
+            child: Transform.translate(
+              offset: Offset(0, bob),
+              child: Transform.flip(
+                flipX: !_movingRight,
+                child: SvgPicture.string(
+                  _catSvg,
+                  width: 72,
+                  height: 44,
+                ),
               ),
             ),
           ),
@@ -97,192 +159,21 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
   Widget _sidebarCat() {
     return Positioned(
       right: 0,
-      bottom: 40,
+      bottom: 50,
       child: GestureDetector(
         onTap: widget.onTap,
-        child: SizedBox(
-          width: 40, height: 60,
-          child: CustomPaint(
-            size: const Size(40, 60),
-            painter: _SidebarCatPainter(),
-          ),
+        child: SvgPicture.string(
+          _catSvg,
+          width: 36,
+          height: 22,
+          fit: BoxFit.cover,
+          alignment: Alignment.centerRight,
         ),
       ),
     );
   }
 }
 
-// ── Walking Cat Painter ──
-
-class _WalkingCatPainter extends CustomPainter {
-  final double walkPhase;
-  final bool movingRight;
-  _WalkingCatPainter({required this.walkPhase, required this.movingRight});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width, h = size.height;
-    final bodyPaint = Paint()..color = const Color(0xFFF5A623);
-    final strokePaint = Paint()..color = const Color(0xFFE0960C)..style = PaintingStyle.stroke..strokeWidth = 1.0;
-    final whitePaint = Paint()..color = Colors.white;
-    final eyePaint = Paint()..color = const Color(0xFF4A3520);
-    final pinkPaint = Paint()..color = const Color(0xFFFFB6C1);
-    final nosePaint = Paint()..color = const Color(0xFFFF6B8A);
-
-    canvas.save();
-    if (!movingRight) { canvas.translate(w, 0); canvas.scale(-1, 1); }
-
-    final bob = sin(walkPhase) * 2;
-    // Cat positioned in lower half
-    final bx = w * 0.55, by = h * 0.65 + bob;
-
-    // ── Long curved tail ──
-    final tailPath = Path();
-    tailPath.moveTo(bx - 16, by - 2);
-    tailPath.cubicTo(bx - 26, by - 8, bx - 30, by - 18, bx - 28, by - 22);
-    tailPath.cubicTo(bx - 30, by - 20, bx - 24, by - 8, bx - 16, by - 1);
-    canvas.drawPath(tailPath, bodyPaint);
-    canvas.drawPath(tailPath, strokePaint);
-
-    // ── Back legs (behind body) ──
-    final backSwing = sin(walkPhase + 1.57) * 2.5;
-    _drawLeg(canvas, bx - 8, by + 7 - backSwing, 12, bodyPaint, strokePaint, whitePaint);
-    _drawLeg(canvas, bx + 1, by + 7 + backSwing, 11, bodyPaint, strokePaint, whitePaint);
-
-    // ── Long slim body ──
-    final bodyRect = RRect.fromLTRBR(bx - 17, by - 6, bx + 11, by + 6, const Radius.circular(6));
-    canvas.drawRRect(bodyRect, bodyPaint);
-    canvas.drawRRect(bodyRect, strokePaint);
-    // Belly
-    canvas.drawRRect(RRect.fromLTRBR(bx - 12, by - 2, bx + 7, by + 4, const Radius.circular(4)), whitePaint);
-
-    // ── Front legs (in front of body) ──
-    final frontSwing = sin(walkPhase) * 2.5;
-    _drawLeg(canvas, bx + 5, by + 3 - frontSwing, 10, bodyPaint, strokePaint, whitePaint);
-    _drawLeg(canvas, bx + 9, by + 3 + frontSwing, 9, bodyPaint, strokePaint, whitePaint);
-
-    // ── Neck ──
-    canvas.drawRRect(RRect.fromLTRBR(bx + 8, by - 10, bx + 16, by - 2, const Radius.circular(3)), bodyPaint);
-    canvas.drawRRect(RRect.fromLTRBR(bx + 8, by - 10, bx + 16, by - 2, const Radius.circular(3)), strokePaint);
-
-    // ── Head: small rounded diamond ──
-    final headCx = bx + 18, headCy = by - 10;
-    final facePath = Path();
-    facePath.addPolygon([
-      Offset(headCx, headCy - 7),   // top
-      Offset(headCx + 7, headCy),   // right
-      Offset(headCx + 4, headCy + 5), // bottom right
-      Offset(headCx - 3, headCy + 5), // bottom left
-      Offset(headCx - 6, headCy),   // left
-    ], true);
-    canvas.drawPath(facePath, bodyPaint);
-    canvas.drawPath(facePath, strokePaint);
-
-    // ── Large pointed ears ──
-    final earPath = Path();
-    earPath.moveTo(headCx - 3, headCy - 5);
-    earPath.lineTo(headCx - 8, headCy - 15);
-    earPath.lineTo(headCx + 1, headCy - 6);
-    canvas.drawPath(earPath, bodyPaint);
-    canvas.drawPath(earPath, strokePaint);
-    earPath.reset();
-    earPath.moveTo(headCx + 2, headCy - 5);
-    earPath.lineTo(headCx + 8, headCy - 13);
-    earPath.lineTo(headCx + 6, headCy - 4);
-    canvas.drawPath(earPath, bodyPaint);
-    canvas.drawPath(earPath, strokePaint);
-    // Inner ear
-    canvas.drawCircle(Offset(headCx - 4, headCy - 9), 2.2, pinkPaint);
-    canvas.drawCircle(Offset(headCx + 5, headCy - 8), 2.2, pinkPaint);
-
-    // ── Eyes: almond shaped ──
-    canvas.drawOval(Rect.fromCenter(center: Offset(headCx - 1, headCy), width: 3.5, height: 3), eyePaint);
-    canvas.drawOval(Rect.fromCenter(center: Offset(headCx + 4, headCy), width: 3.5, height: 3), eyePaint);
-    canvas.drawCircle(Offset(headCx - 0.5, headCy - 0.8), 1, whitePaint);
-    canvas.drawCircle(Offset(headCx + 4.5, headCy - 0.8), 1, whitePaint);
-
-    // ── Nose ──
-    canvas.drawCircle(Offset(headCx + 1.5, headCy + 2.5), 1.2, nosePaint);
-
-    // ── Whiskers ──
-    final whiskerPaint = Paint()..color = Colors.white..strokeWidth = 0.5..style = PaintingStyle.stroke;
-    for (final side in [-1, 1]) {
-      for (final dy in [-0.5, 0, 0.5]) {
-        canvas.drawLine(Offset(headCx + 2, headCy + 2.5 + dy), Offset(headCx + 2 + side * 10, headCy + 1 + dy * 2), whiskerPaint);
-      }
-    }
-
-    // ── Collar (stripes on body) ──
-    final stripePaint = Paint()..color = const Color(0xFFE0960C)..strokeWidth = 2..style = PaintingStyle.stroke;
-    for (int i = 0; i < 3; i++) {
-      final sx = bx - 5 + i * 7;
-      canvas.drawLine(Offset(sx, by - 6), Offset(sx, by + 6), stripePaint);
-    }
-
-    canvas.restore();
-  }
-
-  void _drawLeg(Canvas canvas, double x, double y, double len, Paint fill, Paint stroke, Paint paw) {
-    canvas.drawRRect(RRect.fromLTRBR(x, y, x + 2.5, y + len, const Radius.circular(1.2)), fill);
-    canvas.drawRRect(RRect.fromLTRBR(x, y, x + 2.5, y + len, const Radius.circular(1.2)), stroke);
-    canvas.drawCircle(Offset(x + 1.2, y + len), 2, paw);
-    canvas.drawCircle(Offset(x + 1.2, y + len), 2, stroke);
-  }
-
-  @override
-  bool shouldRepaint(covariant _WalkingCatPainter old) => old.walkPhase != walkPhase || old.movingRight != movingRight;
-}
-
-// ── Sidebar Peeking Cat Painter ──
-
-class _SidebarCatPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width, h = size.height;
-    final bodyPaint = Paint()..color = const Color(0xFFF5A623);
-    final outlinePaint = Paint()..color = const Color(0xFFD4891A)..style = PaintingStyle.stroke..strokeWidth = 1.2;
-    final darkPaint = Paint()..color = const Color(0xFF8B6914);
-    final pinkPaint = Paint()..color = const Color(0xFFFFB6C1);
-
-    // Head peeking from right edge
-    final headCx = w * 0.6, headCy = h * 0.4;
-    canvas.drawCircle(Offset(headCx, headCy), 11, bodyPaint);
-    canvas.drawCircle(Offset(headCx, headCy), 11, outlinePaint);
-
-    // Ears
-    final earPath = Path();
-    earPath.moveTo(headCx - 5, headCy - 8);
-    earPath.lineTo(headCx - 9, headCy - 16);
-    earPath.lineTo(headCx, headCy - 8);
-    canvas.drawPath(earPath, bodyPaint);
-    canvas.drawPath(earPath, outlinePaint);
-    earPath.reset();
-    earPath.moveTo(headCx + 2, headCy - 7);
-    earPath.lineTo(headCx + 8, headCy - 14);
-    earPath.lineTo(headCx + 8, headCy - 5);
-    canvas.drawPath(earPath, bodyPaint);
-    canvas.drawPath(earPath, outlinePaint);
-
-    canvas.drawCircle(Offset(headCx - 6, headCy - 10), 3, pinkPaint);
-    canvas.drawCircle(Offset(headCx + 5, headCy - 9), 3, pinkPaint);
-
-    // Eyes — wide, curious
-    canvas.drawCircle(Offset(headCx - 3, headCy - 1), 2.5, darkPaint);
-    canvas.drawCircle(Offset(headCx + 4, headCy - 1), 2.5, darkPaint);
-    canvas.drawCircle(Offset(headCx - 2.3, headCy - 1.7), 1, Paint()..color = Colors.white);
-    canvas.drawCircle(Offset(headCx + 4.7, headCy - 1.7), 1, Paint()..color = Colors.white);
-
-    // Nose
-    canvas.drawCircle(Offset(headCx + 1, headCy + 2), 1.5, Paint()..color = const Color(0xFFFF6B8A));
-
-    // Paws on edge
-    final pawPaint = Paint()..color = Colors.white;
-    canvas.drawCircle(Offset(headCx - 6, headCy + 12), 3.5, pawPaint);
-    canvas.drawCircle(Offset(headCx + 1, headCy + 12), 3.5, pawPaint);
-    canvas.drawCircle(Offset(headCx - 6, headCy + 12), 3.5, outlinePaint);
-    canvas.drawCircle(Offset(headCx + 1, headCy + 12), 3.5, outlinePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SidebarCatPainter old) => false;
+double lerpDouble(double a, double b, double t) {
+  return a + (b - a) * t;
 }
