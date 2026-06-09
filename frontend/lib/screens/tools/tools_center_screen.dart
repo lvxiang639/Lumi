@@ -7,6 +7,7 @@ import '../email_page.dart';
 import '../file_page.dart';
 import '../summary_page.dart';
 import '../countdown_page.dart';
+import '../knowledge_page.dart';
 import '../../services/routes.dart';
 import '../../theme/app_colors.dart';
 
@@ -23,6 +24,7 @@ class ToolsCenterScreen extends StatelessWidget {
     _Tool('摘要', Icons.summarize, Color(0xFFF97316)),
     _Tool('OCR', Icons.document_scanner, Color(0xFF06B6D4)),
     _Tool('倒数日', Icons.date_range, Color(0xFFEF4444)),
+    _Tool('知识库', Icons.library_books, Color(0xFF8B5CF6)),
   ];
 
   void _navigate(BuildContext ctx, String name) {
@@ -51,6 +53,9 @@ class ToolsCenterScreen extends StatelessWidget {
         break;
       case '倒数日':
         page = const CountdownPage();
+        break;
+      case '知识库':
+        page = const KnowledgePage();
         break;
       default:
         return;

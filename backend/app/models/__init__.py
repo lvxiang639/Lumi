@@ -29,6 +29,7 @@ from app.models.sent_email import SentEmail
 from app.models.countdown import Countdown
 from app.models.proactive_push import ProactivePush
 from app.models.reminder_schedule import ReminderSchedule
+from app.models.knowledge_base import KnowledgeBase, KnowledgeChunk
 
 from app.database import Base
 
