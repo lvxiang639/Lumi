@@ -424,16 +424,12 @@ GREETING_PROMPT = """你是一只关心主人的小猫灵犀。根据以下用�
 小猫灵犀的欢迎语:"""
 
 
-# Separate throttle for connect greetings — only once per 6 hours
-_greeting_last: dict[str, datetime] = {}
-
 async def send_connect_greeting(user_id: str) -> str | None:
-    """One consolidated greeting on app open — weather + calendar + memory.
-    Throttled to once every 6 hours, independent of periodic proactive pushes."""
+    """One consolidated greeting on app open.
+    Shares the SAME throttle as periodic checks — 2h cooldown, 3/day max."""
     now = datetime.now(BEIJING_TZ)
-    last_greet = _greeting_last.get(user_id)
-    if last_greet and (now - last_greet).total_seconds() < 21600:  # 6 hours
-        logger.debug("connect greeting: throttled for %s (last was %s)", user_id[:8], last_greet.strftime("%H:%M"))
+    if not proactive_service._can_push(user_id, now):
+        logger.debug("connect greeting: throttled (shared with periodic) for %s", user_id[:8])
         return None
 
     parts = []
@@ -460,11 +456,15 @@ async def send_connect_greeting(user_id: str) -> str | None:
                 pass
 
     if parts:
-        _greeting_last[user_id] = now
         msg = "\n".join(parts)
-        # Also update general push throttle so periodic check doesn't fire right after
+        # Use shared throttle — same as periodic _do_push
         proactive_service._last_push[user_id] = now
-        logger.info("connect greeting sent to %s: %s", user_id[:8], msg[:50])
+        today = now.date()
+        count, day = proactive_service._push_count.get(user_id, (0, today))
+        if day != today:
+            count = 0
+        proactive_service._push_count[user_id] = (count + 1, today)
+        logger.info("connect greeting sent to %s (push #%d today): %s", user_id[:8], count + 1, msg[:50])
         return msg
     logger.debug("connect greeting: no content for %s", user_id[:8])
     return None

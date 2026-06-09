@@ -171,9 +171,6 @@ class ChatOrchestrator:
             ]
             llm_messages.append({"role": "user", "content": text})
 
-            # Debug: confirm time is in system prompt
-            logger.info("SYSTEM PROMPT: %s", system_prefix[:200].replace("\n", " | "))
-
             # Stream LLM response
             full_response = ""
             async for delta in llm_router.chat_stream(llm_messages):
