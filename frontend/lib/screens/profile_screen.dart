@@ -269,32 +269,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
       {'name': '二次元', 'desc': '萌系元气娘，喵~的说', 'icon': '🎀'},
       {'name': '小猫', 'desc': '猫视角看世界，喵~', 'icon': '🐈'},
     ];
+    String selected = '默认';
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.card(brightness),
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(color: AppColors.border(brightness), borderRadius: BorderRadius.circular(2))),
-            const Text('选择 AI 人格', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 16),
-            ...personas.map((p) => ListTile(
-              leading: Text(p['icon']!, style: const TextStyle(fontSize: 24)),
-              title: Text(p['name']!, style: const TextStyle(fontWeight: FontWeight.w500)),
-              subtitle: Text(p['desc']!, style: const TextStyle(fontSize: 12)),
-              onTap: () {
-                final prov = context.read<AuthProvider>();
-                prov.updateProfile(persona: p['name']);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('已切换为: ${p['name']}'), duration: const Duration(seconds: 1), behavior: SnackBarBehavior.floating));
-              },
-            )),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: AppColors.border(brightness), borderRadius: BorderRadius.circular(2))),
+              const Text('选择 AI 人格', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 16),
+              ...personas.map((p) => Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                decoration: BoxDecoration(
+                  color: selected == p['name'] ? AppColors.accent.withValues(alpha: 0.08) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  border: selected == p['name'] ? Border.all(color: AppColors.accent.withValues(alpha: 0.3)) : null,
+                ),
+                child: ListTile(
+                  leading: Text(p['icon']!, style: const TextStyle(fontSize: 24)),
+                  title: Text(p['name']!, style: const TextStyle(fontWeight: FontWeight.w500)),
+                  subtitle: Text(p['desc']!, style: const TextStyle(fontSize: 12)),
+                  trailing: selected == p['name']
+                      ? const Icon(Icons.check_circle, color: AppColors.accent, size: 20)
+                      : null,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  onTap: () {
+                    setSheetState(() => selected = p['name']!);
+                    final prov = context.read<AuthProvider>();
+                    prov.updateProfile(persona: p['name']);
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('已切换为: ${p['name']}'), duration: const Duration(seconds: 1), behavior: SnackBarBehavior.floating));
+                  },
+                ),
+              )),
             const SizedBox(height: 8),
-          ]),
+          ])),
         ),
       ),
     );

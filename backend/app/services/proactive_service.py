@@ -77,6 +77,7 @@ class ProactiveService:
     async def _check_water(self, user_id: str, now: datetime) -> str | None:
         """Remind to drink water every 2 hours during daytime (8-22)."""
         if now.hour < 8 or now.hour > 22:
+            logger.debug("proactive water: outside daytime (hour=%d)", now.hour)
             return None
         last = self._last_push.get(user_id)
         if last and (now - last).total_seconds() < 7200:
@@ -86,53 +87,62 @@ class ProactiveService:
 
     async def _check_user(self, user_id: str, now: datetime):
         """Consolidated check — build one combined message (max 1 push per cycle)."""
+        logger.info("proactive check: [0] starting scan for %s", user_id[:8])
         if not self._can_push(user_id, now):
+            logger.info("proactive check: throttled (cooldown/limit) for %s", user_id[:8])
             return
 
         async with async_session() as db:
             r = await db.execute(select(User).where(User.id == user_id))
             if not r.scalar_one_or_none():
                 return
-
             parts = []
 
-            # Weather
+            logger.info("proactive check: [1/8] weather for %s", user_id[:8])
             w = await self._check_weather(user_id, now)
+            logger.info("proactive check: weather -> %s", "HIT" if w else "SKIP")
             if w: parts.append(w)
 
-            # Calendar
+            logger.info("proactive check: [2/8] calendar for %s", user_id[:8])
             c = await self._check_calendar(user_id, now, db)
+            logger.info("proactive check: calendar -> %s", "HIT" if c else "SKIP")
             if c: parts.append(c)
 
-            # Expense reminder
+            logger.info("proactive check: [3/8] expense for %s", user_id[:8])
             e = await self._check_expense(user_id, now, db)
+            logger.info("proactive check: expense -> %s", "HIT" if e else "SKIP")
             if e: parts.append(e)
 
-            # Idle greeting
+            logger.info("proactive check: [4/8] idle for %s", user_id[:8])
             idle = await self._check_idle(user_id, now, db)
+            logger.info("proactive check: idle -> %s", "HIT" if idle else "SKIP")
             if idle: parts.append(idle)
 
-            # Water reminder
+            logger.info("proactive check: [5/8] water for %s", user_id[:8])
             water = await self._check_water(user_id, now)
+            logger.info("proactive check: water -> %s", "HIT" if water else "SKIP")
             if water: parts.append(water)
 
-            # Emotion care
+            logger.info("proactive check: [6/8] emotion for %s", user_id[:8])
             emo = await self._check_emotion(user_id, now, db)
+            logger.info("proactive check: emotion -> %s", "HIT" if emo else "SKIP")
             if emo: parts.append(emo)
 
-            # Memory topic
+            logger.info("proactive check: [7/8] memory for %s", user_id[:8])
             mem = await self._check_memory(user_id, now, db)
+            logger.info("proactive check: memory -> %s", "HIT" if mem else "SKIP")
             if mem: parts.append(mem)
 
+            logger.info("proactive check: %d parts collected for %s", len(parts), user_id[:8])
             if parts:
-                msg = "\n".join(parts)
+                msg = "\\n".join(parts)
                 await self._do_push(user_id, now, msg, skill=None)
 
-            # News (low priority, separate)
+            logger.info("proactive check: [8/8] news for %s", user_id[:8])
             news = await self._check_news(user_id, now)
+            logger.info("proactive check: news -> %s", f"{len(news)} items" if news else "SKIP")
             if news and self._can_push(user_id, now):
                 await self._do_push(user_id, now, "📰 本地资讯更新", skill="news", data=news)
-
     def _can_push(self, user_id: str, now: datetime) -> bool:
         """Throttle: max 1 push per 2 hours, max 3 per day."""
         # 2-hour cooldown
