@@ -424,28 +424,29 @@ GREETING_PROMPT = """你是一只关心主人的小猫灵犀。根据以下用�
 小猫灵犀的欢迎语:"""
 
 
+# Separate throttle for connect greetings — only once per 6 hours
+_greeting_last: dict[str, datetime] = {}
+
 async def send_connect_greeting(user_id: str) -> str | None:
-    """One consolidated greeting on app open — weather + calendar + memory."""
+    """One consolidated greeting on app open — weather + calendar + memory.
+    Throttled to once every 6 hours, independent of periodic proactive pushes."""
     now = datetime.now(BEIJING_TZ)
-    if not proactive_service._can_push(user_id, now):
+    last_greet = _greeting_last.get(user_id)
+    if last_greet and (now - last_greet).total_seconds() < 21600:  # 6 hours
+        logger.debug("connect greeting: throttled for %s (last was %s)", user_id[:8], last_greet.strftime("%H:%M"))
         return None
 
     parts = []
     async with async_session() as db:
-        # Weather
         w = await proactive_service._check_weather(user_id, now)
         if w: parts.append(w)
 
-        # Calendar
         c = await proactive_service._check_calendar(user_id, now, db)
         if c: parts.append(c)
 
-        # Memory
         r = await db.execute(
-            select(UserMemory)
-            .where(UserMemory.user_id == user_id)
-            .order_by(UserMemory.updated_at.desc())
-            .limit(8)
+            select(UserMemory).where(UserMemory.user_id == user_id)
+            .order_by(UserMemory.updated_at.desc()).limit(8)
         )
         memories = r.scalars().all()
         if len(memories) >= 2:
@@ -459,14 +460,11 @@ async def send_connect_greeting(user_id: str) -> str | None:
                 pass
 
     if parts:
+        _greeting_last[user_id] = now
         msg = "\n".join(parts)
-        # Update throttle (same as _do_push) but let ws_chat.py send the actual message
+        # Also update general push throttle so periodic check doesn't fire right after
         proactive_service._last_push[user_id] = now
-        today = now.date()
-        count, day = proactive_service._push_count.get(user_id, (0, today))
-        if day != today:
-            count = 0
-        proactive_service._push_count[user_id] = (count + 1, today)
-        logger.info("proactive push #%d to %s: %s", count + 1, user_id[:8], msg[:50])
+        logger.info("connect greeting sent to %s: %s", user_id[:8], msg[:50])
         return msg
+    logger.debug("connect greeting: no content for %s", user_id[:8])
     return None
