@@ -13,15 +13,15 @@
 ┌─────┼──────────────┼──────────────┼─────────────────────┐
 │     ▼              ▼              ▼                     │
 │                  BACKEND (FastAPI)                       │
-│  api/  ←  domain/  ←  core/  ←  config.py              │
+│  api/  ←  domain/knowledge/  ←  infrastructure/        │
 │                │                                        │
 │     ┌──────────┼──────────┐                             │
 │     ▼          ▼          ▼                             │
-│  PostgreSQL   MinIO     Redis (future)                  │
+│  PostgreSQL   MinIO   FAISS (vector search)             │
 └─────────────────────────────────────────────────────────┘
 ```
 
-## Conversation Flow
+## Conversation Flow (Updated)
 
 ```
 User speaks/types
@@ -30,263 +30,137 @@ User speaks/types
 ┌──────────────────────────────────────────────────────────┐
 │ 1. Intent Classification (llm_service.classify_intent)   │
 │    DeepSeek → chat|search|weather|calendar|expense|      │
-│               convert|briefing|email                     │
+│               convert|briefing|email|agent               │
+│    System messages (📋✅❌📝📧📎📄) → force chat         │
 └─────────────┬────────────────────────────────────────────┘
               │
     ┌─────────┴─────────┐
-    │ skill matched?     │
-    ▼ yes               ▼ no (chat)
-┌────────────┐    ┌──────────────────────────┐
-│ Skill      │    │ Build chat context:      │
-│ Registry   │    │  - Long-term memory      │
-│ dispatch   │    │  - Emotion tone          │
-│            │    │  - Last 20 messages      │
-│ Skill      │    │  - System prompt         │
-│ returns    │    │                          │
-│ SkillResult│    │ LLM stream → full response│
-└─────┬──────┘    └──────────┬───────────────┘
-      │                      │
-      └──────────┬───────────┘
-                 ▼
+    │ intent?            │
+    ▼ agent             ▼ skill           ▼ chat
+┌────────────┐  ┌──────────────┐  ┌──────────────────────┐
+│ AI Agent   │  │ Skill        │  │ Build chat context:   │
+│ plan→exec  │  │ Registry     │  │ - Current time (IP)   │
+│ multi-step │  │ dispatch     │  │ - AI Persona          │
+│            │  │ with context │  │ - Memory (keyword)    │
+│ returns    │  │ Skill        │  │ - Emotion (info only) │
+│ text       │  │ returns      │  │ - Last 10 messages    │
+└────────────┘  │ SkillResult  │  │ LLM stream→response   │
+                └──────────────┘  └──────────────────────┘
+                  
+                      ▼
 ┌──────────────────────────────────────────┐
 │ 2. Save Messages (user + assistant)      │
-│ 3. Send 'done' to client                 │
+│ 3. Send 'done' + quick_reply suggestions │
 │ 4. Fire-and-forget:                      │
 │    - Emotion analysis + persist          │
 │    - Memory extraction (async LLM)       │
-│ 5. TTS synthesis + stream audio          │
+│    - Conv memory summary (cumulative)    │
 └──────────────────────────────────────────┘
 ```
 
-## Proactive Care Flow
+## Proactive Care Flow (V2)
 
 ```
-Every ~30 minutes:
+Every ~3 hours (22:00-8:00 quiet hours):
     │
     ▼
 ┌─────────────────────────────────────────────┐
 │ For each online user (WebSocket connected): │
 │                                             │
-│ Check 1: Weather alert? ──→ "带伞 ☔"       │
-│ Check 2: Event in 1hr?  ──→ "会议提醒"     │
-│ Check 3: Missing expense? ──→ "记账 💰"    │
-│ Check 4: Idle 4+ hours? ──→ "你回来啦 🐱" │
-│ Check 5: Memory topic?  ──→ "周杰伦..."    │
-│ Check 6: Sad/angry?     ──→ "要聊聊吗?"    │
+│ Check: Holiday? → push holiday greeting ❌  │
+│ Collect structured data from:               │
+│  - Weather alert                            │
+│  - Calendar event                           │
+│  - Expense reminder                         │
+│  - Idle greeting                            │
+│  - Water reminder                           │
+│  - Emotion care                             │
+│  - Memory topic                             │
 │                                             │
-│ First hit wins (one message per cycle)      │
+│ LLM generates natural push text (1 call)     │
+│ Save to proactive_pushes (DB throttle)       │
+│ Max 3 pushes/day, 2h cooldown                │
+│                                             │
+│ News: separate push (SearXNG, cached 3h)     │
+│ Countdown: alert at 3/1/0 days               │
 └─────────────────────────────────────────────┘
 
-On user connect:
+On user connect (8:00+):
     │
     ▼
 ┌──────────────────────────────────────┐
-│ Memory-driven greeting (1/6 hours):  │
-│ "你回来啦~ 北京今天晴呢 ☀️"          │
+│ Morning briefing (once/day):         │
+│ weather + calendar + expense summary │
 └──────────────────────────────────────┘
 ```
 
-## Emotion System
-
-```
-User message
-    │
-    ▼
-┌────────────────────────────────────────┐
-│ LLM analysis → {emotion, intensity}    │
-│ 6 emotions: joy sad angry calm         │
-│             surprised worried          │
-│                                        │
-│ Decay blending:                        │
-│  - Each emotion decays 0.05-0.20/30min │
-│  - New strong emotion overrides decayed│
-│  - intensity ≤ 0 → reset to calm       │
-│                                        │
-│ Persist to user_emotion_states         │
-│                                        │
-│ Inject tone into LLM system prompt     │
-│ Push emotion_update via WebSocket      │
-│ → frontend → character animation       │
-└────────────────────────────────────────┘
-```
-
-## Long-Term Memory Flow
-
-```
-Conversation ends
-    │
-    ▼
-┌──────────────────────────────┐
-│ Async LLM extraction:        │
-│ "从对话中提取用户关键信息"     │
-│                              │
-│ → user_memories table        │
-│   key: value pairs            │
-│   (city, job, hobby, etc.)   │
-│                              │
-│ > 50 memories → LLM merge    │
-└──────────────────────────────┘
-
-New conversation starts
-    │
-    ▼
-┌──────────────────────────────┐
-│ Load all memories for user   │
-│ Inject as system prompt:     │
-│ "用户信息: 喜欢周杰伦,       │
-│  在北京工作, 养了猫..."      │
-└──────────────────────────────┘
-```
-
-## Email Summary Flow
-
-```
-User: "发送到我的邮箱"  or  Tools Panel → 📧
-    │
-    ▼
-┌──────────────────────────────────┐
-│ 1. Classify intent → email       │
-│ 2. Get recent conversation msgs  │
-│ 3. LLM summarize dialogue        │
-│ 4. SMTP_SSL send (126.com:465)  │
-│ 5. Save to sent_emails table     │
-│ 6. Return success                │
-└──────────────────────────────────┘
-```
-
-## File Conversion Flow
-
-```
-User picks .docx/.pdf (conversation or tools panel)
-    │
-    ▼
-┌─────────────────────────────────────┐
-│ POST /api/tools/convert?target=pdf │
-│                                     │
-│ PDF→DOCX: pdf2docx library         │
-│ DOCX→PDF: python-docx + fpdf2      │
-│           (CJK font on macOS)      │
-│                                     │
-│ Upload result to MinIO              │
-│ Save ConvertedFile record          │
-│ Return JSON with download_url       │
-└─────────────────────────────────────┘
-```
-
-## Daily Briefing Flow
-
-```
-Auto (8 AM Beijing):
-    │
-    ▼
-┌────────────────────────────────────┐
-│ For online users:                  │
-│  - Today's calendar events         │
-│  - Yesterday's expenses            │
-│  - Weather (IP-detected city)      │
-│  - LLM formats greeting            │
-│  - Dedup via last_briefing_date    │
-└────────────────────────────────────┘
-
-Manual: "早上好" → briefing intent → same generation
-```
-
-## Location Detection
-
-```
-Weather query / Briefing
-    │
-    ▼
-┌──────────────────────────────────┐
-│ Layer 1: Client IP header        │
-│   (X-Forwarded-For / X-Real-IP)  │
-│ Layer 2: Server IP → ip-api.com  │
-│ Layer 3: UserMemory key="city"   │
-│ Layer 4: Fallback "Beijing"      │
-└──────────────────────────────────┘
-```
-
-## Domain Model Map
+## Domain Model Map (Updated)
 
 ```
 app/domain/
-├── user/       User, UserMemory, UserEmotionState
-├── chat/       Conversation, Message, MessageRole, MessageType
-│               Orchestrator, LLM Router, TTS, ASR, Skills
-├── calendar/   CalendarEvent, NotificationService
-├── expense/    ExpenseRecord
-├── character/  Character, Outfit, VoicePack, UserInventory
-└── tools/      ConvertedFile, SentEmail, Note, MoodLog
-                Conversion, Email, MinIO, Location, Proactive
+├── knowledge/       KnowledgeBase, KnowledgeChunk (RAG)
+│   ├── repository.py    Abstract interface
+│   └── service.py       Chunking + BGE-M3 embedding
+├── repositories/
+│   ├── user_repo.py     User, Memory, Emotion queries
+│   └── message_repo.py  Conversation, Message queries
+│
+app/models/           SQLAlchemy models (21 tables)
+├── user/            User, UserMemory, UserEmotionState
+├── chat/            Conversation, Message, ConvMemory
+├── calendar/        CalendarEvent
+├── expense/         ExpenseRecord
+├── character/       Character, Outfit, VoicePack, UserInventory
+├── tools/           ConvertedFile, SentEmail, Note, MoodLog
+├── knowledge/       KnowledgeBase, KnowledgeChunk (ARRAY vectors)
+├── proactive_push   Push throttle records (DB-backed)
+├── reminder_schedule Custom time-based reminders
+└── countdown        Countdown days
 ```
 
-## Database Tables (15)
+## Database Tables (21)
 
-| Domain | Table | Key Fields |
-|--------|-------|-----------|
-| User | users | phone, nickname, email, last_briefing_date |
-| User | user_memories | key, value, source_conv_id |
-| User | user_emotion_states | current_emotion, intensity |
-| Chat | conversations | title, user_id, updated_at |
-| Chat | messages | conv_id, role, type, content |
-| Calendar | calendar_events | title, time, repeat_rule |
-| Expense | expense_records | amount, category, remark |
-| Character | characters | user_id, outfit_id, voice_pack_id |
-| Character | outfits | name, model_file, price |
-| Character | voice_packs | name, cosyvoice_id, price |
-| Character | user_inventory | user_id, item_type, item_id, equipped |
-| Tools | converted_files | original_name, target_name, object_name, file_size |
-| Tools | sent_emails | conv_title, recipient, summary_preview |
-| Tools | notes | title, content, note_type |
-| Tools | mood_logs | emotion, intensity, note |
+| Domain | Tables |
+|--------|--------|
+| User | users, user_memories, user_emotion_states |
+| Chat | conversations, messages, conv_memories |
+| Calendar | calendar_events |
+| Expense | expense_records |
+| Character | characters, outfits, voice_packs, user_inventory |
+| Tools | converted_files, sent_emails, notes, mood_logs |
+| Knowledge | knowledge_bases, knowledge_chunks |
+| Push | proactive_pushes, reminder_schedules |
+| Countdown | countdowns |
 
-## API Endpoints
+## API Endpoints (55+)
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST | /api/auth/login | Phone login → JWT |
-| GET/PUT | /api/auth/profile | User profile + email |
-| GET | /api/characters/config | Character config |
-| GET/PUT | /api/characters/outfits, /voices, /equip | Character customization |
+| POST | /api/auth/register | Email register (bcrypt) |
+| POST | /api/auth/email-login | Email login |
+| DELETE | /api/auth/account | Permanently delete account |
+| GET/PUT | /api/auth/profile | Profile + email + persona |
+| GET/PUT | /api/characters/* | Character customization |
 | GET | /api/conversations | List conversations |
 | GET | /api/conversations/{id}/messages | List messages |
-| POST | /api/conversations/{id}/email-summary | Summarize + email |
-| GET | /api/conversations/sent-emails | Sent email history |
+| POST | /api/conversations/{id}/export | Export PDF/DOCX |
+| POST | /api/conversations/{id}/diary | AI diary from conversation |
 | GET/POST/DELETE | /api/calendar | Calendar CRUD |
 | GET/POST/PUT/DELETE | /api/expenses | Expense CRUD |
-| GET | /api/expenses/stats?period=week|month | Expense stats |
-| POST | /api/tools/convert?target=pdf|docx | File conversion |
+| GET | /api/expenses/stats | Stats by category (week/month) |
+| GET | /api/expenses/insights/weekly | Weekly insight report |
+| POST | /api/tools/convert | File conversion (PDF↔DOCX) |
 | GET | /api/tools/files | Converted file list |
 | GET | /api/tools/files/{id}/download | File download |
 | POST | /api/tools/ocr | Image OCR via Qwen-VL |
 | GET/POST/PUT/DELETE | /api/notes | Notes CRUD |
 | GET/POST | /api/notes/moods | Mood logging |
-| GET | /api/notes/moods/stats?period=week|month | Mood stats |
+| GET | /api/countdown | Countdown days CRUD |
+| POST | /api/knowledge/upload | Upload doc → RAG knowledge base |
+| GET/DELETE | /api/knowledge/{id} | List/delete knowledge bases |
+| POST | /api/knowledge/{id}/chat | RAG chat with sources |
 | WS | /ws/chat | WebSocket chat |
-
-## Frontend Widget Map
-
-```
-ChatScreen
-├── SciFiBackground        (animated grid + particles)
-├── AppBar                 (status dot + tools pill + character btn)
-├── Body (Stack)
-│   ├── CharacterWebView   (SVG pet cat, bottom-right 130x200)
-│   ├── _Msgs              (full-screen transparent chat)
-│   │   ├── _bubble        (gradient avatar + glass card)
-│   │   └── _streamBubble  (with typing indicator)
-│   └── Status indicators  (connecting bar, TTS chip)
-├── _InputBar              (text/attach/voice floating row)
-└── ToolsPanel             (full-screen overlay)
-    ├── Sidebar            (7 icon menu items)
-    ├── _CalendarContent
-    ├── _ExpenseContent    (week/month toggle + edit dialog)
-    ├── _NotesContent      (list + add dialog)
-    ├── _OcrContent        (pick image → result)
-    ├── _MoodContent       (emoji picker + week stats)
-    ├── _ConversionContent (file pick + convert + history)
-    └── _EmailContent      (send button + sent history)
-```
 
 ## Skills (8 registered)
 
@@ -295,18 +169,60 @@ ChatScreen
 | weather | weather | IP geolocation + wttr.in API |
 | calendar | calendar | LLM extract time/title → CalendarEvent |
 | expense | expense | LLM extract amount/category → ExpenseRecord |
-| search | search | SearXNG + LLM summarize |
+| search | search | SearXNG + LLM (full results, no summarization) |
 | convert | convert | File format detection → conversion |
 | briefing | briefing | Morning report: weather+calendar+expenses |
 | email | email | Summarize conversation → SMTP send |
-| email_skill | email | Same (conversation-triggered) |
+| agent | agent | Multi-step: plan → execute skills → consolidate |
 
-## Configuration (.env)
+## Frontend Widget Map (Updated)
+
+```
+ChatScreen
+├── ChatBgPainter        (WhatsApp-style tile doodles)
+├── AppBar               (title + online dot + ⋮ menu)
+├── Body (Stack)
+│   ├── ChatBgPainter    (background tile pattern)
+│   ├── ChatMessageList  (messages + bubbles + timestamps)
+│   ├── Quick Reply Chips (glass pills with emoji)
+│   └── OfflineBanner    (top banner when disconnected)
+├── ChatInputBar         (voice mic + text field + send)
+│   └── (pet cat resting removed)
+└── AssistantMenu        (email, note, summary, export, share, diary)
+
+MainScreen (4 tabs)
+├── ConversationListScreen (pin + swipe delete + search)
+├── ToolsCenterScreen      (3×3 grid, 10 tools)
+├── DiscoverScreen         (notifications + news cards)
+└── ProfileScreen          (user card + theme switch + 6 settings)
+
+Tools (10)
+├── CalendarPage           (date cards, upcoming/past groups)
+├── ExpensePage            (stats card + category chart + detail list)
+├── NotesPage, MoodPage, EmailPage, FilePage
+├── SummaryPage, CountdownPage, KnowledgePage
+└── PrivacyScreen
+```
+
+## Key Design Decisions (Updated)
+
+- **Time injection**: Server local time injected into system prompt first line
+- **Memory pruning**: Only last 5 + keyword-matched memories injected (max 8 lines)
+- **History limit**: 10 messages (down from 20)
+- **No conv_memory injection**: Removed from system prompt
+- **Proactive throttle**: DB-backed (`proactive_pushes` table), survives restarts
+- **LLM rate limit**: asyncio.Semaphore(8) for concurrent calls
+- **RAG embedding**: BGE-M3 (1024-dim) via sentence-transformers, FAISS vector search
+- **Pet cat**: 4-frame SVG walk cycle with body sway, occasional pause
+- **Offline detection**: DNS lookup every 15s, red banner when disconnected
+- **iOS/Android widgets**: Swift + Kotlin widget scaffold
+
+## Environment (.env)
 
 ```env
 DEEPSEEK_API_KEY=sk-xxx
 QWEN_API_KEY=sk-xxx
-JWT_SECRET=lingxi-dev-jwt-secret-2026
+JWT_SECRET=<random-64-char>
 DATABASE_URL=postgresql+asyncpg://lingxi:lingxi@localhost:5432/lingxi
 SMTP_HOST=smtp.126.com
 SMTP_PORT=465
@@ -314,21 +230,3 @@ SMTP_USERNAME=lvxiang639@126.com
 SMTP_PASSWORD=<authorization-code>
 SMTP_FROM_EMAIL=lvxiang639@126.com
 ```
-
-## Platform Notes
-
-- **macOS file_picker:** needs `com.apple.security.files.user-selected.read-only` entitlement
-- **iOS microphone:** `NSMicrophoneUsageDescription` in Info.plist
-- **iOS calendar:** `NSCalendarsUsageDescription` in Info.plist  
-- **3D/Vector character:** SVG-based in WebView, works on all platforms
-- **SMTP:** uses SSL port 465 for 126.com
-- **Font paths:** `conversion_service.py` CJK fonts are macOS-specific
-- **Timezones:** backend uses Beijing time (UTC+8) for all date filtering
-
-## Ports
-
-| Service | Port |
-|---------|------|
-| FastAPI | 8000 |
-| PostgreSQL | 5432 |
-| MinIO | 9000 (API), 9001 (Console) |
