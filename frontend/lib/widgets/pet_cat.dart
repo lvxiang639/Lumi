@@ -5,57 +5,64 @@ import '../theme/app_colors.dart';
 
 enum PetPosition { bottomBar, sidebar }
 
-// Simple elegant SVG cat — standing/walking pose
+// Q-version chibi cat SVG — big head, big eyes, tiny body, blush cheeks
 const _catSvg = '''
-<svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
-  <!-- Tail -->
-  <path d="M15 45 Q5 35 8 25 Q10 18 18 30 Q20 35 22 42" stroke="#E0960C" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-  <!-- Back left leg -->
-  <line id="leg-bl" x1="30" y1="50" x2="30" y2="68" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-  <circle cx="30" cy="70" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-  <!-- Back right leg -->
-  <line id="leg-br" x1="42" y1="50" x2="42" y2="66" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-  <circle cx="42" cy="68" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-  <!-- Body -->
-  <ellipse cx="48" cy="44" rx="22" ry="11" fill="#F5A623"/>
-  <ellipse cx="48" cy="44" rx="22" ry="11" fill="none" stroke="#D4891A" stroke-width="1.5"/>
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="blush" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFB6C1" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#FFB6C1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Tail — curved behind -->
+  <path d="M22 62 Q8 55 5 42 Q3 33 10 28" stroke="#FF8C42" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+  <!-- Body — small egg shape -->
+  <ellipse cx="42" cy="68" rx="18" ry="14" fill="#FFB347"/>
   <!-- Belly -->
-  <ellipse cx="50" cy="47" rx="12" ry="6" fill="white" opacity="0.8"/>
-  <!-- Body stripes -->
-  <line x1="35" y1="36" x2="35" y2="52" stroke="#E0960C" stroke-width="2.5" opacity="0.6"/>
-  <line x1="45" y1="34" x2="45" y2="54" stroke="#E0960C" stroke-width="2.5" opacity="0.6"/>
-  <line x1="55" y1="34" x2="55" y2="54" stroke="#E0960C" stroke-width="2.5" opacity="0.6"/>
-  <!-- Front left leg -->
-  <line id="leg-fl" x1="58" y1="52" x2="58" y2="67" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-  <circle cx="58" cy="69" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-  <!-- Front right leg -->
-  <line id="leg-fr" x1="65" y1="52" x2="65" y2="65" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-  <circle cx="65" cy="67" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-  <!-- Neck -->
-  <ellipse cx="68" cy="36" rx="5" ry="8" fill="#F5A623"/>
-  <!-- Head -->
-  <ellipse cx="76" cy="28" rx="12" ry="10" fill="#F5A623"/>
-  <ellipse cx="76" cy="28" rx="12" ry="10" fill="none" stroke="#D4891A" stroke-width="1.2"/>
+  <ellipse cx="44" cy="71" rx="10" ry="8" fill="white" opacity="0.7"/>
+  <!-- Back legs (behind body) -->
+  <ellipse cx="32" cy="78" rx="6" ry="4" fill="#FFB347"/>
+  <ellipse cx="28" cy="82" rx="5" ry="3" fill="white"/>
+  <ellipse cx="48" cy="78" rx="6" ry="4" fill="#FFB347"/>
+  <ellipse cx="44" cy="82" rx="5" ry="3" fill="white"/>
+  <!-- Front legs (in front) -->
+  <ellipse cx="38" cy="76" rx="5" ry="6" fill="#FFB347"/>
+  <ellipse cx="34" cy="82" rx="4.5" ry="3" fill="white"/>
+  <ellipse cx="50" cy="74" rx="5" ry="6" fill="#FFB347"/>
+  <ellipse cx="46" cy="80" rx="4.5" ry="3" fill="white"/>
+  <!-- Head — BIG circle (Q-version proportion) -->
+  <circle cx="48" cy="44" r="25" fill="#FFB347"/>
+  <circle cx="48" cy="44" r="25" fill="none" stroke="#FF8C42" stroke-width="0.8"/>
+  <!-- Head lighter patch -->
+  <circle cx="48" cy="46" r="16" fill="white" opacity="0.25"/>
   <!-- Left ear -->
-  <polygon points="70,20 65,8 76,18" fill="#F5A623" stroke="#D4891A" stroke-width="1"/>
-  <polygon points="71,19 67,10 75,18" fill="#FFB6C1" opacity="0.7"/>
+  <polygon points="28,28 18,6 36,18" fill="#FFB347" stroke="#FF8C42" stroke-width="0.8" stroke-linejoin="round"/>
+  <polygon points="28,24 22,10 33,20" fill="#FFB6C1" opacity="0.6"/>
   <!-- Right ear -->
-  <polygon points="80,19 84,7 87,18" fill="#F5A623" stroke="#D4891A" stroke-width="1"/>
-  <polygon points="81,18 84,9 86,18" fill="#FFB6C1" opacity="0.7"/>
-  <!-- Eyes -->
-  <ellipse cx="73" cy="27" rx="2.5" ry="3" fill="#4A3520"/>
-  <ellipse cx="80" cy="27" rx="2.5" ry="3" fill="#4A3520"/>
-  <circle cx="73.5" cy="26" r="0.8" fill="white"/>
-  <circle cx="80.5" cy="26" r="0.8" fill="white"/>
-  <!-- Nose -->
-  <ellipse cx="76" cy="31" rx="2" ry="1.2" fill="#FF6B8A"/>
-  <!-- Mouth -->
-  <path d="M76 32 L74 34 M76 32 L78 34" stroke="#D4891A" stroke-width="0.6" fill="none"/>
+  <polygon points="62,22 72,4 74,18" fill="#FFB347" stroke="#FF8C42" stroke-width="0.8" stroke-linejoin="round"/>
+  <polygon points="66,20 70,8 72,18" fill="#FFB6C1" opacity="0.6"/>
+  <!-- Left eye — big sparkly anime eye -->
+  <ellipse cx="40" cy="42" rx="5.5" ry="6.5" fill="#2D1B00"/>
+  <ellipse cx="40" cy="41" rx="3.5" ry="4.5" fill="#4A3000"/>
+  <circle cx="39" cy="39" r="2" fill="white"/>
+  <circle cx="41.5" cy="43.5" r="1" fill="white"/>
+  <!-- Right eye -->
+  <ellipse cx="56" cy="42" rx="5.5" ry="6.5" fill="#2D1B00"/>
+  <ellipse cx="56" cy="41" rx="3.5" ry="4.5" fill="#4A3000"/>
+  <circle cx="55" cy="39" r="2" fill="white"/>
+  <circle cx="57.5" cy="43.5" r="1" fill="white"/>
+  <!-- Blush cheeks -->
+  <circle cx="33" cy="50" r="6" fill="url(#blush)"/>
+  <circle cx="63" cy="50" r="6" fill="url(#blush)"/>
+  <!-- Nose — tiny triangle -->
+  <polygon points="48,48 46,50 50,50" fill="#FF6B8A"/>
+  <!-- Mouth — cute w shape -->
+  <path d="M44 51 Q46 54 48 51 Q50 54 52 51" stroke="#8B5E3C" stroke-width="1.2" fill="none" stroke-linecap="round"/>
   <!-- Whiskers -->
-  <line x1="68" y1="30" x2="56" y2="28" stroke="white" stroke-width="0.5" opacity="0.8"/>
-  <line x1="68" y1="31" x2="56" y2="31" stroke="white" stroke-width="0.5" opacity="0.8"/>
-  <line x1="84" y1="30" x2="96" y2="28" stroke="white" stroke-width="0.5" opacity="0.8"/>
-  <line x1="84" y1="31" x2="96" y2="31" stroke="white" stroke-width="0.5" opacity="0.8"/>
+  <line x1="28" y1="48" x2="10" y2="44" stroke="#8B5E3C" stroke-width="0.7" opacity="0.5"/>
+  <line x1="28" y1="50" x2="10" y2="50" stroke="#8B5E3C" stroke-width="0.7" opacity="0.5"/>
+  <line x1="68" y1="48" x2="86" y2="44" stroke="#8B5E3C" stroke-width="0.7" opacity="0.5"/>
+  <line x1="68" y1="50" x2="86" y2="50" stroke="#8B5E3C" stroke-width="0.7" opacity="0.5"/>
 </svg>''';
 
 class PetCat extends StatefulWidget {
