@@ -104,12 +104,12 @@ class ChatOrchestrator:
                 {"type": "llm_stream", "delta": response_text}
             )
         else:
-            # Build conversation history (last 20 messages, before saving current)
+            # Build conversation history (last 10 messages — lean context)
             msgs_result = await db.execute(
                 select(Message)
                 .where(Message.conv_id == conv.id)
                 .order_by(Message.created_at.desc())
-                .limit(20)
+                .limit(10)
             )
             history = msgs_result.scalars().all()
             history.reverse()
@@ -125,46 +125,42 @@ class ChatOrchestrator:
             db.add(user_msg)
             await db.flush()
 
-            # Inject long-term memory + conversation memory as system prompt
-            from app.services.memory_service import (
-                get_memory_summary,
-                get_conv_memory_summary,
-            )
-            memory_summary = await get_memory_summary(user_uuid)
-            conv_memory = await get_conv_memory_summary(conv.id)
+            # Inject relevant memories only (last 5 + keyword match)
+            from app.services.memory_service import get_memory_summary
+            full_memory = await get_memory_summary(user_uuid)
+            memory_lines = (full_memory or "").split("\n")
+            relevant = [l for l in memory_lines[:5] if l.strip()]  # last 5 always
+            # Keyword match against current text
+            for line in memory_lines[5:]:
+                if not line.strip():
+                    continue
+                key = line.split(":")[0].strip() if ":" in line else ""
+                if key and key in text:
+                    relevant.append(line)
+            memory_summary = "\n".join(relevant[:8]) if relevant else ""  # max 8 lines
 
-            # Build LLM messages with memory + history
+            # Build LLM messages — lean, focused system prompt
             llm_messages = []
-            # AI Persona
             persona = (
                 await self._load_persona(user_uuid)
                 or "你是一个贴心的AI助手，名叫灵犀。"
             )
-            # Inject current time — use server local time (Beijing/CST)
             now_dt = datetime.now()
             wdays = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
             time_str = f"{now_dt.strftime('%Y年%m月%d日 %H:%M:%S')} ({wdays[now_dt.weekday()]})"
             system_prefix = f"现在是{time_str}。{persona}"
-            logger.info("system prompt time injected: %s", time_str)
+
             if memory_summary:
-                system_prefix += (
-                    "\n\n以下是关于你正在对话的用户的信息，"
-                    "请在对话中自然地运用这些信息（不要刻意提及你知道这些）：\n"
-                    + memory_summary
-                )
-            if conv_memory:
-                system_prefix += (
-                    "\n\n本次对话背景摘要（以下是之前对话中已经聊过的内容，避免重复）：\n"
-                    + conv_memory
-                )
-            # Inject emotion tone
-            from app.services.emotion_service import (
-                analyze as analyze_emotion,
-                get_emotion_prompt,
-            )
+                system_prefix += f"\n\n用户信息（自然运用，不要刻意提及）:\n{memory_summary}"
+
+            # Emotion — info only, no behavior change instruction
+            from app.services.emotion_service import get_emotion_prompt
             emotion_tone = await get_emotion_prompt(user_uuid)
             if emotion_tone:
-                system_prefix += f"\n\n{emotion_tone}"
+                # Strip the behavior-changing part, keep only the emotion info
+                short_emotion = emotion_tone.split("请根据")[0].strip()
+                if short_emotion:
+                    system_prefix += f"\n\n{short_emotion}"
             llm_messages.append({"role": "system", "content": system_prefix})
             llm_messages += [
                 {"role": m.role.value, "content": m.content} for m in history
