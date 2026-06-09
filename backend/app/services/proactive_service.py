@@ -176,6 +176,11 @@ class ProactiveService:
                 for item in cd:
                     checks.append({"type": "countdown", "title": item["title"], "label": item["label"]})
 
+            # Book recommendation (personalized, once/day via DB throttle)
+            book = await self._check_book_recommendation(user_id, now, db)
+            logger.info("proactive check: book -> %s", "HIT" if book else "SKIP")
+            if book: checks.append(book)
+
             logger.info("proactive check: %d checks hit for %s", len(checks), user_id[:8])
             if checks:
                 msg = await self._generate_push_text(user_id, now, checks)
@@ -442,6 +447,47 @@ class ProactiveService:
         today_key = now.strftime("%m-%d")
         name = HOLIDAYS.get(today_key)
         return {"type": "holiday", "name": name} if name else None
+
+    async def _check_book_recommendation(self, user_id: str, now: datetime, db) -> dict | None:
+        """Personalized book recommendation based on user memories. Once/day per user."""
+        from uuid import UUID
+        # Throttle: only push book recs once per day
+        from app.models.proactive_push import ProactivePush
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        r = await db.execute(
+            select(func.count(ProactivePush.id)).where(
+                ProactivePush.user_id == UUID(user_id),
+                ProactivePush.push_type == "book_recommend",
+                ProactivePush.created_at >= today_start,
+            )
+        )
+        if (r.scalar() or 0) > 0:
+            return None
+
+        # Get user memories for personalization
+        r = await db.execute(
+            select(UserMemory).where(UserMemory.user_id == UUID(user_id)).order_by(UserMemory.updated_at.desc()).limit(10)
+        )
+        memories = r.scalars().all()
+        mem_text = "\n".join(f"- {m.key}: {m.value}" for m in memories) if memories else "暂无用户信息"
+
+        prompt = f"""根据以下用户信息，推荐2-3本适合TA的书籍（每本一行，格式: 📖 书名 - 作者: 一句话推荐理由（15字以内））。
+推荐要基于用户兴趣，实用为主。不要推荐太大众的书。
+
+用户信息:
+{mem_text}
+
+书籍推荐:"""
+
+        try:
+            result = await llm_router.chat([{"role": "user", "content": prompt}])
+            result = (result or "").strip()
+            if result and len(result) > 5:
+                # Save push type for throttle
+                return {"type": "book_recommend", "books": result}
+        except Exception:
+            pass
+        return None
 
     async def _check_countdown(self, user_id: str, now: datetime, db) -> list[dict] | None:
         """Check upcoming or due countdowns."""
