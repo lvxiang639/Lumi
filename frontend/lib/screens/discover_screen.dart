@@ -292,9 +292,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               child: Row(children: [
                 const Text('💬', style: TextStyle(fontSize: 22)),
                 const SizedBox(width: 10),
-                Expanded(child: Text(dailyTopic['content'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 14)))),
-              ],
-            )),
+                Expanded(child: Text(dailyTopic['content'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 14))),
+              ]),
+            ),
           ],
           if (contentCard != null && (contentCard['content'] as String?)?.isNotEmpty == true) ...[
             const SizedBox(height: 10),
