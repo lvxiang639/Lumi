@@ -14,6 +14,7 @@
         "flutter",
         "flutter_local_notifications",
         "flutter_svg",
+        "home_widget",
         "http",
         "intl",
         "path",
@@ -82,6 +83,17 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "flutter_svg",
+      "version": "2.3.0",
+      "dependencies": [
+        "flutter",
+        "http",
+        "vector_graphics",
+        "vector_graphics_codec",
+        "vector_graphics_compiler"
       ]
     },
     {
@@ -449,6 +461,32 @@
       "dependencies": [
         "clock",
         "collection"
+      ]
+    },
+    {
+      "name": "vector_graphics_compiler",
+      "version": "1.2.5",
+      "dependencies": [
+        "args",
+        "meta",
+        "path",
+        "path_parsing",
+        "vector_graphics_codec",
+        "xml"
+      ]
+    },
+    {
+      "name": "vector_graphics_codec",
+      "version": "1.1.13",
+      "dependencies": []
+    },
+    {
+      "name": "vector_graphics",
+      "version": "1.2.2",
+      "dependencies": [
+        "flutter",
+        "http",
+        "vector_graphics_codec"
       ]
     },
     {
@@ -1103,6 +1141,14 @@
       ]
     },
     {
+      "name": "path_parsing",
+      "version": "1.1.0",
+      "dependencies": [
+        "meta",
+        "vector_math"
+      ]
+    },
+    {
       "name": "graphs",
       "version": "2.3.2",
       "dependencies": [
@@ -1235,48 +1281,12 @@
       ]
     },
     {
-      "name": "flutter_svg",
-      "version": "2.3.0",
+      "name": "home_widget",
+      "version": "0.7.0+1",
       "dependencies": [
         "flutter",
-        "http",
-        "vector_graphics",
-        "vector_graphics_codec",
-        "vector_graphics_compiler"
-      ]
-    },
-    {
-      "name": "vector_graphics_codec",
-      "version": "1.1.13",
-      "dependencies": []
-    },
-    {
-      "name": "vector_graphics",
-      "version": "1.2.2",
-      "dependencies": [
-        "flutter",
-        "http",
-        "vector_graphics_codec"
-      ]
-    },
-    {
-      "name": "vector_graphics_compiler",
-      "version": "1.2.5",
-      "dependencies": [
-        "args",
-        "meta",
-        "path",
-        "path_parsing",
-        "vector_graphics_codec",
-        "xml"
-      ]
-    },
-    {
-      "name": "path_parsing",
-      "version": "1.1.0",
-      "dependencies": [
-        "meta",
-        "vector_math"
+        "path_provider",
+        "path_provider_foundation"
       ]
     }
   ],

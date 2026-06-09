@@ -82,8 +82,13 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _walkCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 12));
-    _frameCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 400))..repeat();
+    _walkCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 20));
+    _frameCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500))..repeat();
+    _walkCtrl.addStatusListener((s) {
+      if (s == AnimationStatus.completed || s == AnimationStatus.dismissed) {
+        if (mounted) { _movingRight = !_movingRight; _startWalking(); }
+      }
+    });
   }
 
   @override
@@ -101,11 +106,13 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
     if (!mounted) return;
     final end = _movingRight ? _screenW - 40.0 : 40.0;
     final dist = (end - _walkX).abs();
-    final dur = (dist / _screenW * 20000).toInt().clamp(8000, 25000);
+    final dur = (dist / _screenW * 30000).toInt().clamp(15000, 40000);
     _walkCtrl.duration = Duration(milliseconds: dur);
-    _walkCtrl.forward(from: 0).then((_) {
-      if (mounted) { _movingRight = !_movingRight; _walkX = end; _startWalking(); }
-    });
+    if (_movingRight) {
+      _walkCtrl.forward(from: _walkCtrl.value);
+    } else {
+      _walkCtrl.reverse(from: _walkCtrl.value);
+    }
   }
 
   @override

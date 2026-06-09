@@ -230,6 +230,12 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "home_widget",
+      "rootUri": "file:///Users/lvxiang/.pub-cache/hosted/pub.dev/home_widget-0.7.0+1",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "hooks",
       "rootUri": "file:///Users/lvxiang/.pub-cache/hosted/pub.dev/hooks-2.0.0",
       "packageUri": "lib/",
