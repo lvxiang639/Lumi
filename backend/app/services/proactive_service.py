@@ -29,6 +29,12 @@ logger = logging.getLogger("proactive")
 
 BEIJING_TZ = timezone(timedelta(hours=8))
 
+HOLIDAYS = {
+    "01-01": "元旦", "02-14": "情人节", "03-08": "妇女节",
+    "05-01": "劳动节", "06-01": "儿童节",
+    "10-01": "国庆节", "12-25": "圣诞节",
+}
+
 WEATHER_PROMPT = """当前时间: {now}，用户所在城市: {city}。
 请用一句话（不超过30字）提醒用户天气注意事项。语气亲切可爱（像一只小猫）。
 如果天气没什么特别的，返回空。如果有雨雪大风高温等需要提醒，请简短提醒。
@@ -44,6 +50,17 @@ MEMORY_PROMPT = """你是一只关心主人的小猫。根据以下关于用户�
 用户信息: {memories}
 
 小猫的关心:"""
+
+
+
+NATURAL_PUSH_PROMPT = """你是灵犀，一只关心主人的小猫。根据以下信息，用一句自然温暖的话问候主人（不超过80字）。
+不要逐条复述数据，要像小猫在跟主人聊天一样自然流畅。
+
+当前时间: {now}
+所在城市: {city}
+推送数据: {data_summary}
+
+小猫灵犀:"""
 
 
 class ProactiveService:
@@ -66,17 +83,22 @@ class ProactiveService:
             return
 
         now = datetime.now(BEIJING_TZ)
+        # Quiet hours: 22:00-8:00 — skip all checks
+        if now.hour >= 22 or now.hour < 8:
+            logger.debug("proactive: quiet hours (hour=%d), skipping all checks", now.hour)
+            return
         for uid in users:
             try:
                 await self._check_user(uid, now)
             except Exception:
                 logger.exception("proactive check failed for user=%s", uid[:8])
 
-    async def _check_water(self, user_id: str, now: datetime) -> str | None:
-        """Remind to drink water every 2 hours during daytime (8-22)."""
+    async def _check_water(self, user_id: str, now: datetime) -> dict | None:
+        """Remind to drink water during daytime. Returns structured data."""
         if now.hour < 8 or now.hour > 22:
-            logger.debug("proactive water: outside daytime (hour=%d)", now.hour)
             return None
+        return {"type": "water", "hour": now.hour}
+
     async def _check_user(self, user_id: str, now: datetime):
         """Consolidated check — build one combined message (max 1 push per cycle)."""
         logger.info("proactive check: [0] starting scan for %s", user_id[:8])
@@ -88,53 +110,110 @@ class ProactiveService:
             r = await db.execute(select(User).where(User.id == user_id))
             if not r.scalar_one_or_none():
                 return
-            parts = []
+
+            # Holiday check — highest priority
+            holiday = await self._check_holiday(now)
+            if holiday:
+                logger.info("proactive check: HOLIDAY → %s", holiday.get("name"))
+                msg = await self._generate_push_text(user_id, now, [holiday])
+                if msg:
+                    await self._do_push(user_id, now, msg, skill="holiday")
+                return
+
+            checks = []
 
             logger.info("proactive check: [1/8] weather for %s", user_id[:8])
             w = await self._check_weather(user_id, now)
             logger.info("proactive check: weather -> %s", "HIT" if w else "SKIP")
-            if w: parts.append(w)
+            if w: checks.append(w)
 
             logger.info("proactive check: [2/8] calendar for %s", user_id[:8])
             c = await self._check_calendar(user_id, now, db)
             logger.info("proactive check: calendar -> %s", "HIT" if c else "SKIP")
-            if c: parts.append(c)
+            if c: checks.append(c)
 
             logger.info("proactive check: [3/8] expense for %s", user_id[:8])
             e = await self._check_expense(user_id, now, db)
             logger.info("proactive check: expense -> %s", "HIT" if e else "SKIP")
-            if e: parts.append(e)
+            if e: checks.append(e)
 
             logger.info("proactive check: [4/8] idle for %s", user_id[:8])
             idle = await self._check_idle(user_id, now, db)
             logger.info("proactive check: idle -> %s", "HIT" if idle else "SKIP")
-            if idle: parts.append(idle)
+            if idle: checks.append(idle)
 
             logger.info("proactive check: [5/8] water for %s", user_id[:8])
             water = await self._check_water(user_id, now)
             logger.info("proactive check: water -> %s", "HIT" if water else "SKIP")
-            if water: parts.append(water)
+            if water: checks.append(water)
 
             logger.info("proactive check: [6/8] emotion for %s", user_id[:8])
             emo = await self._check_emotion(user_id, now, db)
             logger.info("proactive check: emotion -> %s", "HIT" if emo else "SKIP")
-            if emo: parts.append(emo)
+            if emo: checks.append(emo)
 
             logger.info("proactive check: [7/8] memory for %s", user_id[:8])
             mem = await self._check_memory(user_id, now, db)
             logger.info("proactive check: memory -> %s", "HIT" if mem else "SKIP")
-            if mem: parts.append(mem)
+            if mem: checks.append(mem)
 
-            logger.info("proactive check: %d parts collected for %s", len(parts), user_id[:8])
-            if parts:
-                msg = "\\n".join(parts)
-                await self._do_push(user_id, now, msg, skill=None)
+            # Countdown check
+            cd = await self._check_countdown(user_id, now, db)
+            if cd:
+                for item in cd:
+                    checks.append({"type": "countdown", "title": item["title"], "label": item["label"]})
+
+            logger.info("proactive check: %d checks hit for %s", len(checks), user_id[:8])
+            if checks:
+                msg = await self._generate_push_text(user_id, now, checks)
+                if msg:
+                    await self._do_push(user_id, now, msg, skill=None)
 
             logger.info("proactive check: [8/8] news for %s", user_id[:8])
             news = await self._check_news(user_id, now)
             logger.info("proactive check: news -> %s", f"{len(news)} items" if news else "SKIP")
             if news and await self._can_push(user_id, now):
                 await self._do_push(user_id, now, "📰 本地资讯更新", skill="news", data=news)
+
+    async def _generate_push_text(self, user_id: str, now: datetime, checks: list[dict]) -> str | None:
+        """Generate natural push text from structured check data via LLM."""
+        lines = []
+        city = "Unknown"
+        for c in checks:
+            t = c.get("type", "")
+            if t == "weather":
+                city = c.get("city", city)
+                if c.get("alert"): lines.append(f"天气提醒={c['alert']}")
+            elif t == "calendar":
+                events = c.get("events", [])
+                if events: lines.append(f"日程={','.join(e['title'] for e in events)}")
+            elif t == "expense":
+                lines.append(f"昨日消费¥{c.get('yesterday_total', 0):.0f}")
+            elif t == "water":
+                lines.append(f"该喝水了")
+            elif t == "idle":
+                lines.append(f"主人{c.get('hours', 0)}小时没上线了")
+            elif t == "emotion":
+                lines.append(f"心情{c.get('current', '')}")
+            elif t == "memory":
+                topics = c.get('topics', [])
+                if topics: lines.append(f"最近关注:{','.join(topics[:3])}")
+            elif t == "holiday":
+                lines.append(f"今天是{c.get('name', '')}🎉")
+        if not lines:
+            return None
+        time_str = now.strftime("%H:%M")
+        data_summary = "，".join(lines)
+        prompt = NATURAL_PUSH_PROMPT.format(now=time_str, city=city, data_summary=data_summary)
+        try:
+            result = await llm_router.chat([{"role": "user", "content": prompt}])
+            result = (result or "").strip()
+            if result and len(result) > 3 and result not in ("暂无", "无", "空", "。", "..."):
+                return result
+        except Exception:
+            pass
+        return "喵～ " + "，".join(lines[:3])
+
     async def _can_push(self, user_id: str, now: datetime) -> bool:
         """DB-backed throttle: max 1 push per 2 hours, max 3 per day."""
         from uuid import UUID
@@ -183,7 +262,7 @@ class ProactiveService:
             await db.commit()
         logger.info("proactive push to %s: %s", user_id[:8], msg[:50])
 
-    async def _check_weather(self, user_id: str, now: datetime) -> str | None:
+    async def _check_weather(self, user_id: str, now: datetime) -> dict | None:
         """Check weather with 2-hour cache per city to reduce LLM cost."""
         try:
             city = await get_city(user_id=user_id)
@@ -196,13 +275,13 @@ class ProactiveService:
             result = await llm_router.chat([{"role": "user", "content": prompt}])
             result = (result or "").strip()
             self._weather_cache[city] = (result or "__NONE__", now)
-            return result if result else None
+            return {"type": "weather", "city": city, "alert": result} if result else None
         except Exception:
             return None
 
     async def _check_calendar(
         self, user_id: str, now: datetime, db
-    ) -> str | None:
+    ) -> dict | None:
         """Check for events in the next 60 minutes."""
         window = now + timedelta(hours=1)
         r = await db.execute(
@@ -232,7 +311,7 @@ class ProactiveService:
 
     async def _check_expense(
         self, user_id: str, now: datetime, db
-    ) -> str | None:
+    ) -> dict | None:
         """Check if user forgot to log expenses yesterday."""
         yesterday = (now - timedelta(days=1)).replace(
             hour=0, minute=0, second=0, microsecond=0
@@ -266,7 +345,7 @@ class ProactiveService:
 
     async def _check_idle(
         self, user_id: str, now: datetime, db
-    ) -> str | None:
+    ) -> dict | None:
         """Check if user has been idle for 4+ hours."""
         r = await db.execute(
             select(Conversation.updated_at)
@@ -290,7 +369,7 @@ class ProactiveService:
 
     async def _check_memory(
         self, user_id: str, now: datetime, db
-    ) -> str | None:
+    ) -> dict | None:
         """Use memories to start a conversation. Cache for 6 hours."""
         cached = self._memory_cache.get(user_id)
         if cached:
@@ -320,7 +399,7 @@ class ProactiveService:
 
     async def _check_emotion(
         self, user_id: str, now: datetime, db
-    ) -> str | None:
+    ) -> dict | None:
         """Check if user has been sad/angry and needs care."""
         # Throttle via global push system
         if not await self._can_push(user_id, now):
@@ -343,6 +422,29 @@ class ProactiveService:
             "worried": "喵~ 你好像有点焦虑，需要我帮你做点什么吗？",
         }
         return messages.get(state.current_emotion)
+
+
+    async def _check_holiday(self, now: datetime) -> dict | None:
+        """Check if today is a holiday."""
+        today_key = now.strftime("%m-%d")
+        name = HOLIDAYS.get(today_key)
+        return {"type": "holiday", "name": name} if name else None
+
+    async def _check_countdown(self, user_id: str, now: datetime, db) -> list[dict] | None:
+        """Check upcoming or due countdowns."""
+        from uuid import UUID
+        from app.models.countdown import Countdown
+        r = await db.execute(
+            select(Countdown).where(Countdown.user_id == UUID(user_id))
+        )
+        items = r.scalars().all()
+        alerts = []
+        for item in items:
+            days_left = (item.target_date.date() - now.date()).days
+            if days_left in (0, 1, 3):
+                label = "🎉就是今天" if days_left == 0 else f"还有{days_left}天" if days_left > 0 else f"已过去{-days_left}天"
+                alerts.append({"title": item.title, "label": label})
+        return alerts[:2] if alerts else None
 
     async def _check_news(self, user_id: str, now: datetime) -> list[dict] | None:
         """Fetch local news headlines. Cache per city for 3 hours."""
