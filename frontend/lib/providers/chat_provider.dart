@@ -4,7 +4,6 @@ import '../models/message.dart';
 import '../services/ws_service.dart';
 import '../services/api_client.dart';
 import '../services/calendar_sync_service.dart';
-import '../services/logger.dart';
 import 'discover_provider.dart';
 
 class ChatProvider extends ChangeNotifier {
