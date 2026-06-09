@@ -50,8 +50,6 @@ class ProactiveService:
     def __init__(self):
         self._task: asyncio.Task | None = None
         self._interval = settings.notification_check_interval * 180  # ~3 hours
-        self._last_push: dict[str, datetime] = {}      # user_id → last push time
-        self._push_count: dict[str, tuple[int, datetime]] = {}  # user_id → (count, day)
         self._news_cache: dict[str, tuple[list[dict], datetime]] = {}  # city → (items, time)
 
     async def _poll(self):
@@ -79,16 +77,10 @@ class ProactiveService:
         if now.hour < 8 or now.hour > 22:
             logger.debug("proactive water: outside daytime (hour=%d)", now.hour)
             return None
-        last = self._last_push.get(user_id)
-        if last and (now - last).total_seconds() < 7200:
-            return None
-        hour = now.hour
-        return f"💧 已经{hour}点了，记得喝杯水哦~ 今天也要元气满满！"
-
     async def _check_user(self, user_id: str, now: datetime):
         """Consolidated check — build one combined message (max 1 push per cycle)."""
         logger.info("proactive check: [0] starting scan for %s", user_id[:8])
-        if not self._can_push(user_id, now):
+        if not await self._can_push(user_id, now):
             logger.info("proactive check: throttled (cooldown/limit) for %s", user_id[:8])
             return
 
@@ -141,38 +133,55 @@ class ProactiveService:
             logger.info("proactive check: [8/8] news for %s", user_id[:8])
             news = await self._check_news(user_id, now)
             logger.info("proactive check: news -> %s", f"{len(news)} items" if news else "SKIP")
-            if news and self._can_push(user_id, now):
+            if news and await self._can_push(user_id, now):
                 await self._do_push(user_id, now, "📰 本地资讯更新", skill="news", data=news)
-    def _can_push(self, user_id: str, now: datetime) -> bool:
-        """Throttle: max 1 push per 2 hours, max 3 per day."""
-        # 2-hour cooldown
-        last = self._last_push.get(user_id)
-        if last and (now - last).total_seconds() < 7200:
-            return False
-        # Daily limit
-        today = now.date()
-        count, day = self._push_count.get(user_id, (0, today))
-        if day != today:
-            count = 0
-        if count >= 3:
-            return False
+    async def _can_push(self, user_id: str, now: datetime) -> bool:
+        """DB-backed throttle: max 1 push per 2 hours, max 3 per day."""
+        from uuid import UUID
+        from app.models.proactive_push import ProactivePush
+        uid = UUID(user_id)
+        async with async_session() as db:
+            # Check 2-hour cooldown
+            two_hours_ago = now - timedelta(hours=2)
+            r = await db.execute(
+                select(func.count(ProactivePush.id)).where(
+                    ProactivePush.user_id == uid,
+                    ProactivePush.created_at >= two_hours_ago,
+                )
+            )
+            if (r.scalar() or 0) > 0:
+                return False
+            # Check daily limit (3 per day)
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            r = await db.execute(
+                select(func.count(ProactivePush.id)).where(
+                    ProactivePush.user_id == uid,
+                    ProactivePush.created_at >= today_start,
+                )
+            )
+            if (r.scalar() or 0) >= 3:
+                return False
         return True
 
     async def _do_push(self, user_id: str, now: datetime, msg: str,
                        skill: str | None = None, data: dict | None = None):
-        """Send push and update throttles."""
+        """Send push and persist record to DB."""
         payload = {"type": "proactive", "delta": msg}
         if skill: payload["skill"] = skill
         if data: payload["data"] = data
         await send_to_user(user_id, payload)
 
-        self._last_push[user_id] = now
-        today = now.date()
-        count, day = self._push_count.get(user_id, (0, today))
-        if day != today:
-            count = 0
-        self._push_count[user_id] = (count + 1, today)
-        logger.info("proactive push #%d to %s: %s", count + 1, user_id[:8], msg[:50])
+        # Persist to DB for cross-restart throttle
+        from uuid import UUID
+        from app.models.proactive_push import ProactivePush
+        async with async_session() as db:
+            db.add(ProactivePush(
+                user_id=UUID(user_id),
+                push_type=skill or "proactive",
+                message_preview=msg[:200],
+            ))
+            await db.commit()
+        logger.info("proactive push to %s: %s", user_id[:8], msg[:50])
 
     async def _check_weather(self, user_id: str, now: datetime) -> str | None:
         """Check weather with 2-hour cache per city to reduce LLM cost."""
@@ -314,8 +323,7 @@ class ProactiveService:
     ) -> str | None:
         """Check if user has been sad/angry and needs care."""
         # Throttle via global push system
-        last = self._last_push.get(user_id)
-        if last and (now - last).total_seconds() < 14400:
+        if not await self._can_push(user_id, now):
             return None
 
         r = await db.execute(
@@ -428,8 +436,8 @@ async def send_connect_greeting(user_id: str) -> str | None:
     """One consolidated greeting on app open.
     Shares the SAME throttle as periodic checks — 2h cooldown, 3/day max."""
     now = datetime.now(BEIJING_TZ)
-    if not proactive_service._can_push(user_id, now):
-        logger.debug("connect greeting: throttled (shared with periodic) for %s", user_id[:8])
+    if not await proactive_service._can_push(user_id, now):
+        logger.debug("connect greeting: throttled for %s", user_id[:8])
         return None
 
     parts = []
@@ -451,20 +459,19 @@ async def send_connect_greeting(user_id: str) -> str | None:
             try:
                 mem = await llm_router.chat([{"role": "user", "content": prompt}])
                 mem = (mem or "").strip()
-                if mem: parts.append(mem)
+                # Filter LLM non-empty-but-meaningless responses
+                if mem and len(mem) > 2 and mem not in ("暂无", "无", "没有", "暂无特别信息", "。", "空"):
+                    parts.append(mem)
+                else:
+                    logger.debug("greeting: LLM returned empty/meaningless: %r", mem[:20] if mem else "")
             except Exception:
                 pass
 
     if parts:
         msg = "\n".join(parts)
-        # Use shared throttle — same as periodic _do_push
-        proactive_service._last_push[user_id] = now
-        today = now.date()
-        count, day = proactive_service._push_count.get(user_id, (0, today))
-        if day != today:
-            count = 0
-        proactive_service._push_count[user_id] = (count + 1, today)
-        logger.info("connect greeting sent to %s (push #%d today): %s", user_id[:8], count + 1, msg[:50])
-        return msg
+        # Persist to DB and send via _do_push (no need for ws_chat.py to send again)
+        await proactive_service._do_push(user_id, now, msg, skill="greeting")
+        logger.info("connect greeting sent to %s: %s", user_id[:8], msg[:50])
+        return None  # already sent by _do_push
     logger.debug("connect greeting: no content for %s", user_id[:8])
     return None

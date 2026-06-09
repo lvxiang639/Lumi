@@ -27,6 +27,7 @@ from app.models.converted_file import ConvertedFile
 from app.models.note import Note, MoodLog
 from app.models.sent_email import SentEmail
 from app.models.countdown import Countdown
+from app.models.proactive_push import ProactivePush
 
 from app.database import Base
 
@@ -43,5 +44,5 @@ __all__ = [
     # Character
     "Character", "UserInventory", "ItemType", "VoicePack", "Outfit",
     # Tools
-    "ConvertedFile", "SentEmail", "Note", "MoodLog", "Countdown",
+    "ConvertedFile", "SentEmail", "Note", "MoodLog", "Countdown", "ProactivePush",
 ]
