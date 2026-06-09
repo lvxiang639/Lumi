@@ -460,6 +460,13 @@ async def send_connect_greeting(user_id: str) -> str | None:
 
     if parts:
         msg = "\n".join(parts)
-        await proactive_service._do_push(user_id, now, msg, skill="greeting")
+        # Update throttle (same as _do_push) but let ws_chat.py send the actual message
+        proactive_service._last_push[user_id] = now
+        today = now.date()
+        count, day = proactive_service._push_count.get(user_id, (0, today))
+        if day != today:
+            count = 0
+        proactive_service._push_count[user_id] = (count + 1, today)
+        logger.info("proactive push #%d to %s: %s", count + 1, user_id[:8], msg[:50])
         return msg
     return None
