@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
@@ -72,8 +73,8 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
       builder: (_, __) {
         final t = _walkCtrl.value;
         _walkX = _movingRight
-            ? lerpDouble(_walkX, _screenW - 40, t)!
-            : lerpDouble(_walkX, 40, t)!;
+            ? ui.lerpDouble(_walkX, _screenW - 40, t)!
+            : ui.lerpDouble(_walkX, 40, t)!;
 
         return Positioned(
           left: _walkX,
