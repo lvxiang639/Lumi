@@ -39,7 +39,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
   late Animation<double> _walkX;
   late Animation<double> _bobY;
   bool _movingRight = true;
-  double _xBase = 0;
+  bool _started = false;
 
   @override
   void initState() {
@@ -55,8 +55,15 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
 
     _bobY = Tween<double>(begin: -3, end: 3).animate(
       CurvedAnimation(parent: _bobCtrl, curve: Curves.easeInOut));
+  }
 
-    _startWalking();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_started) {
+      _started = true;
+      _startWalking();
+    }
   }
 
   void _startWalking() {
