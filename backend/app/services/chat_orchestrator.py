@@ -140,7 +140,13 @@ class ChatOrchestrator:
                 await self._load_persona(user_uuid)
                 or "你是一个贴心的AI助手，名叫灵犀。"
             )
-            system_prefix = persona
+            # Inject current time so LLM always knows the correct time
+            from datetime import timedelta
+            beijing_now = datetime.now(timezone(timedelta(hours=8)))
+            time_str = beijing_now.strftime("%Y年%m月%d日 %H:%M (星期%w，北京时间)")
+            time_str = time_str.replace("星期0", "星期日").replace("星期1", "星期一").replace("星期2", "星期二").replace("星期3", "星期三").replace("星期4", "星期四").replace("星期5", "星期五").replace("星期6", "星期六")
+
+            system_prefix = f"当前准确时间: {time_str}。{persona}"
             if memory_summary:
                 system_prefix += (
                     "\n\n以下是关于你正在对话的用户的信息，"
