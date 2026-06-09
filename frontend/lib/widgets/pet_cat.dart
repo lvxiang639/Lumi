@@ -2,67 +2,19 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum PetPosition { bottomBar, sidebar }
+enum PetPosition { bottomBar, sidebar, paused }
 
-// Walk cycle frame 1 — left legs forward
-const _f1 = '''
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-<defs><radialGradient id="b" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFB6C1" stop-opacity="0.7"/><stop offset="100%" stop-color="#FFB6C1" stop-opacity="0"/></radialGradient></defs>
-<path d="M20 64 Q8 58 6 46 Q5 38 10 34" stroke="#FF8C42" stroke-width="4" fill="none" stroke-linecap="round"/>
-<ellipse cx="44" cy="68" rx="17" ry="13" fill="#FFB347"/>
-<ellipse cx="46" cy="71" rx="10" ry="7" fill="white" opacity="0.6"/>
-<line x1="34" y1="74" x2="30" y2="88" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-<circle cx="30" cy="90" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-<line x1="50" y1="74" x2="54" y2="86" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-<circle cx="54" cy="88" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-<line x1="40" y1="76" x2="44" y2="87" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-<circle cx="44" cy="89" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-<line x1="52" y1="74" x2="48" y2="86" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-<circle cx="48" cy="88" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-<circle cx="50" cy="44" r="24" fill="#FFB347" stroke="#FF8C42" stroke-width=".8"/>
-<circle cx="50" cy="46" r="15" fill="white" opacity=".2"/>
-<polygon points="30,28 20,8 38,18" fill="#FFB347" stroke="#FF8C42" stroke-width=".8"/>
-<polygon points="30,25 23,12 35,20" fill="#FFB6C1" opacity=".5"/>
-<polygon points="64,22 74,6 76,18" fill="#FFB347" stroke="#FF8C42" stroke-width=".8"/>
-<polygon points="67,20 72,10 74,18" fill="#FFB6C1" opacity=".5"/>
-<ellipse cx="42" cy="42" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="42" cy="41" rx="3.5" ry="4.5" fill="#4A3000"/>
-<circle cx="41" cy="39" r="2" fill="white"/><circle cx="43.5" cy="43.5" r="1" fill="white"/>
-<ellipse cx="58" cy="42" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="58" cy="41" rx="3.5" ry="4.5" fill="#4A3000"/>
-<circle cx="57" cy="39" r="2" fill="white"/><circle cx="59.5" cy="43.5" r="1" fill="white"/>
-<circle cx="35" cy="50" r="6" fill="url(#b)"/><circle cx="65" cy="50" r="6" fill="url(#b)"/>
-<polygon points="50,48 48,50 52,50" fill="#FF6B8A"/>
-<path d="M46 51 Q48 54 50 51 Q52 54 54 51" stroke="#8B5E3C" stroke-width="1" fill="none"/>
-</svg>''';
-
-// Walk cycle frame 2 — right legs forward
-const _f2 = '''
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-<defs><radialGradient id="b" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFB6C1" stop-opacity="0.7"/><stop offset="100%" stop-color="#FFB6C1" stop-opacity="0"/></radialGradient></defs>
-<path d="M20 64 Q10 56 8 44 Q7 36 12 32" stroke="#FF8C42" stroke-width="4" fill="none" stroke-linecap="round"/>
-<ellipse cx="44" cy="68" rx="17" ry="13" fill="#FFB347"/>
-<ellipse cx="46" cy="71" rx="10" ry="7" fill="white" opacity="0.6"/>
-<line x1="34" y1="74" x2="38" y2="86" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-<circle cx="38" cy="88" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-<line x1="50" y1="74" x2="46" y2="88" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-<circle cx="46" cy="90" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-<line x1="40" y1="76" x2="36" y2="86" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-<circle cx="36" cy="88" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-<line x1="52" y1="74" x2="56" y2="87" stroke="#D4891A" stroke-width="5" stroke-linecap="round"/>
-<circle cx="56" cy="89" r="3.5" fill="white" stroke="#D4891A" stroke-width="1"/>
-<circle cx="50" cy="44" r="24" fill="#FFB347" stroke="#FF8C42" stroke-width=".8"/>
-<circle cx="50" cy="46" r="15" fill="white" opacity=".2"/>
-<polygon points="30,28 20,8 38,18" fill="#FFB347" stroke="#FF8C42" stroke-width=".8"/>
-<polygon points="30,25 23,12 35,20" fill="#FFB6C1" opacity=".5"/>
-<polygon points="64,22 74,6 76,18" fill="#FFB347" stroke="#FF8C42" stroke-width=".8"/>
-<polygon points="67,20 72,10 74,18" fill="#FFB6C1" opacity=".5"/>
-<ellipse cx="42" cy="42" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="42" cy="41" rx="3.5" ry="4.5" fill="#4A3000"/>
-<circle cx="41" cy="39" r="2" fill="white"/><circle cx="43.5" cy="43.5" r="1" fill="white"/>
-<ellipse cx="58" cy="42" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="58" cy="41" rx="3.5" ry="4.5" fill="#4A3000"/>
-<circle cx="57" cy="39" r="2" fill="white"/><circle cx="59.5" cy="43.5" r="1" fill="white"/>
-<circle cx="35" cy="50" r="6" fill="url(#b)"/><circle cx="65" cy="50" r="6" fill="url(#b)"/>
-<polygon points="50,48 48,50 52,50" fill="#FF6B8A"/>
-<path d="M46 51 Q48 54 50 51 Q52 54 54 51" stroke="#8B5E3C" stroke-width="1" fill="none"/>
-</svg>''';
+// ── 4-frame walk cycle SVG (cat pacing gait) ──
+const _frames = [
+  // 0: left front up, right back up
+  '''<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="b" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFB6C1" stop-opacity="0.7"/><stop offset="100%" stop-color="#FFB6C1" stop-opacity="0"/></radialGradient></defs><path d="M22 64 Q10 56 8 46" stroke="#FF8C42" stroke-width="3.5" fill="none" stroke-linecap="round"/><ellipse cx="44" cy="67" rx="16" ry="12" fill="#FFB347"/><ellipse cx="46" cy="70" rx="9" ry="6" fill="white" opacity="0.5"/><line x1="34" y1="72" x2="32" y2="86" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="32" cy="88" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="50" y1="72" x2="52" y2="84" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="52" cy="86" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="40" y1="74" x2="36" y2="85" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="36" cy="87" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="52" y1="74" x2="55" y2="84" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="55" cy="86" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><circle cx="48" cy="42" r="23" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><circle cx="48" cy="44" r="14" fill="white" opacity=".15"/><polygon points="28,26 18,6 36,16" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><polygon points="28,23 21,10 33,18" fill="#FFB6C1" opacity=".5"/><polygon points="62,20 72,4 74,16" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><polygon points="65,18 70,8 72,16" fill="#FFB6C1" opacity=".5"/><ellipse cx="40" cy="40" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="40" cy="39" rx="3.5" ry="4.5" fill="#4A3000"/><circle cx="39" cy="37" r="2" fill="white"/><ellipse cx="56" cy="40" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="56" cy="39" rx="3.5" ry="4.5" fill="#4A3000"/><circle cx="55" cy="37" r="2" fill="white"/><circle cx="33" cy="48" r="5" fill="url(#b)"/><circle cx="63" cy="48" r="5" fill="url(#b)"/><polygon points="48,46 46,48 50,48" fill="#FF6B8A"/></svg>''',
+  // 1: all legs middle (transition)
+  '''<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="b" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFB6C1" stop-opacity="0.7"/><stop offset="100%" stop-color="#FFB6C1" stop-opacity="0"/></radialGradient></defs><path d="M22 64 Q8 58 6 48" stroke="#FF8C42" stroke-width="3.5" fill="none" stroke-linecap="round"/><ellipse cx="44" cy="67" rx="16" ry="12" fill="#FFB347"/><ellipse cx="46" cy="70" rx="9" ry="6" fill="white" opacity="0.5"/><line x1="34" y1="72" x2="33" y2="86" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="33" cy="88" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="50" y1="72" x2="50" y2="85" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="50" cy="87" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="40" y1="74" x2="39" y2="86" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="39" cy="88" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="52" y1="74" x2="53" y2="85" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="53" cy="87" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><circle cx="48" cy="42" r="23" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><circle cx="48" cy="44" r="14" fill="white" opacity=".15"/><polygon points="28,26 18,6 36,16" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><polygon points="28,23 21,10 33,18" fill="#FFB6C1" opacity=".5"/><polygon points="62,20 72,4 74,16" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><polygon points="65,18 70,8 72,16" fill="#FFB6C1" opacity=".5"/><ellipse cx="40" cy="40" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="40" cy="39" rx="3.5" ry="4.5" fill="#4A3000"/><circle cx="39" cy="37" r="2" fill="white"/><ellipse cx="56" cy="40" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="56" cy="39" rx="3.5" ry="4.5" fill="#4A3000"/><circle cx="55" cy="37" r="2" fill="white"/><circle cx="33" cy="48" r="5" fill="url(#b)"/><circle cx="63" cy="48" r="5" fill="url(#b)"/><polygon points="48,46 46,48 50,48" fill="#FF6B8A"/></svg>''',
+  // 2: right front up, left back up
+  '''<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="b" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFB6C1" stop-opacity="0.7"/><stop offset="100%" stop-color="#FFB6C1" stop-opacity="0"/></radialGradient></defs><path d="M20 64 Q6 58 4 46" stroke="#FF8C42" stroke-width="3.5" fill="none" stroke-linecap="round"/><ellipse cx="44" cy="67" rx="16" ry="12" fill="#FFB347"/><ellipse cx="46" cy="70" rx="9" ry="6" fill="white" opacity="0.5"/><line x1="34" y1="72" x2="37" y2="85" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="37" cy="87" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="50" y1="72" x2="48" y2="86" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="48" cy="88" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="40" y1="74" x2="43" y2="86" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="43" cy="88" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="52" y1="74" x2="50" y2="85" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="50" cy="87" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><circle cx="48" cy="42" r="23" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><circle cx="48" cy="44" r="14" fill="white" opacity=".15"/><polygon points="28,26 18,6 36,16" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><polygon points="28,23 21,10 33,18" fill="#FFB6C1" opacity=".5"/><polygon points="62,20 72,4 74,16" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><polygon points="65,18 70,8 72,16" fill="#FFB6C1" opacity=".5"/><ellipse cx="40" cy="40" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="40" cy="39" rx="3.5" ry="4.5" fill="#4A3000"/><circle cx="39" cy="37" r="2" fill="white"/><ellipse cx="56" cy="40" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="56" cy="39" rx="3.5" ry="4.5" fill="#4A3000"/><circle cx="55" cy="37" r="2" fill="white"/><circle cx="33" cy="48" r="5" fill="url(#b)"/><circle cx="63" cy="48" r="5" fill="url(#b)"/><polygon points="48,46 46,48 50,48" fill="#FF6B8A"/></svg>''',
+  // 3: all legs middle (transition)
+  '''<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="b" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFB6C1" stop-opacity="0.7"/><stop offset="100%" stop-color="#FFB6C1" stop-opacity="0"/></radialGradient></defs><path d="M22 64 Q10 56 8 48" stroke="#FF8C42" stroke-width="3.5" fill="none" stroke-linecap="round"/><ellipse cx="44" cy="67" rx="16" ry="12" fill="#FFB347"/><ellipse cx="46" cy="70" rx="9" ry="6" fill="white" opacity="0.5"/><line x1="34" y1="72" x2="33" y2="86" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="33" cy="88" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="50" y1="72" x2="50" y2="85" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="50" cy="87" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="40" y1="74" x2="39" y2="86" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="39" cy="88" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><line x1="52" y1="74" x2="53" y2="85" stroke="#D4891A" stroke-width="4.5" stroke-linecap="round"/><circle cx="53" cy="87" r="3" fill="white" stroke="#D4891A" stroke-width="1"/><circle cx="48" cy="42" r="23" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><circle cx="48" cy="44" r="14" fill="white" opacity=".15"/><polygon points="28,26 18,6 36,16" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><polygon points="28,23 21,10 33,18" fill="#FFB6C1" opacity=".5"/><polygon points="62,20 72,4 74,16" fill="#FFB347" stroke="#FF8C42" stroke-width=".7"/><polygon points="65,18 70,8 72,16" fill="#FFB6C1" opacity=".5"/><ellipse cx="40" cy="40" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="40" cy="39" rx="3.5" ry="4.5" fill="#4A3000"/><circle cx="39" cy="37" r="2" fill="white"/><ellipse cx="56" cy="40" rx="5" ry="6" fill="#2D1B00"/><ellipse cx="56" cy="39" rx="3.5" ry="4.5" fill="#4A3000"/><circle cx="55" cy="37" r="2" fill="white"/><circle cx="33" cy="48" r="5" fill="url(#b)"/><circle cx="63" cy="48" r="5" fill="url(#b)"/><polygon points="48,46 46,48 50,48" fill="#FF6B8A"/></svg>''',
+];
 
 class PetCat extends StatefulWidget {
   final PetPosition position;
@@ -75,18 +27,28 @@ class PetCat extends StatefulWidget {
 class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
   late AnimationController _walkCtrl;
   late AnimationController _frameCtrl;
+  late AnimationController _swayCtrl;
   bool _started = false;
   double _screenW = 400, _walkX = 0;
   bool _movingRight = true;
+  int _stepCount = 0;
 
   @override
   void initState() {
     super.initState();
     _walkCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 20));
-    _frameCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500))..repeat();
+    _frameCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))..repeat();
+    _swayCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))..repeat();
     _walkCtrl.addStatusListener((s) {
-      if (s == AnimationStatus.completed || s == AnimationStatus.dismissed) {
-        if (mounted) { _movingRight = !_movingRight; _startWalking(); }
+      if ((s == AnimationStatus.completed || s == AnimationStatus.dismissed) && mounted && ++_stepCount < 3) {
+        _movingRight = !_movingRight;
+        _startWalking();
+      } else if (mounted && _stepCount >= 3) {
+        // Pause and look around
+        _stepCount = 0;
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) { _movingRight = !_movingRight; _startWalking(); }
+        });
       }
     });
   }
@@ -97,26 +59,23 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
     if (!_started) {
       _started = true;
       _screenW = MediaQuery.of(context).size.width;
-      _walkX = _screenW * 0.15;
+      _walkX = _screenW * 0.2;
       _startWalking();
     }
   }
 
   void _startWalking() {
     if (!mounted) return;
-    final end = _movingRight ? _screenW - 40.0 : 40.0;
+    final end = _movingRight ? _screenW - 60.0 : 60.0;
     final dist = (end - _walkX).abs();
-    final dur = (dist / _screenW * 30000).toInt().clamp(15000, 40000);
+    final dur = (dist / _screenW * 25000).toInt().clamp(12000, 35000);
     _walkCtrl.duration = Duration(milliseconds: dur);
-    if (_movingRight) {
-      _walkCtrl.forward(from: _walkCtrl.value);
-    } else {
-      _walkCtrl.reverse(from: _walkCtrl.value);
-    }
+    if (_movingRight) _walkCtrl.forward(from: _walkCtrl.value);
+    else _walkCtrl.reverse(from: _walkCtrl.value);
   }
 
   @override
-  void dispose() { _walkCtrl.dispose(); _frameCtrl.dispose(); super.dispose(); }
+  void dispose() { _walkCtrl.dispose(); _frameCtrl.dispose(); _swayCtrl.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -126,21 +85,27 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
 
   Widget _walkingCat() {
     return AnimatedBuilder(
-      animation: Listenable.merge([_walkCtrl, _frameCtrl]),
+      animation: Listenable.merge([_walkCtrl, _frameCtrl, _swayCtrl]),
       builder: (_, __) {
-        _walkX = _movingRight
-            ? lerpDouble(_walkX, _screenW - 40, _walkCtrl.value)!
-            : lerpDouble(_walkX, 40, _walkCtrl.value)!;
-        final bob = sin(_walkCtrl.value * 3.14 * 6) * 2.5;
-        final frame = (_frameCtrl.value * 1000).toInt() % 400 < 200 ? _f1 : _f2;
+        _walkX = _movingRight ? lerpDouble(_walkX, _screenW - 60, _walkCtrl.value)! : lerpDouble(_walkX, 60, _walkCtrl.value)!;
+
+        // Smooth bob + body sway
+        final bob = sin(_walkCtrl.value * 3.14 * 8) * 2;
+        final sway = sin(_swayCtrl.value * 3.14 * 2) * 1.5;
+        final frameIdx = ((_frameCtrl.value * 1000) ~/ 175) % 4;
+        final tailWag = sin(_swayCtrl.value * 3.14 * 2) * 4;
 
         return Positioned(
-          left: _walkX, bottom: 2,
+          left: _walkX,
+          bottom: 2,
           child: GestureDetector(
             onTap: widget.onTap,
             child: Transform.translate(
-              offset: Offset(0, bob),
-              child: Transform.flip(flipX: !_movingRight, child: SvgPicture.string(frame, width: 64, height: 50)),
+              offset: Offset(sway, bob),
+              child: Transform.flip(
+                flipX: !_movingRight,
+                child: SvgPicture.string(_frames[frameIdx], width: 64, height: 50),
+              ),
             ),
           ),
         );
@@ -154,10 +119,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
       onTap: widget.onTap,
       child: Container(
         width: 28, height: 56,
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFB347).withValues(alpha: 0.4),
-          borderRadius: const BorderRadius.horizontal(right: Radius.circular(14)),
-        ),
+        decoration: BoxDecoration(color: const Color(0xFFFFB347).withValues(alpha: 0.4), borderRadius: const BorderRadius.horizontal(right: Radius.circular(14))),
         child: const Center(child: Text('🐱', style: TextStyle(fontSize: 16))),
       ),
     ),
