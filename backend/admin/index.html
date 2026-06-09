@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>灵犀 管理后台</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,PingFang SC,sans-serif;background:#f5f5f5;color:#1a1a1a}
+.nav{background:#6C63FF;color:#fff;padding:12px 24px;display:flex;align-items:center;gap:16px}
+.nav h1{font-size:18px}.nav a{color:#fff;opacity:.7;text-decoration:none;font-size:13px;cursor:pointer}
+.nav a:hover,.nav a.active{opacity:1}
+.main{max-width:1200px;margin:20px auto;padding:0 20px}
+.card{background:#fff;border-radius:10px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card h2{font-size:15px;margin-bottom:12px;color:#6C63FF}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #eee}
+th{background:#f8f9fa;font-weight:600;color:#555}
+tr:hover{background:#f0f0ff}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.stat{padding:16px;border-radius:8px;text-align:center}
+.stat .num{font-size:28px;font-weight:700}.stat .label{font-size:11px;color:#888;margin-top:4px}
+.stat.b1{background:#e8f5e9}.stat.b2{background:#e3f2fd}.stat.b3{background:#fff3e0}.stat.b4{background:#fce4ec}
+.btn{padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-size:12px}
+.btn-primary{background:#6C63FF;color:#fff}.btn-danger{background:#ef4444;color:#fff}.btn-sm{padding:3px 8px}
+input,textarea,select{border:1px solid #ddd;border-radius:6px;padding:6px 10px;font-size:12px;width:100%;margin:4px 0}
+textarea{min-height:60px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tag{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600}
+.tag-on{background:#e8f5e9;color:#2e7d32}.tag-off{background:#fce4ec;color:#c62828}
+.tag-info{background:#e3f2fd;color:#1565c0}
+.pagination{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:12px}
+.loading{text-align:center;padding:40px;color:#999}
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.3);z-index:100;justify-content:center;align-items:center}
+.modal.show{display:flex}.modal-inner{background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%}
+</style>
+</head>
+<body>
+<div class="nav">
+  <h1>🦏 灵犀管理</h1>
+  <a onclick="showTab('dashboard')" id="tab-dashboard" class="active">仪表盘</a>
+  <a onclick="showTab('tables')" id="tab-tables">数据浏览</a>
+  <a onclick="showTab('content')" id="tab-content">内容配置</a>
+  <span style="flex:1"></span>
+  <span id="loginStatus" style="font-size:11px;opacity:.7"></span>
+</div>
+<div class="main" id="main"></div>
+<div class="modal" id="modal"><div class="modal-inner" id="modalInner"></div></div>
+
+<script>
+const BASE = location.origin + '/api/admin';
+let token = '';
+
+// ── Auth ──
+async function login() {
+  const phone = prompt('管理员手机号:');
+  if (!phone) return;
+  const r = await fetch('/api/auth/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+  if (r.ok) { const d = await r.json(); token = d.access_token; document.getElementById('loginStatus').textContent = '✅ 已登录'; showTab('dashboard'); }
+  else alert('登录失败');
+}
+async function api(path, opts={}) {
+  const h = {...opts.headers, 'Authorization': 'Bearer '+token, 'Content-Type':'application/json'};
+  return fetch(BASE+path, {...opts, headers:h});
+}
+
+// ── Tabs ──
+function showTab(tab) {
+  document.querySelectorAll('.nav a').forEach(a=>a.classList.remove('active'));
+  document.getElementById('tab-'+tab)?.classList.add('active');
+  if (tab=='dashboard') loadDashboard();
+  else if (tab=='tables') loadTables();
+  else if (tab=='content') loadContent();
+}
+
+// ── Dashboard ──
+async function loadDashboard() {
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="loading">加载中...</div>';
+  const r = await api('/stats');
+  if (!r.ok) { main.innerHTML = '<div class="card"><button class="btn btn-primary" onclick="login()">请先登录</button></div>'; return; }
+  const stats = await r.json();
+  const colors = ['b1','b2','b3','b4'];
+  main.innerHTML = `
+    <div class="card"><h2>📊 数据概览</h2>
+    <div class="stats">${Object.entries(stats).map(([k,v],i)=>
+      '<div class="stat '+colors[i%4]+'"><div class="num">'+(v==='N/A'?'-':v)+'</div><div class="label">'+k+'</div></div>').join('')}
+    </div></div>`;
+}
+
+// ── Tables ──
+let curTable = 'users', curPage = 1;
+async function loadTables() {
+  const main = document.getElementById('main');
+  const tables = ['users','conversations','messages','calendar_events','expense_records','notes','mood_logs','countdowns','knowledge_bases','proactive_pushes','daily_content_configs','reminder_schedules','user_memories','converted_files','sent_emails'];
+  main.innerHTML = `
+    <div class="card">
+      <h2>📋 数据浏览</h2>
+      <div class="row" style="margin-bottom:12px">
+        <select onchange="curTable=this.value;curPage=1;loadTableData()" id="tableSelect">${tables.map(t=>`<option value="${t}" ${t===curTable?'selected':''}>${t}</option>`).join('')}</select>
+        <span id="tableInfo"></span>
+      </div>
+      <div id="tableContent"></div>
+    </div>`;
+  loadTableData();
+}
+async function loadTableData() {
+  const el = document.getElementById('tableContent');
+  el.innerHTML = '<div class="loading">加载中...</div>';
+  const r = await api('/tables/'+curTable+'?page='+curPage);
+  if (!r.ok) { el.innerHTML = '<p>加载失败</p>'; return; }
+  const d = await r.json();
+  if (!d.rows.length) { el.innerHTML = '<p>暂无数据</p>'; return; }
+  const cols = Object.keys(d.rows[0]);
+  el.innerHTML = `
+    <div style="overflow-x:auto">
+    <table><thead><tr>${cols.map(c=>'<th>'+c+'</th>').join('')}</tr></thead>
+    <tbody>${d.rows.map(r=>'<tr>'+cols.map(c=>'<td>'+(r[c]||'')+'</td>').join('')+'</tr>').join('')}</tbody></table>
+    </div>
+    <div class="pagination">
+      <button class="btn btn-primary" onclick="curPage--;loadTableData()" ${curPage<=1?'disabled':''}>上一页</button>
+      <span>第 ${d.page} 页 / 共 ${Math.ceil(d.total/d.limit)} 页 (${d.total} 条)</span>
+      <button class="btn btn-primary" onclick="curPage++;loadTableData()" ${d.page*d.limit>=d.total?'disabled':''}>下一页</button>
+    </div>`;
+}
+
+// ── Content Configs ──
+async function loadContent() {
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="loading">加载中...</div>';
+  const r = await api('/content-configs');
+  if (!r.ok) { main.innerHTML = '<p>加载失败 — 请先登录</p>'; return; }
+  const d = await r.json();
+  main.innerHTML = `
+    <div class="card">
+      <h2>📝 每日内容配置</h2>
+      <button class="btn btn-primary" onclick="editConfig()" style="margin-bottom:12px">+ 新增配置</button>
+      <div style="overflow-x:auto"><table>
+      <thead><tr><th>类型</th><th>名称</th><th>提示词</th><th>优先级</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${d.items.map(c=>`
+        <tr>
+          <td><span class="tag tag-info">${c.content_type}</span></td>
+          <td>${c.display_name}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.prompt||''}</td>
+          <td>${c.priority}</td>
+          <td><span class="tag ${c.enabled?'tag-on':'tag-off'}">${c.enabled?'启用':'禁用'}</span></td>
+          <td>
+            <button class="btn btn-primary btn-sm" onclick="editConfig('${c.id}','${c.content_type}','${c.display_name}',${c.priority},${c.enabled})">编辑</button>
+          </td>
+        </tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
+}
+
+function editConfig(id, type, name, prio, enabled) {
+  const isNew = !id;
+  document.getElementById('modalInner').innerHTML = `
+    <h3 style="margin-bottom:12px">${isNew?'新增':'编辑'}内容配置</h3>
+    <label>类型</label><input id="cfgType" value="${type||''}" ${isNew?'':'readonly'}>
+    <label>名称</label><input id="cfgName" value="${name||''}">
+    <label>提示词</label><textarea id="cfgPrompt"></textarea>
+    <label>优先级</label><input id="cfgPrio" type="number" value="${prio||99}">
+    <label><input type="checkbox" id="cfgEnabled" ${enabled!==false?'checked':''}> 启用</label>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-primary" onclick="saveConfig('${id||''}')">保存</button>
+      <button class="btn" onclick="closeModal()">取消</button>
+    </div>`;
+  document.getElementById('modal').classList.add('show');
+  // Load existing prompt
+  if (!isNew) {
+    api('/content-configs').then(r=>r.json()).then(d=>{
+      const c = d.items.find(i=>i.id===id);
+      if (c) document.getElementById('cfgPrompt').value = c.prompt||'';
+    });
+  }
+}
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+async function saveConfig(id) {
+  const body = {
+    display_name: document.getElementById('cfgName').value,
+    prompt: document.getElementById('cfgPrompt').value,
+    priority: parseInt(document.getElementById('cfgPrio').value)||99,
+    enabled: document.getElementById('cfgEnabled').checked,
+  };
+  if (!id) body.content_type = document.getElementById('cfgType').value;
+  const r = id ? await api('/content-configs/'+id, {method:'PUT',body:JSON.stringify(body)}) : await api('/content-configs', {method:'POST',body:JSON.stringify(body)});
+  if (r.ok) { closeModal(); loadContent(); }
+  else alert('保存失败');
+}
+
+// ── Init ──
+login();
+
+function escapeHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+async function delRow(table, id) {
+  if (!confirm('确定删除 '+table+' #'+id+' ？')) return;
+  const r = await api('/tables/'+table+'/'+id, {method:'DELETE'});
+  if (r.ok) loadTableData(); else alert('删除失败');
+}
+function editRow(table, id) {
+  document.getElementById('modalInner').innerHTML = '<h3>编辑 '+table+'</h3><div id="editFields">加载中...</div><button class="btn btn-primary" onclick="saveEdit(\''+table+'\',\''+id+'\')" style="margin-top:12px">保存</button> <button class="btn" onclick="closeModal()">取消</button>';
+  document.getElementById('modal').classList.add('show');
+  api('/tables/'+table+'?limit=50&page=1').then(async r=>{
+    const d = await r.json();
+    const row = d.rows.find(r=>String(r.id)==String(id));
+    if (!row) { document.getElementById('editFields').innerHTML='<p>未找到</p>'; return; }
+    document.getElementById('editFields').innerHTML = Object.entries(row).filter(([k])=>k!=='id'&&k!=='created_at').map(([k,v])=>'<label>'+k+'</label><input id="ef_'+k+'" value="'+escapeHtml(v||'')+'">').join('');
+  });
+}
+async function saveEdit(table, id) {
+  const body = {};
+  document.querySelectorAll('[id^="ef_"]').forEach(el=>{ body[el.id.replace('ef_','')] = el.value; });
+  const r = await api('/tables/'+table+'/'+id, {method:'PUT',body:JSON.stringify(body)});
+  if (r.ok) { closeModal(); loadTableData(); } else alert('保存失败');
+}
+</script>
+</body>
+</html>

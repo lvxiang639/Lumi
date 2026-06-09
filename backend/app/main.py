@@ -15,6 +15,7 @@ from app.api.notes import router as notes_router
 from app.api.ws_chat import router as ws_router
 from app.api.countdown import router as countdown_router
 from app.api.knowledge import router as knowledge_router
+from app.api.admin import router as admin_router
 
 app = FastAPI(title="灵犀 API", version="0.1.0")
 
@@ -38,6 +39,7 @@ app.include_router(notes_router)
 app.include_router(ws_router)
 app.include_router(countdown_router)
 app.include_router(knowledge_router)
+app.include_router(admin_router)
 
 
 @app.on_event("startup")
