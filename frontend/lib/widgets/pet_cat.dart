@@ -87,7 +87,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
     return AnimatedBuilder(
       animation: Listenable.merge([_walkCtrl, _frameCtrl, _swayCtrl]),
       builder: (_, __) {
-        _walkX = _movingRight ? (lerpDouble(_walkX, _screenW - 60, _walkCtrl.value) ?? _walkX) : (lerpDouble(_walkX, 60, _walkCtrl.value) ?? _walkX);
+        _walkX = _movingRight ? lerpDouble(_walkX, _screenW - 60, _walkCtrl.value) : lerpDouble(_walkX, 60, _walkCtrl.value);
 
         // Smooth bob + body sway
         final bob = sin(_walkCtrl.value * 3.14 * 8) * 2;
