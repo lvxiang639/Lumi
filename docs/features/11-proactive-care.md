@@ -1,59 +1,55 @@
-# 主动关怀 (Proactive Care)
+# 主动关怀 V2 (Proactive Care)
 
 ## 架构
+
 ```
-connection_manager.py  ← 追踪在线 WebSocket 用户
-proactive_service.py  ← 每 30 分钟检查
-ws_chat.py             ← 连接时触发问候
+proactive_service.py
+├── _poll()         每 ~3 小时循环，22-8 时跳过
+├── _check_all()    遍历在线用户
+├── _check_user()   单用户 8 项检查 + LLM 生成
+├── _can_push()     DB 节流：2h 冷却 + 3条/天
+├── _do_push()      发送 WS + 写 proactive_pushes 表
+│
+├── _check_holiday()    节日检测（7个内置节日）
+├── _check_weather()    天气提醒（2h 缓存）
+├── _check_calendar()   未来 1h 日程
+├── _check_expense()    昨日消费
+├── _check_idle()       4h+ 未上线
+├── _check_water()      白天补水提醒
+├── _check_emotion()    情绪关怀
+├── _check_memory()     记忆话题
+├── _check_countdown()  倒数日 3/1/0 天提醒
+├── _check_news()       新闻推送（独立）
+│
+├── _generate_push_text() LLM 自然文案生成
+└── send_connect_greeting() WS连接问候（共享节流）
 ```
 
-## 定时检查 (每 30 分钟)
-```
-对每个在线用户，按优先级检查:
-    │
-    ├── Check 1: 天气预警 ☔
-    │   LLM 判断是否需要提醒 (雨/雪/大风/高温)
-    │   → "外面要下雨了，出门记得带伞哦"
-    │
-    ├── Check 2: 临近日程 📅
-    │   未来 1 小时内是否有日历事件
-    │   → "30分钟后有个会议，别忘了喵~"
-    │
-    ├── Check 3: 漏记账 💰
-    │   昨天有对话但没有记账记录
-    │   → "昨天好像忘记记账了，要现在记一下吗？"
-    │
-    ├── Check 4: 久未出现 😴
-    │   最后活跃时间 > 4 小时
-    │   → "喵~ 好久不见！你回来啦 🐱"
-    │
-    ├── Check 5: 记忆话题 💭
-    │   用已有记忆生成自然关心话题
-    │   → "听说周杰伦出了新歌，你听了吗？"
-    │
-    └── Check 6: 情绪关怀 💝
-        检测 sad/angry/worried + intensity > 0.5
-        → "感觉你心情不太好，要聊聊吗？"
-        (4 小时内最多一次)
+## 推送流程
 
-每次只发一条 (first hit wins)
-```
+1. 定时循环每 ~3 小时触发，22:00-8:00 安静时段跳过
+2. 节假日优先：命中则覆盖其他检查
+3. 8 项检查返回结构化 dict
+4. 所有 HIT 汇总 → LLM 一次生成自然文案（80 字内）
+5. `proactive_pushes` 表持久化记录
+6. 新闻独立推送，不合并
 
-## 连接问候
-```
-用户打开 App (WebSocket 连接)
-    │
-    ▼
-send_memory_greeting(user_id)
-    │
-    ├── 检查上次问候时间 (> 6 小时?)
-    ├── 读取用户记忆 (最多 8 条)
-    ├── LLM 生成个性化欢迎语
-    └── WebSocket 推送
-    → "你回来啦~ 今天北京天气不错呢 ☀️"
-```
+## 节流设计
 
-## 关键逻辑
-- **单条原则**: 每次检查周期只发一条，避免刷屏
-- **防重复**: 情绪关怀 4h 冷却，问候 6h 冷却
-- **仅在线**: `connection_manager.online_users()` 过滤
+- 数据库表 `proactive_pushes`：user_id + push_type + created_at
+- 2 小时冷却：`SELECT COUNT() WHERE created_at >= NOW() - 2h`
+- 每日上限 3 条：`SELECT COUNT() WHERE created_at >= today`
+- 服务器重启安全：记录在 DB，不依赖内存
+
+## 晨间简报
+
+- 8 点后首次上线触发
+- 查询 `proactive_pushes` 表当日是否已发
+- 内容：天气 + 日程 + 昨日消费 + LLM 鼓励语
+
+## 配置
+
+- 检查间隔：`notification_check_interval * 180` 秒（~3h）
+- 安静时段：22:00 - 8:00
+- 日推送上限：3 条
+- 冷却时间：2 小时
