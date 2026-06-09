@@ -105,6 +105,17 @@ async def email_login(req: EmailLoginRequest, db: AsyncSession = Depends(get_db)
     return LoginResponse(access_token=token, is_new_user=False)
 
 
+@router.delete("/account")
+async def delete_account(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete user account and all associated data."""
+    await db.delete(current_user)
+    await db.commit()
+    return {"status": "deleted"}
+
+
 @router.post("/refresh", response_model=RefreshResponse)
 async def refresh_token(current_user: User = Depends(get_current_user)):
     token = create_access_token({"sub": str(current_user.id)})

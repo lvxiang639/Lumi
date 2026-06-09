@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/character_provider.dart';
 import '../providers/theme_provider.dart';
 import '../screens/summary_page.dart';
+import '../screens/privacy_screen.dart';
 import '../theme/app_colors.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -175,6 +176,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _divider(b),
               _settingItem(Icons.info_outline, '关于灵犀', b, () {
                 _showAboutDialog();
+              }),
+              _divider(b),
+              _settingItem(Icons.privacy_tip_outlined, '隐私政策', b, () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyScreen()));
               }),
             ],
           ),
