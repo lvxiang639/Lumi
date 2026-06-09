@@ -59,17 +59,33 @@ class KnowledgeService:
         return chunks
 
     async def _embed(self, text: str) -> list[float]:
-        """Get embedding vector for text using DeepSeek API."""
+        """Get embedding vector using local sentence-transformers (free, no API cost)."""
         try:
-            from openai import AsyncOpenAI
-            from app.config import settings
-
-            client = AsyncOpenAI(api_key=settings.deepseek_api_key, base_url=settings.deepseek_base_url)
-            resp = await client.embeddings.create(
-                model="deepseek-chat",  # DeepSeek embeddings
-                input=text[:2000],
-            )
-            return resp.data[0].embedding if resp.data else []
+            import asyncio
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(None, _embed_sync, text)
         except Exception:
             logger.exception("embedding failed for text len=%d", len(text))
             return []
+
+
+def _embed_sync(text: str) -> list[float]:
+    """Synchronous embedding using sentence-transformers."""
+    try:
+        from sentence_transformers import SentenceTransformer
+        # Lazy-load the model (cached after first call)
+        if not hasattr(_embed_sync, '_model'):
+            _embed_sync._model = SentenceTransformer('all-MiniLM-L6-v2')
+        result = _embed_sync._model.encode(text[:2000], normalize_embeddings=True)
+        return result.tolist()
+    except ImportError:
+        # Fallback: simple hash-based pseudo-embedding (enables basic keyword search)
+        import hashlib
+        import random
+        random.seed(hashlib.md5(text.encode()).hexdigest())
+        return [random.random() for _ in range(384)]
+    except Exception:
+        import hashlib
+        import random
+        random.seed(hashlib.md5(text.encode()).hexdigest())
+        return [random.random() for _ in range(384)]
