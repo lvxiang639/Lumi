@@ -70,22 +70,22 @@ class KnowledgeService:
 
 
 def _embed_sync(text: str) -> list[float]:
-    """Synchronous embedding using sentence-transformers."""
+    """Synchronous embedding using BGE-M3 (best Chinese + multilingual model)."""
     try:
         from sentence_transformers import SentenceTransformer
-        # Lazy-load the model (cached after first call)
         if not hasattr(_embed_sync, '_model'):
-            _embed_sync._model = SentenceTransformer('all-MiniLM-L6-v2')
-        result = _embed_sync._model.encode(text[:2000], normalize_embeddings=True)
+            _embed_sync._model = SentenceTransformer('BAAI/bge-m3')
+        result = _embed_sync._model.encode(
+            text[:2000],
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
         return result.tolist()
     except ImportError:
-        # Fallback: simple hash-based pseudo-embedding (enables basic keyword search)
-        import hashlib
-        import random
+        import hashlib; import random
         random.seed(hashlib.md5(text.encode()).hexdigest())
-        return [random.random() for _ in range(384)]
+        return [random.random() for _ in range(1024)]
     except Exception:
-        import hashlib
-        import random
+        import hashlib; import random
         random.seed(hashlib.md5(text.encode()).hexdigest())
-        return [random.random() for _ in range(384)]
+        return [random.random() for _ in range(1024)]

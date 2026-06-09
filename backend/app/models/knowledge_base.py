@@ -24,5 +24,5 @@ class KnowledgeChunk(Base):
     kb_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, default=0)
-    embedding: Mapped[list[float]] = mapped_column(ARRAY(Float), nullable=True)
+    embedding: Mapped[list[float]] = mapped_column(ARRAY(Float, dimensions=1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
