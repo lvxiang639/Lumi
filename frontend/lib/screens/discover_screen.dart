@@ -99,9 +99,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   itemCount: provider.items.length,
                   itemBuilder: (ctx, i) {
                     final item = provider.items[i];
-                    // News items get special multi-card rendering
+                    // Special card types
                     if (item.skill == 'news' && item.newsItems.isNotEmpty) {
                       return _newsCard(item, brightness);
+                    }
+                    if (item.skill == 'daily_content' && item.data != null) {
+                      return _dailyContentCard(item, brightness);
                     }
                     return _normalCard(item, brightness);
                   },
@@ -252,6 +255,69 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             );
           }),
         ],
+      ),
+    );
+  }
+
+  Widget _dailyContentCard(DiscoverItem item, Brightness b) {
+    final data = item.data!;
+    final dailyTopic = data['daily_topic'] as Map<String, dynamic>?;
+    final contentCard = data['content_card'] as Map<String, dynamic>?;
+    final hotTrends = data['hot_trends'] as Map<String, dynamic>?;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [const Color(0xFF8B5CF6).withValues(alpha: 0.08), const Color(0xFFEC4899).withValues(alpha: 0.04)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Text('📰', style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 8),
+            const Text('每日精选', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            const Spacer(),
+            GestureDetector(
+              onLongPress: () => _copyText('每日精选\n${dailyTopic?['content'] ?? ''}\n${contentCard?['content'] ?? ''}'),
+              child: Text(_formatTime(item.createdAt), style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
+            ),
+          ]),
+          if (dailyTopic != null && (dailyTopic['content'] as String?)?.isNotEmpty == true) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [
+                const Text('💬', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: 10),
+                Expanded(child: Text(dailyTopic['content'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 14)))),
+              ],
+            )),
+          ],
+          if (contentCard != null && (contentCard['content'] as String?)?.isNotEmpty == true) ...[
+            const SizedBox(height: 10),
+            ...((contentCard['content'] as String? ?? '').split('\n').where((l) => l.trim().isNotEmpty).map((line) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(line.trim(), style: TextStyle(color: AppColors.text(b), fontSize: 13, height: 1.4)),
+            ))),
+          ],
+          if (hotTrends != null) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            Text('🔥 热门资讯', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12, fontWeight: FontWeight.w600)),
+            ...((hotTrends['content'] as List?)?.take(4) ?? []).map((t) => Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(children: [
+                const Text('·', style: TextStyle(fontSize: 16, color: Color(0xFFF97316))),
+                const SizedBox(width: 6),
+                Expanded(child: Text(t['title'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+              ]),
+            )),
+          ],
+        ]),
       ),
     );
   }

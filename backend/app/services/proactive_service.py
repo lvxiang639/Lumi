@@ -62,6 +62,18 @@ NATURAL_PUSH_PROMPT = """你是灵犀，一只关心主人的小猫。根据以�
 
 小猫灵犀:"""
 
+DAILY_TOPIC_PROMPT = """生成一个有趣的每日话题（20字以内），可以引发用户思考和分享。话题要轻松自然，像朋友聊天。不要涉及政治敏感话题。
+例如: "今天最让你开心的一件小事是什么？" "如果明天是世界末日，你会怎么过？" "你最近单曲循环的一首歌是？"
+
+每日话题:"""
+
+CONTENT_CARD_PROMPT = """生成一张每日内容卡片，包含以下三项（每项一行，格式: emoji 标题: 内容）：
+1. 🔮 今日运势: 一句简短有趣的运势（15字以内，随机生成，轻松幽默）
+2. 💡 冷知识: 一个有趣的冷知识（20字以内，要出乎意料）
+3. 🌟 今日一言: 一句正能量名言（20字以内，标注出处）
+
+内容卡片:"""
+
 
 class ProactiveService:
     def __init__(self):
@@ -73,6 +85,7 @@ class ProactiveService:
         while True:
             try:
                 await self._check_all()
+                await push_daily_content()
             except Exception:
                 logger.exception("proactive poll error")
             await asyncio.sleep(self._interval)
@@ -532,6 +545,107 @@ GREETING_PROMPT = """你是一只关心主人的小猫灵犀。根据以下用�
 {memories}
 
 小猫灵犀的欢迎语:"""
+
+
+async def generate_daily_content() -> dict | None:
+    """Generate today's daily content from DB-configured content types. Cached per day."""
+    now = datetime.now(BEIJING_TZ)
+    today_key = now.strftime("%Y-%m-%d")
+    if hasattr(generate_daily_content, '_cache'):
+        cached_date, cached_data = generate_daily_content._cache
+        if cached_date == today_key:
+            return cached_data
+
+    # Load enabled content configs from DB
+    configs = []
+    try:
+        async with async_session() as db:
+            from app.models.daily_content_config import DailyContentConfig
+            r = await db.execute(
+                select(DailyContentConfig).where(DailyContentConfig.enabled == True).order_by(DailyContentConfig.priority)
+            )
+            configs = r.scalars().all()
+    except Exception:
+        logger.exception("failed to load daily content configs")
+
+    result = {}
+    for cfg in configs:
+        try:
+            content = await llm_router.chat([{"role": "user", "content": cfg.prompt}])
+            result[cfg.content_type] = {
+                "display_name": cfg.display_name,
+                "content": (content or "").strip()[:300],
+            }
+        except Exception:
+            result[cfg.content_type] = {"display_name": cfg.display_name, "content": ""}
+
+    # Fallback: hot trends from SearXNG
+    if not configs or "hot_trends" in result:
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    f"{settings.searxng_url}/search",
+                    params={"q": "热搜", "format": "json", "categories": "news"},
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                trends = resp.json().get("results", [])[:5]
+                result["hot_trends"] = {
+                    "display_name": "🔥 热门资讯",
+                    "content": [{"title": t.get("title", ""), "url": t.get("url", "")} for t in trends],
+                }
+        except Exception:
+            pass
+
+    generate_daily_content._cache = (today_key, result)
+    return result
+
+
+async def push_daily_content():
+    """Push daily content to all online users (once per day)."""
+    content = await generate_daily_content()
+    if not content:
+        return
+
+    for uid in online_users():
+        try:
+            payload = {"type": "proactive", "delta": "📰 每日精选", "skill": "daily_content", "data": content}
+            await send_to_user(uid, payload)
+        except Exception:
+            pass
+
+
+async def seed_daily_content_configs():
+    """Insert default daily content configs. Safe to call — uses ON CONFLICT DO NOTHING pattern."""
+    defaults = [
+        ("daily_topic", "💬 每日话题", DAILY_TOPIC_PROMPT, 1),
+        ("content_card", "🌟 今日卡片", CONTENT_CARD_PROMPT, 2),
+    ]
+    try:
+        async with async_session() as db:
+            from app.models.daily_content_config import DailyContentConfig
+            for ctype, name, prompt, prio in defaults:
+                existing = await db.execute(select(DailyContentConfig).where(DailyContentConfig.content_type == ctype))
+                if existing.scalar_one_or_none() is None:
+                    db.add(DailyContentConfig(content_type=ctype, display_name=name, prompt=prompt, priority=prio))
+            await db.commit()
+            logger.info("seeded daily_content_configs defaults")
+    except Exception:
+        logger.exception("seed daily_content_configs failed")
+
+
+DAILY_TOPIC_PROMPT = """生成一个有趣的每日话题（20字以内），可以引发用户思考和分享。话题要轻松自然，像朋友聊天。不要涉及政治敏感话题。
+例如: "今天最让你开心的一件小事是什么？" "如果明天是世界末日，你会怎么过？"
+
+每日话题:"""
+
+CONTENT_CARD_PROMPT = """生成一张每日内容卡片，包含以下三项（每行一项，格式: emoji 标题: 内容）：
+1. 🔮 今日运势: 一句简短有趣的运势（15字以内，随机生成，轻松幽默）
+2. 💡 冷知识: 一个有趣的冷知识（20字以内，要出乎意料）
+3. 🌟 今日一言: 一句正能量名言（20字以内，标注出处）
+
+内容卡片:"""
 
 
 async def send_connect_greeting(user_id: str) -> str | None:
