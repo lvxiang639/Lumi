@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
-import 'pet_cat.dart';
 
 class ChatInputBar extends StatelessWidget {
   final TextEditingController ctrl;
   final bool showField;
   final VoidCallback onToggle, onSend, onFile, onVoice;
   final Brightness brightness;
-  final String emotion;
   final bool listening;
 
   const ChatInputBar({
@@ -15,7 +13,7 @@ class ChatInputBar extends StatelessWidget {
     required this.ctrl, required this.showField,
     required this.onToggle, required this.onSend, required this.onFile,
     required this.onVoice, required this.brightness,
-    this.listening = false, this.emotion = 'calm',
+    this.listening = false,
   });
 
   @override
@@ -78,8 +76,6 @@ class ChatInputBar extends StatelessWidget {
             child: Icon(hasText ? Icons.send_rounded : Icons.add, color: hasText ? Colors.white : AppColors.accent, size: 18),
           ),
         ),
-        const SizedBox(width: 4),
-        petCatResting(isThinking: !hasText, emotion: emotion),
       ]),
     );
   }

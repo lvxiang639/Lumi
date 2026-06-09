@@ -88,28 +88,17 @@ class _MainScreenState extends State<MainScreen> {
             },
           ),
         ),
-        // Pet cat — walks above bottom nav
+        // Walking cat — managed by PetCat internally
         if (!_catCollapsed)
-          Positioned(
-            bottom: kBottomNavigationBarHeight + 4,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: PetCat(
-                position: PetPosition.bottomBar,
-                onTap: () => setState(() => _catCollapsed = true),
-              ),
-            ),
+          PetCat(
+            position: PetPosition.bottomBar,
+            onTap: () => setState(() => _catCollapsed = true),
           ),
-        // Collapsed cat sidebar toggle
+        // Sidebar peeking cat
         if (_catCollapsed)
-          Positioned(
-            right: 0,
-            bottom: kBottomNavigationBarHeight + 40,
-            child: GestureDetector(
-              onTap: () => setState(() => _catCollapsed = false),
-              child: PetCat(position: PetPosition.sidebar),
-            ),
+          PetCat(
+            position: PetPosition.sidebar,
+            onTap: () => setState(() => _catCollapsed = false),
           ),
       ],
     );
