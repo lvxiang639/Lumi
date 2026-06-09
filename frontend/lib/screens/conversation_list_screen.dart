@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../providers/conversation_provider.dart';
 import '../theme/app_colors.dart';
+import '../services/routes.dart';
 import 'chat_screen.dart';
 
 class ConversationListScreen extends StatefulWidget {
@@ -55,15 +56,11 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
   }
 
   void _newConversation() {
-    Navigator.push(context,
-      MaterialPageRoute(builder: (_) => const ChatScreen()),
-    ).then((_) => _refresh());
+    Navigator.push(context, slideRoute(const ChatScreen())).then((_) => _refresh());
   }
 
   void _openConversation(String convId) {
-    Navigator.push(context,
-      MaterialPageRoute(builder: (_) => ChatScreen(conversationId: convId)),
-    ).then((_) => _refresh());
+    Navigator.push(context, slideRoute(ChatScreen(conversationId: convId))).then((_) => _refresh());
   }
 
   String _formatRelativeTime(DateTime dt) {

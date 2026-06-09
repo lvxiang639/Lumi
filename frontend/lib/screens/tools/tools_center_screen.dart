@@ -7,6 +7,7 @@ import '../email_page.dart';
 import '../file_page.dart';
 import '../summary_page.dart';
 import '../countdown_page.dart';
+import '../../services/routes.dart';
 import '../../theme/app_colors.dart';
 
 class ToolsCenterScreen extends StatelessWidget {
@@ -54,7 +55,7 @@ class ToolsCenterScreen extends StatelessWidget {
       default:
         return;
     }
-    Navigator.push(ctx, MaterialPageRoute(builder: (_) => page));
+    Navigator.push(ctx, slideRoute(page));
   }
 
   @override

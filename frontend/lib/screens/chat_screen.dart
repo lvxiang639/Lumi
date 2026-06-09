@@ -21,6 +21,16 @@ import '../widgets/chat_input_bar.dart';
 import '../services/logger.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+// iOS-style slide transition
+Route _slideRoute(Widget page) {
+  return PageRouteBuilder(
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (_, __, ___) => page,
+    transitionsBuilder: (_, anim, __, child) =>
+        SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)), child: child),
+  );
+}
+
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
   final String? conversationTitle;
