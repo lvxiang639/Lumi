@@ -12,10 +12,7 @@ class PetCat extends StatefulWidget {
 }
 
 class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
-  late AnimationController _walkCtrl;
-  late AnimationController _legCtrl;
-  late AnimationController _tailCtrl;
-  late AnimationController _blinkCtrl;
+  late AnimationController _walkCtrl, _legCtrl, _tailCtrl, _blinkCtrl;
   bool _started = false;
   double _screenW = 400, _walkX = 0;
   bool _movingRight = true;
@@ -32,14 +29,13 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
     _walkCtrl.addStatusListener((s) {
       if ((s == AnimationStatus.completed || s == AnimationStatus.dismissed) && mounted) {
         _stepCount++;
-        if (_stepCount > 2 + Random().nextInt(2)) {
+        if (_stepCount > 2 + Random().nextInt(3)) {
           _stepCount = 0;
           Future.delayed(Duration(seconds: 2 + Random().nextInt(2)), () {
             if (mounted) { _movingRight = !_movingRight; _startWalking(); }
           });
         } else {
-          _movingRight = !_movingRight;
-          _startWalking();
+          _movingRight = !_movingRight; _startWalking();
         }
       }
     });
@@ -80,8 +76,8 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
       animation: Listenable.merge([_walkCtrl, _legCtrl, _tailCtrl, _blinkCtrl]),
       builder: (_, __) {
         _walkX = _movingRight ? lerpD(_walkX, _screenW - 40, _walkCtrl.value) : lerpD(_walkX, 40, _walkCtrl.value);
-        final legPhase = _legCtrl.value * 2 * pi;
-        final tailPhase = _tailCtrl.value * 2 * pi;
+        final lp = _legCtrl.value * 2 * pi;
+        final tp = _tailCtrl.value * 2 * pi;
         final blink = _blinkCtrl.value;
         final bob = sin(_walkCtrl.value * pi * 6) * 2;
 
@@ -96,7 +92,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
                   flipX: !_movingRight,
                   child: CustomPaint(
                     size: const Size(56, 50),
-                    painter: _CatPainter(legPhase: legPhase, tailPhase: tailPhase, blink: blink),
+                    painter: _CatPainter(legPhase: lp, tailPhase: tp, blink: blink),
                   ),
                 ),
               ),
@@ -105,8 +101,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
                   final angle = -pi / 2 + (i - 2) * 0.35;
                   final dist = 18.0 + i * 7;
                   return Positioned(
-                    top: 8 + sin(angle) * dist,
-                    left: 24 + cos(angle) * dist,
+                    top: 8 + sin(angle) * dist, left: 24 + cos(angle) * dist,
                     child: TweenAnimationBuilder<double>(
                       tween: Tween(begin: 1.0, end: 0.0),
                       duration: const Duration(milliseconds: 400),
@@ -135,8 +130,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
   );
 }
 
-// ── Geometric Cat Painter (pure code, no SVG, clean minimal style) ──
-
+// ── Geometric Cat Painter ──
 class _CatPainter extends CustomPainter {
   final double legPhase, tailPhase, blink;
   _CatPainter({required this.legPhase, required this.tailPhase, required this.blink});
@@ -149,76 +143,60 @@ class _CatPainter extends CustomPainter {
     final stroke = Paint()..color = const Color(0xFFE8962E)..style = PaintingStyle.stroke..strokeWidth = 1.2;
     final white = Paint()..color = Colors.white;
     final dark = Paint()..color = const Color(0xFF4A3520);
-    final pink = Paint()..color = const Color(0xFFF8BBD0);
 
-    // ── Tail ──
-    final tailPath = Path();
-    tailPath.moveTo(cx - 12, cy + 6);
-    tailPath.cubicTo(cx - 22, cy + 4 + sin(tailPhase) * 6, cx - 28, cy - 2 + sin(tailPhase) * 8, cx - 26, cy - 12 + sin(tailPhase) * 4);
-    canvas.drawPath(tailPath, body..style = PaintingStyle.fill);
-    canvas.drawPath(tailPath, stroke);
+    // Tail
+    final tp = Path()..moveTo(cx - 12, cy + 6);
+    tp.cubicTo(cx - 22, cy + 4 + sin(tailPhase) * 6, cx - 28, cy - 2 + sin(tailPhase) * 8, cx - 26, cy - 12 + sin(tailPhase) * 4);
+    canvas.drawPath(tp, body); canvas.drawPath(tp, stroke);
 
-    // ── Back legs ──
+    // Back legs
     _leg(canvas, cx - 6, cy + 7, 10, sin(legPhase + pi) * 2.5, body, stroke, white);
     _leg(canvas, cx + 6, cy + 7, 9, sin(legPhase) * 2.5, body, stroke, white);
 
-    // ── Body ──
-    final bodyRect = RRect.fromLTRBR(cx - 14, cy - 5, cx + 14, cy + 8, const Radius.circular(10));
-    canvas.drawRRect(bodyRect, body);
-    canvas.drawRRect(bodyRect, stroke);
+    // Body
+    final br = RRect.fromLTRBR(cx - 14, cy - 5, cx + 14, cy + 8, const Radius.circular(10));
+    canvas.drawRRect(br, body); canvas.drawRRect(br, stroke);
     canvas.drawOval(Rect.fromCenter(center: Offset(cx, cy + 2), width: 18, height: 10), white..color = Colors.white.withValues(alpha: 0.5));
 
-    // ── Front legs ──
+    // Front legs
     _leg(canvas, cx - 4, cy + 6, 8, sin(legPhase + pi * 0.5) * 2.5, body, stroke, white);
     _leg(canvas, cx + 8, cy + 6, 7, sin(legPhase + pi * 1.5) * 2.5, body, stroke, white);
 
-    // ── Head ──
-    final headCy = cy - 14;
-    canvas.drawCircle(Offset(cx + 4, headCy), 14, body);
-    canvas.drawCircle(Offset(cx + 4, headCy), 14, stroke);
+    // Head
+    final hc = cy - 14;
+    canvas.drawCircle(Offset(cx + 4, hc), 14, body); canvas.drawCircle(Offset(cx + 4, hc), 14, stroke);
+    _ear(canvas, cx - 2, hc - 11, -1, body, stroke);
+    _ear(canvas, cx + 10, hc - 10, 1, body, stroke);
+    canvas.drawOval(Rect.fromCenter(center: Offset(cx + 4, hc + 2), width: 16, height: 12), white..color = Colors.white.withValues(alpha: 0.3));
 
-    // ── Ears ──
-    _ear(canvas, cx - 2, headCy - 11, -1, body, stroke, pink);
-    _ear(canvas, cx + 10, headCy - 10, 1, body, stroke, pink);
+    // Eyes
+    final eh = 5.0 * (blink < 0.05 ? 0.2 : 1.0);
+    canvas.drawOval(Rect.fromCenter(center: Offset(cx, hc - 2), width: 4, height: eh), dark);
+    canvas.drawOval(Rect.fromCenter(center: Offset(cx + 8, hc - 2), width: 4, height: eh), dark);
+    canvas.drawCircle(Offset(cx - 0.5, hc - 3), 1.2, white);
+    canvas.drawCircle(Offset(cx + 7.5, hc - 3), 1.2, white);
 
-    // ── Face patch ──
-    canvas.drawOval(Rect.fromCenter(center: Offset(cx + 4, headCy + 2), width: 16, height: 12), white..color = Colors.white.withValues(alpha: 0.3));
+    // Blush
+    final blush = Paint()..color = const Color(0xFFFFCDD2).withValues(alpha: 0.5);
+    canvas.drawCircle(Offset(cx - 2, hc + 4), 5, blush);
+    canvas.drawCircle(Offset(cx + 10, hc + 4), 5, blush);
 
-    // ── Eyes (blinking) ──
-    final eyeH = 5.0 * (blink < 0.05 ? 0.2 : 1.0);
-    canvas.drawOval(Rect.fromCenter(center: Offset(cx, headCy - 2), width: 4, height: eyeH), dark);
-    canvas.drawOval(Rect.fromCenter(center: Offset(cx + 8, headCy - 2), width: 4, height: eyeH), dark);
-    canvas.drawCircle(Offset(cx - 0.5, headCy - 3), 1.2, white);
-    canvas.drawCircle(Offset(cx + 7.5, headCy - 3), 1.2, white);
-
-    // ── Blush ──
-    canvas.drawCircle(Offset(cx - 2, headCy + 4), 5, pink..color = const Color(0xFFFFCDD2).withValues(alpha: 0.5));
-    canvas.drawCircle(Offset(cx + 10, headCy + 4), 5, pink..color = const Color(0xFFFFCDD2).withValues(alpha: 0.5));
-
-    // ── Nose + Mouth ──
-    canvas.drawCircle(Offset(cx + 4, headCy + 2), 1.2, Paint()..color = const Color(0xFFFF6B8A));
-    final mouth = Path();
-    mouth.moveTo(cx + 4, headCy + 3);
-    mouth.lineTo(cx + 2, headCy + 5);
-    mouth.moveTo(cx + 4, headCy + 3);
-    mouth.lineTo(cx + 6, headCy + 5);
-    canvas.drawPath(mouth, stroke..strokeWidth = 0.8);
+    // Nose + mouth
+    canvas.drawCircle(Offset(cx + 4, hc + 2), 1.2, Paint()..color = const Color(0xFFFF6B8A));
+    final mp = Path()..moveTo(cx + 4, hc + 3)..lineTo(cx + 2, hc + 5); mp.moveTo(cx + 4, hc + 3); mp.lineTo(cx + 6, hc + 5);
+    canvas.drawPath(mp, stroke..strokeWidth = 0.8);
   }
 
   void _leg(Canvas c, double x, double y, double h, double swing, Paint body, Paint stroke, Paint paw) {
-    c.drawRRect(RRect.fromLTRBR(x, y + swing, x + 3, y + h, const Radius.circular(2)), body);
-    c.drawRRect(RRect.fromLTRBR(x, y + swing, x + 3, y + h, const Radius.circular(2)), stroke);
+    c.drawRRect(RRect.fromLTRBR(x, y + swing, x + 3, y + h, Radius.zero), body);
+    c.drawRRect(RRect.fromLTRBR(x, y + swing, x + 3, y + h, Radius.zero), stroke);
     c.drawCircle(Offset(x + 1.5, y + h + swing * 0.3), 2.5, paw);
   }
 
-  void _ear(Canvas c, double x, double y, int dir, Paint body, Paint stroke, Paint pink) {
-    final path = Path();
-    path.moveTo(x, y + 6);
-    path.lineTo(x - 4 * dir, y - 8);
-    path.lineTo(x + 2 * dir, y + 4);
-    c.drawPath(path, body);
-    c.drawPath(path, stroke);
-    c.drawCircle(Offset(x - 2 * dir, y - 4), 3, pink);
+  void _ear(Canvas c, double x, double y, int dir, Paint body, Paint stroke) {
+    final ep = Path()..moveTo(x, y + 6)..lineTo(x - 4 * dir, y - 8)..lineTo(x + 2 * dir, y + 4);
+    c.drawPath(ep, body); c.drawPath(ep, stroke);
+    c.drawCircle(Offset(x - 2 * dir, y - 4), 3, Paint()..color = const Color(0xFFF8BBD0));
   }
 
   @override
