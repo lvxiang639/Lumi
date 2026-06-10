@@ -116,9 +116,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   Widget _normalCard(DiscoverItem item, Brightness b) {
     final color = _skillColor(item.skill);
-    return GestureDetector(
-      onLongPress: () => _copyText(item.text),
-      child: Container(
+    return Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
@@ -145,6 +143,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   Text(_skillLabel(item.skill),
                       style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
                   const Spacer(),
+                  GestureDetector(
+                    onTap: () => _copyText(item.text),
+                    child: Icon(Icons.copy, size: 14, color: AppColors.textSecondary(b).withValues(alpha: 0.4)),
+                  ),
+                  const SizedBox(width: 4),
                   Text(_formatTime(item.createdAt),
                       style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
                 ]),
@@ -155,8 +158,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ),
           ),
         ],
-      ),
-    ),
     );
   }
 
