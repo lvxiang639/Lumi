@@ -597,6 +597,34 @@ GREETING_PROMPT = """你是一只关心主人的小猫灵犀。根据以下用�
 小猫灵犀的欢迎语:"""
 
 
+def _clean_llm_content(text: str) -> str:
+    """Clean LLM output: remove English-only lines, meta-responses, and garbage."""
+    import re
+    lines = text.strip().split('\n')
+    cleaned = []
+    english_pattern = re.compile(r'^[A-Za-z][A-Za-z\s\.,!?;:\-\'"]+$')
+    garbage_starts = (
+        'It looks like', 'I apologize', "I'm sorry", 'As an AI',
+        'Sorry', 'Sure', 'Certainly', 'Here', 'Feel free',
+        'How can I', 'Let me', 'I can', 'You can',
+    )
+    for line in lines:
+        t = line.strip()
+        if not t:
+            continue
+        # Skip pure English lines
+        if english_pattern.match(t):
+            continue
+        # Skip LLM meta-responses
+        if any(t.startswith(g) for g in garbage_starts):
+            continue
+        # Skip raw JSON/URL dumps
+        if t.startswith('[{') or t.startswith('http'):
+            continue
+        cleaned.append(t)
+    return '\n'.join(cleaned).strip()
+
+
 async def generate_daily_content() -> dict | None:
     """Generate today's daily content from DB-configured content types. Cached per day."""
     now = datetime.now(BEIJING_TZ)
@@ -622,9 +650,10 @@ async def generate_daily_content() -> dict | None:
     for cfg in configs:
         try:
             content = await llm_router.chat([{"role": "user", "content": cfg.prompt}])
+            cleaned = _clean_llm_content(content or "")
             result[cfg.content_type] = {
                 "display_name": cfg.display_name,
-                "content": (content or "").strip()[:300],
+                "content": cleaned[:300] if cleaned else "",
             }
         except Exception:
             result[cfg.content_type] = {"display_name": cfg.display_name, "content": ""}
