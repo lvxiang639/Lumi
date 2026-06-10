@@ -158,9 +158,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ),
           ),
         ],
-    );
+        ],
       ),
-  }
+    );
 
   Widget _newsCard(DiscoverItem item, Brightness b) {
     final newsItems = item.newsItems;
