@@ -263,17 +263,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   Widget _dailyContentCard(DiscoverItem item, Brightness b) {
     final data = item.data!;
-    String extractText(dynamic value) {
-      if (value is Map) return (value['content'] ?? '').toString();
-      return value.toString();
-    }
-
-    final parts = <String, String>{};
-    for (final key in data.keys) {
-      final val = data[key];
+    // Collect text content from all keys (String only, skip Lists/JSON dumps)
+    final texts = <String>[];
+    for (final val in data.values) {
       if (val is Map) {
-        final text = (val['content'] ?? '').toString();
-        if (text.isNotEmpty && text != 'null') parts[key] = text;
+        final c = val['content'];
+        if (c is String && c.isNotEmpty && !c.startsWith('[{')) {
+          texts.add(c);
+        }
+      } else if (val is String && val.isNotEmpty && !val.startsWith('[{')) {
+        texts.add(val);
       }
     }
 
@@ -292,19 +291,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             const Text('每日精选', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             const Spacer(),
             GestureDetector(
-              onTap: () => _copyText(parts.values.join('\n')),
+              onTap: () => _copyText(texts.join('\n')),
               child: Icon(Icons.copy, size: 14, color: AppColors.textSecondary(b).withValues(alpha: 0.5)),
             ),
             const SizedBox(width: 6),
             Text(_formatTime(item.createdAt), style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
           ]),
-          if (parts.isEmpty)
+          if (texts.isEmpty)
             const Padding(padding: EdgeInsets.only(top: 12), child: Text('内容加载中...', style: TextStyle(color: Colors.grey, fontSize: 13)))
           else ...[
             const SizedBox(height: 10),
-            ...parts.entries.map((e) => Padding(
+            ...texts.map((t) => Padding(
               padding: const EdgeInsets.only(bottom: 6),
-              child: Text(e.value, style: TextStyle(color: AppColors.text(b), fontSize: 13, height: 1.5)),
+              child: Text(t, style: TextStyle(color: AppColors.text(b), fontSize: 13, height: 1.5)),
             )),
           ],
         ]),
