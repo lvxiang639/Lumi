@@ -272,7 +272,7 @@ class ProactiveService:
         if data: payload["data"] = data
         await send_to_user(user_id, payload)
 
-        # Persist to DB for cross-restart throttle
+        # Persist to DB — frontend polls /api/push/poll every 15min for missed pushes
         from uuid import UUID
         from app.models.proactive_push import ProactivePush
         async with async_session() as db:

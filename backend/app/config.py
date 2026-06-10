@@ -7,6 +7,11 @@ class Settings(BaseSettings):
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
     minio_bucket: str = "lingxi"
+    # Push notifications (empty = disabled, fcm/jpush/apns)
+    push_provider: str = ""
+    fcm_server_key: str = ""
+    jpush_app_key: str = ""
+    jpush_master_secret: str = ""
     jwt_secret: str = "dev-secret-change-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 days in minutes (10080)

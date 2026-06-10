@@ -261,9 +261,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   Widget _dailyContentCard(DiscoverItem item, Brightness b) {
     final data = item.data!;
-    final dailyTopic = data['daily_topic'] as Map<String, dynamic>?;
-    final contentCard = data['content_card'] as Map<String, dynamic>?;
-    final hotTrends = data['hot_trends'] as Map<String, dynamic>?;
+    String extractText(dynamic value) {
+      if (value is Map) return (value['content'] ?? '').toString();
+      return value.toString();
+    }
+
+    final parts = <String, String>{};
+    for (final key in data.keys) {
+      final val = data[key];
+      if (val is Map) {
+        final text = (val['content'] ?? '').toString();
+        if (text.isNotEmpty && text != 'null') parts[key] = text;
+      }
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -280,41 +290,17 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             const Text('每日精选', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             const Spacer(),
             GestureDetector(
-              onLongPress: () => _copyText('每日精选\n${dailyTopic?['content'] ?? ''}\n${contentCard?['content'] ?? ''}'),
+              onLongPress: () => _copyText(parts.values.join('\n')),
               child: Text(_formatTime(item.createdAt), style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
             ),
           ]),
-          if (dailyTopic != null && (dailyTopic['content'] as String?)?.isNotEmpty == true) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
-              child: Row(children: [
-                const Text('💬', style: TextStyle(fontSize: 22)),
-                const SizedBox(width: 10),
-                Expanded(child: Text(dailyTopic['content'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 14))),
-              ]),
-            ),
-          ],
-          if (contentCard != null && (contentCard['content'] as String?)?.isNotEmpty == true) ...[
+          if (parts.isEmpty)
+            const Padding(padding: EdgeInsets.only(top: 12), child: Text('内容加载中...', style: TextStyle(color: Colors.grey, fontSize: 13)))
+          else ...[
             const SizedBox(height: 10),
-            ...((contentCard['content'] as String? ?? '').split('\n').where((l) => l.trim().isNotEmpty).map((line) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(line.trim(), style: TextStyle(color: AppColors.text(b), fontSize: 13, height: 1.4)),
-            ))),
-          ],
-          if (hotTrends != null) ...[
-            const SizedBox(height: 10),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
-            Text('🔥 热门资讯', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12, fontWeight: FontWeight.w600)),
-            ...((hotTrends['content'] as List?)?.take(4) ?? []).map((t) => Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Row(children: [
-                const Text('·', style: TextStyle(fontSize: 16, color: Color(0xFFF97316))),
-                const SizedBox(width: 6),
-                Expanded(child: Text(t['title'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
-              ]),
+            ...parts.entries.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(e.value, style: TextStyle(color: AppColors.text(b), fontSize: 13, height: 1.5)),
             )),
           ],
         ]),

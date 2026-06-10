@@ -21,18 +21,27 @@ class CharacterProvider extends ChangeNotifier {
   }
 
   Future<void> loadConfig() async {
+    if (_loading) return;
     _loading = true;
     notifyListeners();
     try {
-      final configData = await _api.get('/api/characters/config');
+      final configData = await _api.get('/api/characters/config').timeout(const Duration(seconds: 5));
       _config = CharacterConfig.fromJson(configData);
-      final outfitsData = await _api.get('/api/characters/outfits');
-      _outfits =
-          (outfitsData['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final voicesData = await _api.get('/api/characters/voices');
-      _voices =
-          (voicesData['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    } catch (_) {}
+    } catch (_) {
+      _config = null;
+    }
+    try {
+      final outfitsData = await _api.get('/api/characters/outfits').timeout(const Duration(seconds: 5));
+      _outfits = (outfitsData['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    } catch (_) {
+      _outfits = [];
+    }
+    try {
+      final voicesData = await _api.get('/api/characters/voices').timeout(const Duration(seconds: 5));
+      _voices = (voicesData['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    } catch (_) {
+      _voices = [];
+    }
     _loading = false;
     notifyListeners();
   }

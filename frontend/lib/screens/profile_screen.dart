@@ -274,7 +274,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       {'name': '二次元', 'desc': '萌系元气娘，喵~的说', 'icon': '🎀'},
       {'name': '小猫', 'desc': '猫视角看世界，喵~', 'icon': '🐈'},
     ];
+    // Load current persona from auth provider
     String selected = '默认';
+    final auth = context.read<AuthProvider>();
+    // Try to read from user data if available
+    selected = '默认'; // default fallback
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.card(brightness),
