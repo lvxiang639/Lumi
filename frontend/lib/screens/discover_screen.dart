@@ -292,9 +292,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             const Text('每日精选', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             const Spacer(),
             GestureDetector(
-              onLongPress: () => _copyText(parts.values.join('\n')),
-              child: Text(_formatTime(item.createdAt), style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
+              onTap: () => _copyText(parts.values.join('\n')),
+              child: Icon(Icons.copy, size: 14, color: AppColors.textSecondary(b).withValues(alpha: 0.5)),
             ),
+            const SizedBox(width: 6),
+            Text(_formatTime(item.createdAt), style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
           ]),
           if (parts.isEmpty)
             const Padding(padding: EdgeInsets.only(top: 12), child: Text('内容加载中...', style: TextStyle(color: Colors.grey, fontSize: 13)))
