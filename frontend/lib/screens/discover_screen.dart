@@ -117,13 +117,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Widget _normalCard(DiscoverItem item, Brightness b) {
     final color = _skillColor(item.skill);
     return Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.card(b),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card(b),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
@@ -158,9 +158,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ),
           ),
         ],
-        ],
       ),
     );
+  }
 
   Widget _newsCard(DiscoverItem item, Brightness b) {
     final newsItems = item.newsItems;
