@@ -263,22 +263,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   Widget _dailyContentCard(DiscoverItem item, Brightness b) {
     final data = item.data!;
-    // Collect text content — String only, skip Lists/JSON dumps and pure-English lines
+    // Collect text content from all keys (String only, skip Lists/JSON dumps)
+    // Content is already cleaned by backend — just display as-is
     final texts = <String>[];
-    final englishRegex = RegExp(r'^[A-Za-z].*[a-z].*$');
     for (final val in data.values) {
       if (val is Map) {
         final c = val['content'];
-        if (c is String && c.isNotEmpty && !c.startsWith('[{')) {
-          // Split multi-line content and filter English-only lines
-          final filtered = c.split('\n').where((line) {
-            final t = line.trim();
-            return t.isNotEmpty && !t.startsWith('[{') && !englishRegex.hasMatch(t);
-          }).join('\n');
-          if (filtered.isNotEmpty) texts.add(filtered);
-        }
-      } else if (val is String && val.isNotEmpty && !val.startsWith('[{')) {
-        if (!englishRegex.hasMatch(val)) texts.add(val);
+        if (c is String && c.isNotEmpty) texts.add(c);
+      } else if (val is String && val.isNotEmpty) {
+        texts.add(val);
       }
     }
 
