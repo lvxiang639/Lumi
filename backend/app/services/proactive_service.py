@@ -218,6 +218,10 @@ class ProactiveService:
                 if topics: lines.append(f"最近关注:{','.join(topics[:3])}")
             elif t == "holiday":
                 lines.append(f"今天是{c.get('name', '')}🎉")
+            elif t == "book_recommend":
+                lines.append(f"📚 书籍推荐")
+            elif t == "countdown":
+                lines.append(f"倒数日:{c.get('title', '')}{c.get('label', '')}")
         if not lines:
             return None
         time_str = now.strftime("%H:%M")
@@ -649,15 +653,40 @@ async def generate_daily_content() -> dict | None:
 
 
 async def push_daily_content():
-    """Push daily content to all online users (once per day)."""
+    """Push daily content to online users who haven't received it today."""
     content = await generate_daily_content()
     if not content:
         return
 
+    now = datetime.now(BEIJING_TZ)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
     for uid in online_users():
+        # Check if already pushed today
+        try:
+            from uuid import UUID
+            from app.models.proactive_push import ProactivePush
+            from app.database import async_session
+            async with async_session() as db:
+                r = await db.execute(
+                    select(func.count(ProactivePush.id)).where(
+                        ProactivePush.user_id == UUID(uid),
+                        ProactivePush.push_type == "daily_content",
+                        ProactivePush.created_at >= today_start,
+                    )
+                )
+                if (r.scalar() or 0) > 0:
+                    continue
+        except Exception:
+            pass
+
         try:
             payload = {"type": "proactive", "delta": "📰 每日精选", "skill": "daily_content", "data": content}
             await send_to_user(uid, payload)
+            # Record push in DB
+            async with async_session() as db:
+                db.add(ProactivePush(user_id=UUID(uid), push_type="daily_content", message_preview="每日精选"))
+                await db.commit()
         except Exception:
             pass
 

@@ -68,7 +68,10 @@ async def browse_table(
         raise HTTPException(400, f"Table not allowed: {table_name}")
 
     offset = (page - 1) * limit
-    r = await db.execute(text(f"SELECT * FROM {table_name} ORDER BY created_at DESC NULLS LAST LIMIT {limit} OFFSET {offset}"))
+    try:
+        r = await db.execute(text(f"SELECT * FROM {table_name} ORDER BY created_at DESC NULLS LAST LIMIT {limit} OFFSET {offset}"))
+    except Exception:
+        r = await db.execute(text(f"SELECT * FROM {table_name} LIMIT {limit} OFFSET {offset}"))
     columns = list(r.keys())
     rows = []
     for row in r.fetchall():
