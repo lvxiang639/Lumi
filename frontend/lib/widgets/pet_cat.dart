@@ -124,7 +124,7 @@ class _PetCatState extends State<PetCat> with TickerProviderStateMixin {
         } else if (_behavior == CatBehavior.stretching) {
           svg = _stretchFrame;
         } else {
-          svg = _walkFrames[frameIdx < 4 ? (frameIdx % 4) : (3 - frameIdx % 4)];
+          svg = _walkFrames[frameIdx % 3];
         }
 
         return Positioned(
