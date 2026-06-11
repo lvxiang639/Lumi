@@ -6,7 +6,6 @@ import '../theme/app_colors.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
-
   @override
   State<DiscoverScreen> createState() => _DiscoverScreenState();
 }
@@ -21,291 +20,223 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   String _formatTime(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
+    final now = DateTime.now(); final diff = now.difference(dt);
     if (diff.inMinutes < 1) return '刚刚';
     if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
     if (diff.inHours < 24) return '${diff.inHours}小时前';
+    if (diff.inDays < 7) return '${diff.inDays}天前';
     return '${dt.month}/${dt.day}';
   }
 
   String _skillLabel(String? skill) {
     switch (skill) {
-      case 'greeting': return '欢迎语';
+      case 'greeting': return '灵犀问候';
       case 'weather': return '天气提醒';
       case 'calendar': return '日程提醒';
       case 'expense': return '记账提醒';
       case 'memory': return '记忆话题';
       case 'emotion': return '情绪关怀';
+      case 'morning_briefing': return '晨间简报';
+      case 'daily_content': return '每日精选';
+      case 'news': return '本地资讯';
       default: return '灵犀';
     }
   }
 
-  Color _skillColor(String? skill) {
+  String _skillIcon(String? skill) {
     switch (skill) {
-      case 'greeting': return const Color(0xFF10B981);
-      case 'weather': return const Color(0xFF3B82F6);
-      case 'calendar': return const Color(0xFFF59E0B);
-      case 'expense': return const Color(0xFFF97316);
-      case 'memory': return const Color(0xFF8B5CF6);
-      case 'emotion': return const Color(0xFFEC4899);
-      default: return AppColors.accent;
-    }
-  }
-
-  IconData _skillIcon(String? skill) {
-    switch (skill) {
-      case 'greeting': return Icons.waving_hand_outlined;
-      case 'weather': return Icons.wb_sunny_outlined;
-      case 'calendar': return Icons.calendar_month_outlined;
-      case 'expense': return Icons.account_balance_wallet_outlined;
-      case 'memory': return Icons.psychology_outlined;
-      case 'emotion': return Icons.favorite_outline;
-      default: return Icons.notifications_outlined;
+      case 'greeting': return '🐱';
+      case 'weather': return '☀️';
+      case 'calendar': return '📅';
+      case 'expense': return '💰';
+      case 'memory': return '🧠';
+      case 'emotion': return '💭';
+      case 'morning_briefing': return '🌅';
+      case 'daily_content': return '📰';
+      case 'news': return '📰';
+      default: return '🦏';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
-
     return Consumer<DiscoverProvider>(
       builder: (ctx, provider, _) {
         return Scaffold(
           backgroundColor: AppColors.bg(brightness),
           appBar: AppBar(
-            title: Row(
-              children: [
-                const Text('发现'),
-                if (provider.unreadCount > 0) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.danger,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text('${provider.unreadCount}',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
-                  ),
-                ],
+            title: Row(children: [
+              const Text('发现'),
+              if (provider.unreadCount > 0) ...[const SizedBox(width: 6),
+                Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: AppColors.danger, borderRadius: BorderRadius.circular(10)),
+                  child: Text('${provider.unreadCount}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600))),
               ],
-            ),
+            ]),
           ),
           body: provider.items.isEmpty
               ? _emptyState(brightness)
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: provider.items.length,
-                  itemBuilder: (ctx, i) {
-                    final item = provider.items[i];
-                    // Special card types
-                    if (item.skill == 'news' && item.newsItems.isNotEmpty) {
-                      return _newsCard(item, brightness);
-                    }
-                    if (item.skill == 'daily_content' && item.data != null) {
-                      return _dailyContentCard(item, brightness);
-                    }
-                    return _normalCard(item, brightness);
-                  },
+              : RefreshIndicator(
+                  onRefresh: () async {},
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(0, 8, 0, 80),
+                    itemCount: provider.items.length,
+                    itemBuilder: (ctx, i) => _momentsCard(provider.items[i], brightness),
+                  ),
                 ),
         );
       },
     );
   }
 
-  Widget _normalCard(DiscoverItem item, Brightness b) {
-    final color = _skillColor(item.skill);
+  // ── WeChat Moments-style card ──
+
+  Widget _momentsCard(DiscoverItem item, Brightness b) {
+    final isDailyContent = item.skill == 'daily_content';
+    final isNews = item.skill == 'news';
+
+    if (isDailyContent && item.data != null) return _dailyContentCard(item, b);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.card(b),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
+      margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+      color: AppColors.card(b),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // ── Header: avatar + name + time ──
+          Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFB347).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(child: Text(_skillIcon(item.skill), style: const TextStyle(fontSize: 22))),
             ),
-            child: Icon(_skillIcon(item.skill), color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Text(_skillLabel(item.skill),
-                      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => _copyText(item.text),
-                    child: Icon(Icons.copy, size: 14, color: AppColors.textSecondary(b).withValues(alpha: 0.4)),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(_formatTime(item.createdAt),
-                      style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_skillLabel(item.skill), style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 1),
+              Text(_formatTime(item.createdAt), style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.6), fontSize: 11)),
+            ])),
+          ]),
+          const SizedBox(height: 10),
+          // ── Body: content ──
+          Text(item.text, style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.6)),
+          // ── News links ──
+          if (isNews && item.newsItems.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: b == Brightness.light ? const Color(0xFFF8F9FA) : const Color(0xFF1A1D21), borderRadius: BorderRadius.circular(8)),
+              child: Column(children: item.newsItems.take(3).map((n) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(children: [
+                  const Text('·', style: TextStyle(fontSize: 16, color: Color(0xFFF97316))),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(n['title'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
                 ]),
-                const SizedBox(height: 4),
-                Text(item.text,
-                    style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.5)),
-                _actionButtons(item, b),
-              ],
+              )).toList()),
             ),
-          ),
-        ],
+          ],
+          const SizedBox(height: 8),
+          // ── Divider ──
+          Divider(height: 1, color: AppColors.border(b).withValues(alpha: 0.5)),
+          // ── Footer: actions ──
+          _actionBar(item, b),
+        ]),
       ),
     );
   }
 
-  Widget _newsCard(DiscoverItem item, Brightness b) {
-    final newsItems = item.newsItems;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.card(b),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-            child: Row(children: [
-              Container(
-                width: 32, height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF97316).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.newspaper, color: Color(0xFFF97316), size: 18),
-              ),
-              const SizedBox(width: 10),
-              const Text('📰 本地资讯',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              const Spacer(),
-              Text(_formatTime(item.createdAt),
-                  style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
-            ]),
-          ),
-          const Divider(height: 1),
-          // News items
-          ...newsItems.asMap().entries.map((e) {
-            final n = e.value;
-            final title = n['title'] as String? ?? '';
-            final summary = n['summary'] as String? ?? '';
-            final link = n['link'] as String? ?? '';
-            final isLast = e.key == newsItems.length - 1;
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title,
-                          style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w600)),
-                      if (summary.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(summary,
-                            style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12, height: 1.4),
-                            maxLines: 3, overflow: TextOverflow.ellipsis),
-                      ],
-                      const SizedBox(height: 6),
-                      Row(children: [
-                        GestureDetector(
-                          onTap: () => _copyText('$title\n$summary\n$link'),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.accent.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              Icon(Icons.copy, size: 12, color: AppColors.accent),
-                              const SizedBox(width: 4),
-                              Text('复制', style: TextStyle(color: AppColors.accent, fontSize: 11)),
-                            ]),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () => _openLink(link),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3B82F6).withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              Icon(Icons.open_in_new, size: 12, color: const Color(0xFF3B82F6)),
-                              const SizedBox(width: 4),
-                              const Text('打开', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 11)),
-                            ]),
-                          ),
-                        ),
-                      ]),
-                    ],
-                  ),
-                ),
-                if (!isLast) const Divider(height: 1, indent: 14, endIndent: 14),
-              ],
-            );
-          }),
-        ],
-      ),
+  // ── Action bar (WeChat style) ──
+
+  Widget _actionBar(DiscoverItem item, Brightness b) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(children: [
+        GestureDetector(
+          onTap: () => context.read<DiscoverProvider>().toggleLike(item.id),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(item.liked ? Icons.favorite : Icons.favorite_border, size: 18, color: item.liked ? Colors.red : AppColors.textSecondary(b).withValues(alpha: 0.5)),
+            if (item.likeCount > 0) ...[const SizedBox(width: 4), Text('${item.likeCount}', style: TextStyle(color: Colors.red, fontSize: 12))],
+          ]),
+        ),
+        const SizedBox(width: 24),
+        GestureDetector(
+          onTap: () {
+            showDialog(context: context, builder: (ctx) {
+              final ctrl = TextEditingController(text: item.note);
+              return AlertDialog(title: const Text('备注'), content: TextField(controller: ctrl, maxLines: 3, decoration: const InputDecoration(hintText: '写点想法...')), actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+                TextButton(onPressed: () { context.read<DiscoverProvider>().setNote(item.id, ctrl.text); Navigator.pop(ctx); }, child: const Text('保存')),
+              ]);
+            });
+          },
+          child: Icon(Icons.chat_bubble_outline, size: 18, color: AppColors.textSecondary(b).withValues(alpha: 0.5)),
+        ),
+        const Spacer(),
+        GestureDetector(
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: item.text));
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制，去聊天页发送吧 💬'), duration: Duration(seconds: 1)));
+          },
+          child: Icon(Icons.share_outlined, size: 18, color: AppColors.accent),
+        ),
+      ]),
+    );
+    // Show note/comment below the action bar
+    if (item.note.isNotEmpty)
+      Container(
+        margin: const EdgeInsets.only(top: 6),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: b == Brightness.light ? const Color(0xFFF0F0F5) : const Color(0xFF1E2229), borderRadius: BorderRadius.circular(8)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('💬', style: TextStyle(fontSize: 12)),
+          const SizedBox(width: 6),
+          Expanded(child: Text(item.note, style: TextStyle(color: AppColors.text(b), fontSize: 13, height: 1.4))),
+        ]),
     );
   }
+
+  // ── Daily Content Card ──
 
   Widget _dailyContentCard(DiscoverItem item, Brightness b) {
     final data = item.data!;
-    // Collect text content from all keys (String only, skip Lists/JSON dumps)
-    // Content is already cleaned by backend — just display as-is
     final texts = <String>[];
     for (final val in data.values) {
       if (val is Map) {
         final c = val['content'];
         if (c is String && c.isNotEmpty) texts.add(c);
-      } else if (val is String && val.isNotEmpty) {
-        texts.add(val);
-      }
+      } else if (val is String && val.isNotEmpty) texts.add(val);
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [const Color(0xFF8B5CF6).withValues(alpha: 0.08), const Color(0xFFEC4899).withValues(alpha: 0.04)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(14),
-      ),
+      margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+      color: AppColors.card(b),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Text('📰', style: TextStyle(fontSize: 20)),
-            const SizedBox(width: 8),
-            const Text('每日精选', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-            const Spacer(),
-            GestureDetector(
-              onTap: () => _copyText(texts.join('\n')),
-              child: Icon(Icons.copy, size: 14, color: AppColors.textSecondary(b).withValues(alpha: 0.5)),
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)]), borderRadius: BorderRadius.circular(10)),
+              child: const Center(child: Text('📰', style: TextStyle(fontSize: 22))),
             ),
-            const SizedBox(width: 6),
-            Text(_formatTime(item.createdAt), style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('每日精选', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              Text(_formatTime(item.createdAt), style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.6), fontSize: 11)),
+            ])),
           ]),
+          const SizedBox(height: 10),
           if (texts.isEmpty)
-            const Padding(padding: EdgeInsets.only(top: 12), child: Text('内容加载中...', style: TextStyle(color: Colors.grey, fontSize: 13)))
-          else ...[
-            const SizedBox(height: 10),
-            ...texts.map((t) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(t, style: TextStyle(color: AppColors.text(b), fontSize: 13, height: 1.5)),
-            )),
-          ],
+            const Text('内容加载中...', style: TextStyle(color: Colors.grey, fontSize: 13))
+          else
+            ...texts.map((t) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(t, style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.6)))),
+          const SizedBox(height: 4),
+          Divider(height: 1, color: AppColors.border(b).withValues(alpha: 0.5)),
+          _actionBar(item, b),
         ]),
       ),
     );
@@ -313,105 +244,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   void _copyText(String text) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating));
   }
 
-  void _openLink(String url) {
-    if (url.isEmpty) return;
-    Clipboard.setData(ClipboardData(text: url));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('链接已复制: $url'), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating),
-    );
-  }
-
-  void _shareToChat(String text) {
-    Clipboard.setData(ClipboardData(text: text));
-    // Navigate to chat tab (index 0) with content ready
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已复制，去聊天页粘贴发送吧 💬'), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating),
-    );
-  }
-
-  Widget _actionButtons(DiscoverItem item, Brightness b) {
-    final likeCount = item.likeCount;
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Row(children: [
-        GestureDetector(
-          onTap: () => context.read<DiscoverProvider>().toggleLike(item.id),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(item.liked ? Icons.favorite : Icons.favorite_border, size: 16, color: item.liked ? Colors.red : AppColors.textSecondary(b).withValues(alpha: 0.5)),
-            const SizedBox(width: 4),
-            Text(likeCount > 0 ? '$likeCount' : '点赞', style: TextStyle(fontSize: 11, color: item.liked ? Colors.red : AppColors.textSecondary(b).withValues(alpha: 0.5))),
-          ]),
-        ),
-        const SizedBox(width: 16),
-        GestureDetector(
-          onTap: () {
-            showDialog(context: context, builder: (ctx) {
-              final ctrl = TextEditingController(text: item.note);
-              return AlertDialog(title: const Text('备注'), content: TextField(controller: ctrl, maxLines: 3, decoration: const InputDecoration(hintText: '写点备注...')), actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-                TextButton(onPressed: () { context.read<DiscoverProvider>().setNote(item.id, ctrl.text); Navigator.pop(ctx); }, child: const Text('保存')),
-              ]);
-            });
-          },
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.chat_bubble_outline, size: 14, color: AppColors.textSecondary(b).withValues(alpha: 0.5)),
-            const SizedBox(width: 4),
-            Text(item.note.isNotEmpty ? '已备注' : '备注', style: TextStyle(fontSize: 11, color: AppColors.textSecondary(b).withValues(alpha: 0.5))),
-          ]),
-        ),
-        const Spacer(),
-        GestureDetector(
-          onTap: () => _shareToChat(item.text),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.share_outlined, size: 14, color: AppColors.accent),
-            const SizedBox(width: 4),
-            const Text('转发', style: TextStyle(fontSize: 11, color: AppColors.accent)),
-          ]),
-        ),
-      ]),
-    );
-  }
-
-  Widget _emptyState(Brightness b) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Icon(Icons.notifications_none,
-                size: 36, color: AppColors.accent.withValues(alpha: 0.5)),
-          ),
-          const SizedBox(height: 20),
-          Text('还没有通知',
-              style: TextStyle(
-                  color: AppColors.text(b),
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              '天气提醒、日程推送、主动关怀\n会在这里出现，不打扰你的对话',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: AppColors.textSecondary(b),
-                  fontSize: 13,
-                  height: 1.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _emptyState(Brightness b) => Center(
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 72, height: 72, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(20)), child: Icon(Icons.notifications_none, size: 36, color: AppColors.accent.withValues(alpha: 0.5))),
+      const SizedBox(height: 20), Text('还没有动态', style: TextStyle(color: AppColors.text(b), fontSize: 17, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 8), Text('天气提醒、日程推送、主动关怀\n会在这里出现', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary(b), fontSize: 13, height: 1.5)),
+    ]),
+  );
 }
