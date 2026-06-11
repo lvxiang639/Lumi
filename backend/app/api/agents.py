@@ -41,9 +41,30 @@ class AgentRunRequest(BaseModel):
 
 @router.get("")
 async def list_agents(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    r = await db.execute(select(UserAgent).where(UserAgent.user_id == current_user.id).order_by(UserAgent.created_at.desc()))
+    # Show public agents + user's own agents
+    from sqlalchemy import or_
+    r = await db.execute(select(UserAgent).where(or_(UserAgent.is_public == True, UserAgent.user_id == current_user.id)).order_by(UserAgent.created_at.desc()))
     agents = r.scalars().all()
-    return {"items": [{"id": str(a.id), "name": a.name, "description": a.description, "icon": a.icon, "step_count": 0, "created_at": a.created_at.isoformat() if a.created_at else ""} for a in agents]}
+    # Get step counts
+    return {"items": [{"id": str(a.id), "name": a.name, "description": a.description, "icon": a.icon, "step_count": 0, "is_public": a.is_public, "owner": a.is_public, "created_at": a.created_at.isoformat() if a.created_at else ""} for a in agents]}
+
+
+@router.get("/{agent_id}/history")
+async def get_agent_history(agent_id: UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Get run history for an agent."""
+    from app.models.agent_run import AgentRun
+    r = await db.execute(select(AgentRun).where(AgentRun.agent_id == agent_id, AgentRun.user_id == current_user.id).order_by(AgentRun.created_at.desc()).limit(20))
+    runs = r.scalars().all()
+    return {"items": [{"id": str(rn.id), "answers": rn.answers, "result": rn.result[:500], "created_at": rn.created_at.isoformat() if rn.created_at else ""} for rn in runs]}
+
+
+@router.get("/history")
+async def list_run_history(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """List all agent run history for user."""
+    from app.models.agent_run import AgentRun
+    r = await db.execute(select(AgentRun).where(AgentRun.user_id == current_user.id).order_by(AgentRun.created_at.desc()).limit(50))
+    runs = r.scalars().all()
+    return {"items": [{"id": str(rn.id), "agent_id": str(rn.agent_id), "agent_name": rn.agent_name, "result": rn.result[:200], "created_at": rn.created_at.isoformat() if rn.created_at else ""} for rn in runs]}
 
 
 @router.post("", status_code=201)
@@ -88,6 +109,23 @@ async def delete_agent(agent_id: UUID, current_user: User = Depends(get_current_
     await db.commit()
     if r.rowcount == 0: raise HTTPException(404, "Not found")
     return {"status": "deleted"}
+
+
+# ── Save run ──
+
+class SaveRunRequest(BaseModel):
+    answers: dict = {}
+    result: str = ""
+
+@router.post("/{agent_id}/save-run")
+async def save_run(agent_id: UUID, req: SaveRunRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    r = await db.execute(select(UserAgent).where(UserAgent.id == agent_id))
+    agent = r.scalar_one_or_none()
+    if not agent: raise HTTPException(404, "Not found")
+    from app.models.agent_run import AgentRun
+    db.add(AgentRun(user_id=current_user.id, agent_id=agent_id, agent_name=agent.name, answers=json.dumps(req.answers, ensure_ascii=False), result=req.result))
+    await db.commit()
+    return {"status": "saved"}
 
 
 # ── Execution ──

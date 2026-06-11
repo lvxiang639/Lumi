@@ -41,6 +41,10 @@ class _AgentRunPageState extends State<AgentRunPage> {
       final d = json.decode(r.body);
       if (d['status'] == 'done') {
         _result = d['result']; _currentStep = null;
+        // Save run history
+        try {
+          await http.post(Uri.parse('${AppConfig.apiBaseUrl}/api/agents/${widget.agentId}/save-run'), headers: {'Authorization': 'Bearer $tok', 'Content-Type': 'application/json'}, body: json.encode({'answers': _answers, 'result': _result}));
+        } catch (_) {}
       } else {
         _currentStep = d;
       }
