@@ -8,7 +8,7 @@ class DiscoverItem {
   final String? skill;
   final DateTime createdAt;
   final Map<String, dynamic>? data;
-  String note;
+  List<String> comments;
   int likeCount;
   bool liked;
 
@@ -18,10 +18,10 @@ class DiscoverItem {
     this.skill,
     required this.createdAt,
     this.data,
-    this.note = '',
+    List<String>? comments,
     this.likeCount = 0,
     this.liked = false,
-  });
+  }) : comments = comments ?? [];
 
   List<Map<String, dynamic>> get newsItems {
     if (skill != 'news' || data == null) return [];
@@ -33,7 +33,7 @@ class DiscoverItem {
   Map<String, dynamic> toJson() => {
     'id': id, 'text': text, 'skill': skill,
     'createdAt': createdAt.toIso8601String(),
-    'data': data, 'note': note, 'likeCount': likeCount, 'liked': liked,
+    'data': data, 'comments': comments, 'likeCount': likeCount, 'liked': liked,
   };
 
   factory DiscoverItem.fromJson(Map<String, dynamic> json) => DiscoverItem(
@@ -42,7 +42,7 @@ class DiscoverItem {
     skill: json['skill'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
     data: json['data'] as Map<String, dynamic>?,
-    note: json['note'] as String? ?? '',
+    comments: (json['comments'] as List?)?.cast<String>() ?? [],
     likeCount: json['likeCount'] as int? ?? 0,
     liked: json['liked'] == true,
   );
@@ -120,9 +120,9 @@ class DiscoverProvider extends ChangeNotifier {
     _save(); notifyListeners();
   }
 
-  void setNote(String itemId, String note) {
+  void addComment(String itemId, String comment) {
     for (final item in _items) {
-      if (item.id == itemId) { item.note = note; break; }
+      if (item.id == itemId) { item.comments.add(comment); break; }
     }
     _save(); notifyListeners();
   }

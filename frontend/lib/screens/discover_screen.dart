@@ -11,6 +11,11 @@ class DiscoverScreen extends StatefulWidget {
 }
 
 class _DiscoverScreenState extends State<DiscoverScreen> {
+  String? _commentingId;
+  final _commentCtrl = TextEditingController();
+  final Set<String> _expandedIds = {};
+  @override
+  void dispose() { _commentCtrl.dispose(); super.dispose(); }
   @override
   void initState() {
     super.initState();
@@ -164,15 +169,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         ),
         const SizedBox(width: 24),
         GestureDetector(
-          onTap: () {
-            showDialog(context: context, builder: (ctx) {
-              final ctrl = TextEditingController(text: item.note);
-              return AlertDialog(title: const Text('备注'), content: TextField(controller: ctrl, maxLines: 3, decoration: const InputDecoration(hintText: '写点想法...')), actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-                TextButton(onPressed: () { context.read<DiscoverProvider>().setNote(item.id, ctrl.text); Navigator.pop(ctx); }, child: const Text('保存')),
-              ]);
-            });
-          },
+          onTap: () => setState(() => _commentingId = _commentingId == item.id ? null : item.id),
           child: Icon(Icons.chat_bubble_outline, size: 18, color: AppColors.textSecondary(b).withValues(alpha: 0.5)),
         ),
         const Spacer(),
@@ -185,18 +182,65 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         ),
       ]),
     );
-    // Show note/comment below the action bar
-    if (item.note.isNotEmpty)
+    // Comments section
+    final showComments = item.comments.isNotEmpty;
+    final expanded = _expandedIds.contains(item.id);
+    final visibleComments = expanded ? item.comments : item.comments.take(3).toList();
+
+    if (showComments || _commentingId == item.id) ...[
+      const SizedBox(height: 6),
       Container(
-        margin: const EdgeInsets.only(top: 6),
-        padding: const EdgeInsets.all(8),
+        margin: const EdgeInsets.only(left: 0),
+        padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(color: b == Brightness.light ? const Color(0xFFF0F0F5) : const Color(0xFF1E2229), borderRadius: BorderRadius.circular(8)),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('💬', style: TextStyle(fontSize: 12)),
-          const SizedBox(width: 6),
-          Expanded(child: Text(item.note, style: TextStyle(color: AppColors.text(b), fontSize: 13, height: 1.4))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Existing comments
+          ...visibleComments.map((c) => Padding(
+            padding: const EdgeInsets.only(bottom: 3),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('💬', style: TextStyle(fontSize: 11)),
+              const SizedBox(width: 4),
+              Expanded(child: Text(c, style: TextStyle(color: AppColors.text(b), fontSize: 13, height: 1.4))),
+            ]),
+          )),
+          // Expand/collapse
+          if (item.comments.length > 3)
+            GestureDetector(
+              onTap: () => setState(() => expanded ? _expandedIds.remove(item.id) : _expandedIds.add(item.id)),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2, bottom: 2),
+                child: Text(expanded ? '收起' : '展开全部 ${item.comments.length} 条', style: TextStyle(color: AppColors.accent, fontSize: 11)),
+              ),
+            ),
+          // Inline comment input
+          if (_commentingId == item.id)
+            Row(children: [
+              const Text('💬', style: TextStyle(fontSize: 14)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  controller: _commentCtrl, autofocus: true,
+                  style: TextStyle(color: AppColors.text(b), fontSize: 13),
+                  decoration: InputDecoration(hintText: '写评论...', hintStyle: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 13), border: InputBorder.none, contentPadding: EdgeInsets.zero, isDense: true),
+                  onSubmitted: (v) {
+                    if (v.trim().isNotEmpty) {
+                      context.read<DiscoverProvider>().addComment(item.id, v.trim());
+                      _commentCtrl.clear();
+                    }
+                  },
+                ),
+              ),
+              TextButton(onPressed: () {
+                if (_commentCtrl.text.trim().isNotEmpty) {
+                  context.read<DiscoverProvider>().addComment(item.id, _commentCtrl.text.trim());
+                  _commentCtrl.clear();
+                }
+                setState(() => _commentingId = null);
+              }, child: const Text('发送', style: TextStyle(fontSize: 12))),
+            ]),
         ]),
-    );
+      ),
+    ];
   }
 
   // ── Daily Content Card ──
