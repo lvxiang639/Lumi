@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../providers/conversation_provider.dart';
 import '../theme/app_colors.dart';
 import '../services/routes.dart';
+import '../widgets/shimmer_skeleton.dart';
 import 'chat_screen.dart';
 
 class ConversationListScreen extends StatefulWidget {
@@ -101,7 +102,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
       body: Consumer<ConversationProvider>(
         builder: (ctx, provider, _) {
           if (provider.loading && provider.conversations.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const SkeletonList(count: 6);
           }
           if (provider.error != null && provider.conversations.isEmpty) {
             return _errorState(brightness);
