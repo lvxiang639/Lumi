@@ -154,6 +154,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 const SizedBox(height: 4),
                 Text(item.text,
                     style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.5)),
+                _actionButtons(item, b),
               ],
             ),
           ),
@@ -322,6 +323,56 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     Clipboard.setData(ClipboardData(text: url));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('链接已复制: $url'), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  void _shareToChat(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    // Navigate to chat tab (index 0) with content ready
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已复制，去聊天页粘贴发送吧 💬'), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  Widget _actionButtons(DiscoverItem item, Brightness b) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(children: [
+        GestureDetector(
+          onTap: () => context.read<DiscoverProvider>().toggleFavorite(item.id),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(item.isFavorite ? Icons.favorite : Icons.favorite_border, size: 16, color: item.isFavorite ? Colors.red : AppColors.textSecondary(b).withValues(alpha: 0.5)),
+            const SizedBox(width: 4),
+            Text(item.isFavorite ? '已收藏' : '收藏', style: TextStyle(fontSize: 11, color: item.isFavorite ? Colors.red : AppColors.textSecondary(b).withValues(alpha: 0.5))),
+          ]),
+        ),
+        const SizedBox(width: 16),
+        GestureDetector(
+          onTap: () {
+            showDialog(context: context, builder: (ctx) {
+              final ctrl = TextEditingController(text: item.note);
+              return AlertDialog(title: const Text('备注'), content: TextField(controller: ctrl, maxLines: 3, decoration: const InputDecoration(hintText: '写点备注...')), actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+                TextButton(onPressed: () { context.read<DiscoverProvider>().setNote(item.id, ctrl.text); Navigator.pop(ctx); }, child: const Text('保存')),
+              ]);
+            });
+          },
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.chat_bubble_outline, size: 14, color: AppColors.textSecondary(b).withValues(alpha: 0.5)),
+            const SizedBox(width: 4),
+            Text(item.note.isNotEmpty ? '已备注' : '备注', style: TextStyle(fontSize: 11, color: AppColors.textSecondary(b).withValues(alpha: 0.5))),
+          ]),
+        ),
+        const Spacer(),
+        GestureDetector(
+          onTap: () => _shareToChat(item.text),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.share_outlined, size: 14, color: AppColors.accent),
+            const SizedBox(width: 4),
+            const Text('转发', style: TextStyle(fontSize: 11, color: AppColors.accent)),
+          ]),
+        ),
+      ]),
     );
   }
 
