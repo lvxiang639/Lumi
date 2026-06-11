@@ -8,8 +8,9 @@ class DiscoverItem {
   final String? skill;
   final DateTime createdAt;
   final Map<String, dynamic>? data;
-  bool isFavorite;
   String note;
+  int likeCount;
+  bool liked;
 
   DiscoverItem({
     required this.id,
@@ -17,8 +18,9 @@ class DiscoverItem {
     this.skill,
     required this.createdAt,
     this.data,
-    this.isFavorite = false,
     this.note = '',
+    this.likeCount = 0,
+    this.liked = false,
   });
 
   List<Map<String, dynamic>> get newsItems {
@@ -31,7 +33,7 @@ class DiscoverItem {
   Map<String, dynamic> toJson() => {
     'id': id, 'text': text, 'skill': skill,
     'createdAt': createdAt.toIso8601String(),
-    'data': data, 'isFavorite': isFavorite, 'note': note,
+    'data': data, 'note': note, 'likeCount': likeCount, 'liked': liked,
   };
 
   factory DiscoverItem.fromJson(Map<String, dynamic> json) => DiscoverItem(
@@ -40,8 +42,9 @@ class DiscoverItem {
     skill: json['skill'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String? ?? DateTime.now().toIso8601String()),
     data: json['data'] as Map<String, dynamic>?,
-    isFavorite: json['isFavorite'] == true,
     note: json['note'] as String? ?? '',
+    likeCount: json['likeCount'] as int? ?? 0,
+    liked: json['liked'] == true,
   );
 }
 
@@ -106,9 +109,13 @@ class DiscoverProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleFavorite(String itemId) {
+  void toggleLike(String itemId) {
     for (final item in _items) {
-      if (item.id == itemId) { item.isFavorite = !item.isFavorite; break; }
+      if (item.id == itemId) {
+        if (item.liked) { item.likeCount--; item.liked = false; }
+        else { item.likeCount++; item.liked = true; }
+        break;
+      }
     }
     _save(); notifyListeners();
   }

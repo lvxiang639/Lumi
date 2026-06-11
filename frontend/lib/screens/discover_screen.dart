@@ -335,15 +335,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Widget _actionButtons(DiscoverItem item, Brightness b) {
+    final likeCount = item.likeCount;
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Row(children: [
         GestureDetector(
-          onTap: () => context.read<DiscoverProvider>().toggleFavorite(item.id),
+          onTap: () => context.read<DiscoverProvider>().toggleLike(item.id),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(item.isFavorite ? Icons.favorite : Icons.favorite_border, size: 16, color: item.isFavorite ? Colors.red : AppColors.textSecondary(b).withValues(alpha: 0.5)),
+            Icon(item.liked ? Icons.favorite : Icons.favorite_border, size: 16, color: item.liked ? Colors.red : AppColors.textSecondary(b).withValues(alpha: 0.5)),
             const SizedBox(width: 4),
-            Text(item.isFavorite ? '已收藏' : '收藏', style: TextStyle(fontSize: 11, color: item.isFavorite ? Colors.red : AppColors.textSecondary(b).withValues(alpha: 0.5))),
+            Text(likeCount > 0 ? '$likeCount' : '点赞', style: TextStyle(fontSize: 11, color: item.liked ? Colors.red : AppColors.textSecondary(b).withValues(alpha: 0.5))),
           ]),
         ),
         const SizedBox(width: 16),
