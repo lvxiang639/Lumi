@@ -22,7 +22,6 @@ class WsService {
   String? conversationId;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
-  bool _intentionalClose = false;
 
   static const _initialReconnectDelay = Duration(seconds: 1);
   void Function(WsState)? onStateChanged;
@@ -31,7 +30,6 @@ class WsService {
   Stream<WsMessage> get messages => _controller.stream;
 
   Future<void> connect() async {
-    _intentionalClose = false;
     await _doConnect();
   }
 
@@ -41,8 +39,9 @@ class WsService {
   }
 
   Future<void> _doConnect() async {
-    // Guard against double connection
-    if (_state == WsState.connecting || _state == WsState.connected) return;
+    // Close any existing connection first
+    _subscription?.cancel();
+    _channel?.sink.close();
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token') ?? '';
     _setState(WsState.connecting);
@@ -74,7 +73,6 @@ class WsService {
     _subscription = null;
     _channel = null;
 
-    if (_intentionalClose) return;
     _scheduleReconnect();
   }
 
@@ -109,7 +107,6 @@ class WsService {
   // ============================================================
 
   Future<void> disconnect() async {
-    _intentionalClose = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _subscription?.cancel();
@@ -121,7 +118,6 @@ class WsService {
   }
 
   void dispose() {
-    _intentionalClose = true;
     _reconnectTimer?.cancel();
     _subscription?.cancel();
     _channel?.sink.close();

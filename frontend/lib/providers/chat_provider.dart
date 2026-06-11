@@ -32,7 +32,6 @@ class ChatProvider extends ChangeNotifier {
 
   void startConversation({String? conversationId}) {
     _wsSubscription?.cancel();
-    _ws.disconnect();  // Force disconnect — ensures clean state for new/existing conv
     _messages.clear();
     _streamingText = "";
     _conversationId = conversationId;

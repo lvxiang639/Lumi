@@ -91,4 +91,4 @@ async def websocket_chat(ws: WebSocket):
 
         except WebSocketDisconnect:
             unregister(user_id, send_message)
-            logger.info("WS disconnected: user=%s", user_id[:8])
+            logger.debug("WS disconnected: user=%s", user_id[:8])
