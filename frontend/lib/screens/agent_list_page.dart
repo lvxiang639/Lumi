@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../config.dart';
 import '../theme/app_colors.dart';
 import 'agent_run_page.dart';
+import 'agent_detail_page.dart';
 import 'agent_edit_page.dart';
 
 class AgentListPage extends StatefulWidget {
@@ -90,7 +91,7 @@ class _AgentListPageState extends State<AgentListPage> {
             const SizedBox(height: 2),
             Text(a['description'] as String? ?? '', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12)),
           ])),
-          IconButton(icon: Icon(Icons.play_arrow, color: AppColors.accent, size: 22), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AgentRunPage(agentId: a['id'] as String))).then((_) => _load())),
+          IconButton(icon: Icon(Icons.play_arrow, color: AppColors.accent, size: 22), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AgentDetailPage(agentId: a['id'] as String))).then((_) => _load())),
           IconButton(icon: const Icon(Icons.edit_outlined, size: 16, color: Colors.grey), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AgentEditPage(agentId: a['id'] as String))).then((_) => _load())),
           if (a['is_public'] != true) IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red, size: 16), onPressed: () => _delete(a['id'] as String)),
         ]),
