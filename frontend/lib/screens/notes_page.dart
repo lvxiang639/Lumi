@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/notes_service.dart';
 import '../theme/app_colors.dart';
 
@@ -6,6 +7,8 @@ class NotesPage extends StatefulWidget {
   const NotesPage({super.key});
   @override
   State<NotesPage> createState() => _NotesPageState();
+  void _showNoteDetail(Map<String, dynamic> note, Brightness b) {
+
 }
 
 class _NotesPageState extends State<NotesPage> {
@@ -25,6 +28,33 @@ class _NotesPageState extends State<NotesPage> {
       _notes = await _service.listNotes(noteType: 'note');
     } catch (_) {}
     setState(() => _loading = false);
+  }
+
+  void _showNoteDetail(Map<String, dynamic> note, Brightness b) {
+    final title = note['title'] as String? ?? '';
+    final content = note['content'] as String? ?? '';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6, maxChildSize: 0.9, minChildSize: 0.3, expand: false,
+        builder: (ctx, scrollCtrl) => Container(
+          decoration: BoxDecoration(color: AppColors.card(b), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+          child: Column(children: [
+            Container(width: 36, height: 4, margin: const EdgeInsets.only(top: 10, bottom: 14), decoration: BoxDecoration(color: AppColors.border(b), borderRadius: BorderRadius.circular(2))),
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(children: [
+              Expanded(child: Text(title, style: TextStyle(color: AppColors.text(b), fontSize: 17, fontWeight: FontWeight.w600))),
+              IconButton(icon: const Icon(Icons.copy, size: 18), onPressed: () { Clipboard.setData(ClipboardData(text: '$title
+
+$content')); Navigator.pop(ctx); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1))); }, tooltip: '复制全部'),
+            ])),
+            const Divider(),
+            Expanded(child: SingleChildScrollView(controller: scrollCtrl, padding: const EdgeInsets.all(20), child: SelectableText(content, style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.7)))),
+          ]),
+        ),
+      ),
+    );
   }
 
   Future<void> _add() async {
@@ -135,28 +165,32 @@ class _NotesPageState extends State<NotesPage> {
                             padding: const EdgeInsets.only(right: 20),
                             child: const Icon(Icons.delete, color: Colors.red)),
                         onDismissed: (_) => _delete(n['id'] as String),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.card(brightness),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(n['title'] as String? ?? '',
-                                    style: TextStyle(
-                                        color: AppColors.text(brightness),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500)),
-                                if ((n['content'] as String? ?? '').isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(n['content'] as String,
+                        child: GestureDetector(
+                          onTap: () => _showNoteDetail(n, brightness),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.card(brightness),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(n['title'] as String? ?? '',
                                       style: TextStyle(
-                                          color: AppColors.textSecondary(
-                                              brightness),
-                                          fontSize: 12),
+                                          color: AppColors.text(brightness),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500)),
+                                  if ((n['content'] as String? ?? '').isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(n['content'] as String,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            color: AppColors.textSecondary(
+                                                brightness),
+                                            fontSize: 12),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis),
                                 ],
@@ -173,4 +207,39 @@ class _NotesPageState extends State<NotesPage> {
       ),
     );
   }
+  void _showNoteDetail(Map<String, dynamic> note, Brightness b) {
+    final title = note['title'] as String? ?? '';
+    final content = note['content'] as String? ?? '';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        minChildSize: 0.3,
+        expand: false,
+        builder: (ctx, scrollCtrl) => Container(
+          decoration: BoxDecoration(color: AppColors.card(b), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+          child: Column(children: [
+            Container(width: 36, height: 4, margin: const EdgeInsets.only(top: 10, bottom: 14), decoration: BoxDecoration(color: AppColors.border(b), borderRadius: BorderRadius.circular(2))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(children: [
+                Expanded(child: Text(title, style: TextStyle(color: AppColors.text(b), fontSize: 17, fontWeight: FontWeight.w600))),
+                IconButton(icon: const Icon(Icons.copy, size: 18), onPressed: () {
+                  Clipboard.setData(ClipboardData(text: '$title\n\n$content'));
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1)));
+                }, tooltip: '复制全部'),
+              ]),
+            ),
+            const Divider(),
+            Expanded(child: SingleChildScrollView(controller: scrollCtrl, padding: const EdgeInsets.all(20), child: SelectableText(content, style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.7)))),
+          ]),
+        ),
+      ),
+    );
+  }
+
 }
