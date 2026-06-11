@@ -143,7 +143,13 @@ async def update_profile(req: UpdateProfileRequest, current_user: User = Depends
         from sqlalchemy import select as sa_select
         r = await db.execute(sa_select(UserMemory).where(
             UserMemory.user_id == current_user.id, UserMemory.key == "ai_persona"))
-        mem = r.scalar_one_or_none()
+        mems = r.scalars().all()
+        # Clean duplicates, keep first
+        if len(mems) > 1:
+            for m in mems[1:]:
+                await db.delete(m)
+            await db.flush()
+        mem = mems[0] if mems else None
         if mem:
             mem.value = req.persona
         else:
