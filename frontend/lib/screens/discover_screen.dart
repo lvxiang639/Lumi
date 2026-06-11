@@ -186,19 +186,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final showComments = item.comments.isNotEmpty;
     final expanded = _expandedIds.contains(item.id);
     final visibleComments = expanded ? item.comments : item.comments.take(3).toList();
+    final hasCommentSection = showComments || _commentingId == item.id;
 
-    if (showComments || _commentingId == item.id) ...[
-      const SizedBox(height: 6),
+    if (hasCommentSection)
+      SizedBox(height: 6),
+    if (hasCommentSection)
       Container(
         margin: const EdgeInsets.only(left: 0),
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(color: b == Brightness.light ? const Color(0xFFF0F0F5) : const Color(0xFF1E2229), borderRadius: BorderRadius.circular(8)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Existing comments
           ...visibleComments.map((c) => Padding(
             padding: const EdgeInsets.only(bottom: 3),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('💬', style: TextStyle(fontSize: 11)),
+              Text('💬', style: TextStyle(fontSize: 11)),
               const SizedBox(width: 4),
               Expanded(child: Text(c, style: TextStyle(color: AppColors.text(b), fontSize: 13, height: 1.4))),
             ]),
@@ -240,7 +241,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             ]),
         ]),
       ),
-    ];
+    );
   }
 
   // ── Daily Content Card ──
