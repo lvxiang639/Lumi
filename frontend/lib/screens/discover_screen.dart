@@ -221,11 +221,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     );
   }
 
-  void _copyText(String text) {
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating));
-  }
-
   Widget _emptyState(Brightness b) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
     Container(width: 72, height: 72, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(20)), child: Icon(Icons.notifications_none, size: 36, color: AppColors.accent.withValues(alpha: 0.5))),
     const SizedBox(height: 20), Text('还没有动态', style: TextStyle(color: AppColors.text(b), fontSize: 17, fontWeight: FontWeight.w600)),
