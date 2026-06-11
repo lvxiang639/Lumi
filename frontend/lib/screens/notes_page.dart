@@ -6,6 +6,8 @@ import '../theme/app_colors.dart';
 class NotesPage extends StatefulWidget {
   const NotesPage({super.key});
   @override
+  State<NotesPage> createState() => _NotesPageState();
+}
 
 class _NotesPageState extends State<NotesPage> {
   final NotesService _service = NotesService();
