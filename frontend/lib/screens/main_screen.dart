@@ -22,8 +22,8 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _pages = const [
     ConversationListScreen(),
-    ToolsCenterScreen(),
     DiscoverScreen(),
+    ToolsCenterScreen(),
     ProfileScreen(),
   ];
 
@@ -52,7 +52,7 @@ class _MainScreenState extends State<MainScreen> {
                 currentIndex: _currentIndex,
                 onTap: (i) {
                   setState(() => _currentIndex = i);
-                  if (i == 2) discover.markAllRead();
+                  if (i == 1) discover.markAllRead();
                 },
                 items: [
                   const BottomNavigationBarItem(
@@ -60,16 +60,11 @@ class _MainScreenState extends State<MainScreen> {
                     activeIcon: Icon(Icons.chat_bubble),
                     label: '聊天',
                   ),
-                  const BottomNavigationBarItem(
-                    icon: Icon(Icons.apps_outlined),
-                    activeIcon: Icon(Icons.apps),
-                    label: '工具',
-                  ),
                   BottomNavigationBarItem(
                     icon: Badge(
                       isLabelVisible: badge > 0,
                       label: Text('$badge', style: const TextStyle(fontSize: 10)),
-                      child: Icon(_currentIndex == 2 ? Icons.explore : Icons.explore_outlined),
+                      child: Icon(_currentIndex == 1 ? Icons.explore : Icons.explore_outlined),
                     ),
                     activeIcon: Badge(
                       isLabelVisible: badge > 0,
@@ -77,6 +72,11 @@ class _MainScreenState extends State<MainScreen> {
                       child: const Icon(Icons.explore),
                     ),
                     label: '发现',
+                  ),
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.apps_outlined),
+                    activeIcon: Icon(Icons.apps),
+                    label: '工具',
                   ),
                   const BottomNavigationBarItem(
                     icon: Icon(Icons.person_outline),
