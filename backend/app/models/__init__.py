@@ -31,6 +31,7 @@ from app.models.proactive_push import ProactivePush
 from app.models.reminder_schedule import ReminderSchedule
 from app.models.knowledge_base import KnowledgeBase, KnowledgeChunk
 
+from app.models.study_record import StudyRecord, PracticePush
 from app.models.user_agent import UserAgent, AgentStep
 from app.models.daily_content_config import DailyContentConfig
 from app.database import Base
