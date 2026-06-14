@@ -114,10 +114,20 @@ class _StudyPageState extends State<StudyPage> {
     Text('✅ ${_result!['answer']}', style: TextStyle(color: Colors.green, fontSize: 15, fontWeight: FontWeight.w600)),
   ]));
 
-  Widget _recordsTab(Brightness b) => _records.isEmpty ? Center(child: Text('还没有学习记录', style: TextStyle(color: AppColors.textSecondary(b)))) : ListView.builder(
-    padding: const EdgeInsets.all(16), itemCount: _records.length,
+  String _filterSubject = '';
+  Widget _recordsTab(Brightness b) {
+    final filtered = _filterSubject.isEmpty ? _records : _records.where((r) => r['subject'] == _filterSubject).toList();
+    return Column(children: [
+      if (_records.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 4), child: Row(children: [
+        _filterChip('全部', '', b), const SizedBox(width: 8),
+        _filterChip('数学', '数学', b), const SizedBox(width: 8),
+        _filterChip('语文', '语文', b), const SizedBox(width: 8),
+        _filterChip('英语', '英语', b),
+      ])),
+      Expanded(child: _records.isEmpty ? Center(child: Text('还没有学习记录', style: TextStyle(color: AppColors.textSecondary(b)))) : ListView.builder(
+    padding: const EdgeInsets.all(16), itemCount: filtered.length,
     itemBuilder: (_, i) {
-      final r = _records[i];
+      final r = filtered[i];
       final mastered = r['status'] == '已掌握';
       return GestureDetector(
         onTap: () => _showDetail(r, b),
@@ -186,8 +196,15 @@ class _StudyPageState extends State<StudyPage> {
           ]),
         ),
       ),
-    );
+    )]);
   }
+
+  Widget _filterChip(String label, String value, Brightness b) {
+    final active = _filterSubject == value;
+    return GestureDetector(onTap: () => setState(() => _filterSubject = value), child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), decoration: BoxDecoration(color: active ? AppColors.accent : AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)), child: Text(label, style: TextStyle(color: active ? Colors.white : AppColors.accent, fontSize: 12)))));
+  }
+
+
   Widget _analysisTab(Brightness b) {
     if (_analysis == null) return const Center(child: CircularProgressIndicator());
     final weak = (_analysis!['weak_points'] as List?) ?? [];
