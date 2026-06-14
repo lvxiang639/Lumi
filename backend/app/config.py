@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     deepseek_model_name: str = "deepseek-chat"
     chat_model_name: str = "deepseek-v4-flash"
     qwen_model_name: str = "qwen-plus"
+    qwen_vision_model_name: str = "qwen-vl-plus"
     asr_model_name: str = "qwen3-asr-flash"
     tts_model_name: str = "qwen3-tts-flash-2025-11-27"
     tts_default_voice: str = "Cherry"

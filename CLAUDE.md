@@ -153,7 +153,8 @@ app/models/           SQLAlchemy models (21 tables)
 | POST | /api/tools/convert | File conversion (PDF↔DOCX) |
 | GET | /api/tools/files | Converted file list |
 | GET | /api/tools/files/{id}/download | File download |
-| POST | /api/tools/ocr | Image OCR via Qwen-VL |
+| POST | /api/tools/ocr | Image OCR via PaddleOCR (Qwen-VL fallback) |
+| POST | /api/tools/ocr/structure | Document layout analysis via PP-StructureV3 |
 | GET/POST/PUT/DELETE | /api/notes | Notes CRUD |
 | GET/POST | /api/notes/moods | Mood logging |
 | GET | /api/countdown | Countdown days CRUD |

@@ -68,6 +68,19 @@ async def startup():
     notification_service.start()
     from app.services.proactive_service import proactive_service
     proactive_service.start()
+    # Pre-load OCR models in background
+    import asyncio
+    asyncio.create_task(_warmup_ocr())
+
+
+async def _warmup_ocr():
+    """Warm up OCR models in background after startup."""
+    try:
+        from app.services.ocr_service import ocr_service
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, ocr_service.warmup)
+    except Exception:
+        pass
 
 
 @app.on_event("shutdown")
