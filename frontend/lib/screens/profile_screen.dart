@@ -214,7 +214,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Center(
       child: TextButton(
         onPressed: () async {
-          await context.read<AuthProvider>().logout();
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('退出登录'),
+              content: const Text('确定要退出登录吗？'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+                TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定退出', style: TextStyle(color: AppColors.danger))),
+              ],
+            ),
+          );
+          if (confirmed == true) {
+            await context.read<AuthProvider>().logout();
+          }
         },
         child: Text('退出登录',
             style: TextStyle(

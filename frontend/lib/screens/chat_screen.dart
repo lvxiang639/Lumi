@@ -351,7 +351,7 @@ class _ChatScreenState extends State<ChatScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content: Text(msg),
-          duration: const Duration(seconds: 1),
+          duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating),
     );
   }

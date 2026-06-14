@@ -8,7 +8,6 @@ class AssistantMenu extends StatelessWidget {
   final VoidCallback onExtractSummary;
   final VoidCallback? onExport;
   final VoidCallback? onShare;
-  final VoidCallback? onDiary;
 
   const AssistantMenu({
     super.key,
@@ -18,7 +17,6 @@ class AssistantMenu extends StatelessWidget {
     required this.onExtractSummary,
     this.onExport,
     this.onShare,
-    this.onDiary,
   });
 
   @override

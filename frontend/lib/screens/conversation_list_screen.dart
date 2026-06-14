@@ -167,7 +167,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                   : RefreshIndicator(
                       onRefresh: _refresh,
                       child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                         itemCount: filtered.length,
                         itemBuilder: (ctx, i) =>
                             _convItem(brightness, filtered[i]),
@@ -191,9 +191,22 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     return Dismissible(
       key: ValueKey(id),
       direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        _deleteConv(id);
-        return true;
+      confirmDismiss: (direction) async {
+        final confirmed = await showDialog<bool>(
+          context: ctx,
+          builder: (ctx) => AlertDialog(
+            title: const Text('删除对话'),
+            content: const Text('确定要删除这个对话吗？此操作不可撤销。'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('删除', style: TextStyle(color: AppColors.danger))),
+            ],
+          ),
+        );
+        if (confirmed == true) {
+          await _deleteConv(id);
+        }
+        return confirmed ?? false;
       },
       background: Container(
         alignment: Alignment.centerRight,

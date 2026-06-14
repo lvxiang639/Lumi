@@ -41,9 +41,9 @@ class _MainScreenState extends State<MainScreen> {
     return Stack(
       children: [
         Scaffold(
-          body: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: _pages[_currentIndex],
+          body: IndexedStack(
+            index: _currentIndex,
+            children: _pages,
           ),
           bottomNavigationBar: Consumer<DiscoverProvider>(
             builder: (ctx, discover, _) {

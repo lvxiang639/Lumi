@@ -95,8 +95,11 @@ class ToolsCenterScreen extends StatelessWidget {
   }
 
   Widget _toolCard(BuildContext ctx, _Tool tool, Brightness b) {
-    return GestureDetector(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
       onTap: () => _navigate(ctx, tool.name),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.card(b),
@@ -126,7 +129,8 @@ class ToolsCenterScreen extends StatelessWidget {
           ],
         ),
       ),
-    );
+      ),
+    ); // Material + InkWell
   }
 }
 

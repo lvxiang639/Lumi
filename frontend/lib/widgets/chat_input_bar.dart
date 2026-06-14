@@ -31,18 +31,18 @@ class ChatInputBar extends StatelessWidget {
         GestureDetector(
           onTap: onVoice,
           child: Container(
-            width: 36, height: 36,
+            width: 44, height: 44,
             decoration: BoxDecoration(
               color: listening ? AppColors.danger.withValues(alpha: 0.15) : AppColors.accent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(22),
             ),
-            child: Icon(listening ? Icons.mic : Icons.mic_none, color: listening ? AppColors.danger : AppColors.accent, size: 20),
+            child: Icon(listening ? Icons.mic : Icons.mic_none, color: listening ? AppColors.danger : AppColors.accent, size: 22),
           ),
         ),
         const SizedBox(width: 6),
         // Text field
         Expanded(child: Container(
-          constraints: const BoxConstraints(minHeight: 36, maxHeight: 100),
+          constraints: const BoxConstraints(minHeight: 44, maxHeight: 100),
           decoration: BoxDecoration(
             color: brightness == Brightness.light ? Colors.white : AppColors.darkCard,
             borderRadius: BorderRadius.circular(22),
@@ -68,12 +68,12 @@ class ChatInputBar extends StatelessWidget {
         GestureDetector(
           onTap: hasText ? onSend : onFile,
           child: Container(
-            width: 36, height: 36,
+            width: 44, height: 44,
             decoration: BoxDecoration(
               color: hasText ? AppColors.accent : AppColors.accent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(22),
             ),
-            child: Icon(hasText ? Icons.send_rounded : Icons.add, color: hasText ? Colors.white : AppColors.accent, size: 18),
+            child: Icon(hasText ? Icons.send_rounded : Icons.add, color: hasText ? Colors.white : AppColors.accent, size: 20),
           ),
         ),
       ]),

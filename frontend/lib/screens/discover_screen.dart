@@ -18,14 +18,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   void dispose() { _commentCtrl.dispose(); super.dispose(); }
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DiscoverProvider>().markAllRead();
-    });
-  }
-
   String _formatTime(DateTime dt) {
     final now = DateTime.now(); final diff = now.difference(dt);
     if (diff.inMinutes < 1) return '刚刚';
