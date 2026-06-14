@@ -128,51 +128,50 @@ class _OcrPageState extends State<OcrPage> {
         leading: IconButton(icon: Icon(Icons.arrow_back_ios_new, size: 18, color: AppColors.textSecondary(b)), onPressed: () => Navigator.pop(context)),
         title: Text('OCR 文字识别', style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600)),
       ),
-      body: Column(children: [
+      body: _loading
+        ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+        : CustomScrollView(slivers: [
         // Result area
-        if (_text != null || _loading)
-          Container(
+        if (_text != null)
+          SliverToBoxAdapter(child: Container(
             width: double.infinity, margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(12)),
-            child: _loading
-                ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.accent)))
-                : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    if (_imageBytes != null)
-                      ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(_imageBytes!, height: 150, fit: BoxFit.contain)),
-                    const SizedBox(height: 12),
-                    SelectableText(_text ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.6)),
-                  ]),
-          ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (_imageBytes != null)
+                ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(_imageBytes!, height: 120, fit: BoxFit.contain)),
+              const SizedBox(height: 12),
+              SelectableText(_text ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.6)),
+            ]),
+          )),
         // History
-        Expanded(child: _records.isEmpty
-            ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Container(width: 64, height: 64, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)), child: Icon(Icons.document_scanner, size: 32, color: AppColors.accent.withValues(alpha: 0.5))),
-                const SizedBox(height: 16),
-                Text('还没有识别记录', style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                Text('点击下方按钮拍照或选择图片', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 13)),
-              ]))
-            : ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                itemCount: _records.length,
-                itemBuilder: (_, i) {
-                  final r = _records[i];
-                  return GestureDetector(
-                    onTap: () => _showDetail(r, b),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(10)),
-                      child: Row(children: [
-                        Container(width: 36, height: 36, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.document_scanner, size: 18, color: AppColors.accent)),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text(r['text'] as String? ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.text(b), fontSize: 13))),
-                        Text(_fmtTime(r['created_at']), style: TextStyle(color: AppColors.textSecondary(b), fontSize: 10)),
-                      ]),
-                    ),
-                  );
-                },
-              ),
-        ),
+        if (_records.isEmpty)
+          SliverFillRemaining(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 64, height: 64, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)), child: Icon(Icons.document_scanner, size: 32, color: AppColors.accent.withValues(alpha: 0.5))),
+            const SizedBox(height: 16),
+            Text('还没有识别记录', style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Text('点击下方按钮拍照或选择图片', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 13)),
+          ])))
+        else
+          SliverList(delegate: SliverChildBuilderDelegate(
+            (_, i) {
+              final r = _records[i];
+              return GestureDetector(
+                onTap: () => _showDetail(r, b),
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 8), padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(10)),
+                  child: Row(children: [
+                    Container(width: 36, height: 36, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.document_scanner, size: 18, color: AppColors.accent)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(r['text'] as String? ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.text(b), fontSize: 13))),
+                    Text(_fmtTime(r['created_at']), style: TextStyle(color: AppColors.textSecondary(b), fontSize: 10)),
+                  ]),
+                ),
+              );
+            },
+            childCount: _records.length,
+          )),
       ]),
       floatingActionButton: FloatingActionButton(
         onPressed: _loading ? null : _pickAndOcr,

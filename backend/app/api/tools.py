@@ -152,31 +152,39 @@ async def ocr_image(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Extract text from an image and save record."""
-    import base64
+    """Extract text from an image — PaddleOCR (free) first, Qwen fallback."""
+    import base64, asyncio
     file_bytes = await file.read()
     b64 = base64.b64encode(file_bytes).decode()
     img_b64 = f"data:{file.content_type or 'image/jpeg'};base64,{b64}"
 
-    prompt = """请识别图片中的所有文字内容，直接返回文字，不要解释。"""
-
+    text = ""
+    # 1. Try PaddleOCR (free, offline, best Chinese recognition)
     try:
-        from openai import AsyncOpenAI
-        from app.config import settings
-        qwen_mm = AsyncOpenAI(
-            api_key=settings.qwen_api_key,
-            base_url=settings.qwen_base_url,
-        )
-        resp = await qwen_mm.chat.completions.create(
-            model=settings.qwen_model_name,
-            messages=[{"role": "user", "content": [
-                {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
-            ]}],
-            max_tokens=512,
-        )
-        text = (resp.choices[0].message.content or "").strip()
+        loop = asyncio.get_running_loop()
+        text = await loop.run_in_executor(None, _ocr_sync_tools, file_bytes)
     except Exception:
+        pass
+
+    # 2. Fallback to Qwen multimodal
+    if not text.strip():
+        try:
+            from openai import AsyncOpenAI
+            from app.config import settings
+            qwen_mm = AsyncOpenAI(api_key=settings.qwen_api_key, base_url=settings.qwen_base_url)
+            resp = await qwen_mm.chat.completions.create(
+                model=settings.qwen_model_name,
+                messages=[{"role": "user", "content": [
+                    {"type": "text", "text": "请识别图片中的所有文字内容，直接返回文字，不要解释。"},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+                ]}],
+                max_tokens=512,
+            )
+            text = (resp.choices[0].message.content or "").strip()
+        except Exception:
+            pass
+
+    if not text.strip():
         raise HTTPException(500, "OCR识别失败，请确认图片格式正确")
 
     # Save record
@@ -239,3 +247,35 @@ async def get_ocr_record(
         "text": record.text,
         "created_at": record.created_at.isoformat() if record.created_at else "",
     }
+
+
+# ── PaddleOCR helper (free, offline, best Chinese recognition) ──
+
+def _ocr_sync_tools(image_bytes: bytes) -> str:
+    """Run PaddleOCR on an image — shared with tools OCR endpoint."""
+    try:
+        import io
+        from PIL import Image
+        import numpy as np
+
+        if not hasattr(_ocr_sync_tools, '_ocr'):
+            from paddleocr import PaddleOCR
+            _ocr_sync_tools._ocr = PaddleOCR(lang='ch', use_textline_orientation=True)
+
+        img = Image.open(io.BytesIO(image_bytes))
+        img_np = np.array(img)
+        result = _ocr_sync_tools._ocr.predict(img_np)
+
+        lines = []
+        for r in result:
+            data = r.json if hasattr(r, 'json') else {}
+            res = data.get('res', data)
+            texts = res.get('rec_texts', [])
+            for t in texts:
+                if t and t.strip():
+                    lines.append(t.strip())
+        return '\n'.join(lines) if lines else ''
+    except ImportError:
+        return ''
+    except Exception:
+        return ''
