@@ -150,21 +150,17 @@ async def download_file(
 async def ocr_image(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Extract text from an image using Qwen multimodal API."""
+    """Extract text from an image and save record."""
     import base64
     file_bytes = await file.read()
     b64 = base64.b64encode(file_bytes).decode()
+    img_b64 = f"data:{file.content_type or 'image/jpeg'};base64,{b64}"
 
-    prompt = """请识别图片中的所有文字内容。同时判断图片类型:
-- receipt: 发票/收据/小票
-- card: 名片
-- text: 普通文字
-
-返回JSON: {"type": "receipt|card|text", "text": "识别出的文字"}"""
+    prompt = """请识别图片中的所有文字内容，直接返回文字，不要解释。"""
 
     try:
-        # Use Qwen's multimodal endpoint directly (not DeepSeek)
         from openai import AsyncOpenAI
         from app.config import settings
         qwen_mm = AsyncOpenAI(
@@ -179,15 +175,67 @@ async def ocr_image(
             ]}],
             max_tokens=512,
         )
-        raw = resp.choices[0].message.content or ""
+        text = (resp.choices[0].message.content or "").strip()
     except Exception:
         raise HTTPException(500, "OCR识别失败，请确认图片格式正确")
 
-    import json, re
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        m = re.search(r'\{[^}]+\}', raw)
-        data = json.loads(m.group()) if m else {"type": "text", "text": raw}
+    # Save record
+    from app.models.ocr_record import OcrRecord
+    record = OcrRecord(user_id=current_user.id, image_base64=img_b64, text=text)
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
 
-    return {"type": data.get("type", "text"), "text": data.get("text", raw)}
+    return {"id": str(record.id), "text": text, "created_at": record.created_at.isoformat()}
+
+
+@router.get("/ocr/records")
+async def list_ocr_records(
+    page: int = Query(1),
+    limit: int = Query(20),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List OCR records for current user."""
+    from app.models.ocr_record import OcrRecord
+    q = (
+        select(OcrRecord)
+        .where(OcrRecord.user_id == current_user.id)
+        .order_by(OcrRecord.created_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+    )
+    r = await db.execute(q)
+    rows = r.scalars().all()
+    return {
+        "items": [{
+            "id": str(row.id),
+            "text": row.text[:100],
+            "created_at": row.created_at.isoformat() if row.created_at else "",
+        } for row in rows],
+    }
+
+
+@router.get("/ocr/records/{record_id}")
+async def get_ocr_record(
+    record_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a single OCR record with full text and image."""
+    from app.models.ocr_record import OcrRecord
+    r = await db.execute(
+        select(OcrRecord).where(
+            OcrRecord.id == record_id,
+            OcrRecord.user_id == current_user.id,
+        )
+    )
+    record = r.scalar_one_or_none()
+    if not record:
+        raise HTTPException(404, "记录不存在")
+    return {
+        "id": str(record.id),
+        "image_base64": record.image_base64,
+        "text": record.text,
+        "created_at": record.created_at.isoformat() if record.created_at else "",
+    }

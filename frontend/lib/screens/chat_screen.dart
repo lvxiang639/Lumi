@@ -130,7 +130,6 @@ class _ChatScreenState extends State<ChatScreen> {
         onExtractSummary: _onExtractSummary,
         onExport: _onExport,
         onShare: _onShare,
-        onDiary: _onDiary,
       ),
     );
   }
@@ -167,22 +166,6 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (_) {
       chat.sendText('❌ 笔记保存失败');
     }
-  }
-
-  Future<void> _onDiary() async {
-    final chat = context.read<ChatProvider>();
-    final convId = chat.conversationId;
-    if (convId == null) { _snack('请先发送一条消息'); return; }
-    chat.sendText('📔 正在生成日记...');
-    try {
-      final tok = (await SharedPreferences.getInstance()).getString('access_token') ?? '';
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/conversations/$convId/diary');
-      final resp = await http.post(uri, headers: {'Authorization': 'Bearer $tok', 'Content-Type': 'application/json'});
-      if (resp.statusCode == 200) {
-        final d = jsonDecode(resp.body) as Map<String, dynamic>;
-        chat.sendText('📔 ${d['content']}');
-      } else { chat.sendText('❌ 日记生成失败'); }
-    } catch (_) { chat.sendText('❌ 日记生成失败'); }
   }
 
   void _onShare() {

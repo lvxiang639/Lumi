@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import '../config.dart';
 
 class DiscoverItem {
   final String id;
@@ -82,6 +84,53 @@ class DiscoverProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (_) {}
+    // Fetch today's daily content from server
+    _fetchDailyContent();
+  }
+
+  Future<void> _fetchDailyContent() async {
+    try {
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/discover/daily');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token') ?? '';
+      final resp = await http.get(uri, headers: {'Authorization': 'Bearer $token'})
+          .timeout(const Duration(seconds: 5));
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        final content = data['content'];
+        if (content != null && content is Map && content.isNotEmpty) {
+          final todayKey = data['date'] as String? ?? '';
+          final alreadyExists = _items.any((item) =>
+            item.skill == 'daily_content' &&
+            item.data?['_date'] == todayKey);
+          if (!alreadyExists) {
+            (content as Map<String, dynamic>)['_date'] = todayKey;
+            _items.insert(0, DiscoverItem(
+              id: 'daily_$todayKey',
+              text: '📰 每日精选',
+              skill: 'daily_content',
+              data: content,
+              createdAt: DateTime.now(),
+            ));
+            _unreadCount++;
+            await _saveWithPrefs(prefs);
+            notifyListeners();
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveWithPrefs(SharedPreferences prefs) async {
+    try {
+      final list = _items.map((e) => e.toJson()).toList();
+      await prefs.setString(_storageKey, json.encode(list));
+      await prefs.setInt('discover_unread', _unreadCount);
+    } catch (_) {}
+  }
+
+  void refreshDailyContent() {
+    _fetchDailyContent();
   }
 
   Future<void> _save() async {

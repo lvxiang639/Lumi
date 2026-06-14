@@ -1,5 +1,5 @@
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
@@ -40,7 +40,8 @@ async def create_expense(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ExpenseItem:
-    recorded_at = req.recorded_at or datetime.now(timezone.utc)
+    beijing_tz = timezone(timedelta(hours=8))
+    recorded_at = req.recorded_at or datetime.now(beijing_tz)
     expense = ExpenseRecord(
         user_id=current_user.id,
         amount=req.amount,

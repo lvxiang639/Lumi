@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.logging import setup_logging
 from app.api.auth import router as auth_router
+from app.api.deps import get_current_user
 import time, logging
 
 setup_logging()
@@ -80,3 +81,27 @@ async def shutdown():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/discover/daily")
+async def get_daily_content(
+    current_user = Depends(get_current_user),
+):
+    """Return today's daily content for the discover page. Loads from DB."""
+    import json
+    from datetime import datetime, timezone, timedelta
+    from app.database import async_session
+    from sqlalchemy import select
+    from app.models.daily_content import DailyContent
+
+    # Use Beijing time for date consistency with generate_daily_content()
+    beijing_tz = timezone(timedelta(hours=8))
+    today = datetime.now(beijing_tz).date()
+    async with async_session() as db:
+        r = await db.execute(
+            select(DailyContent).where(DailyContent.date == today)
+        )
+        row = r.scalar_one_or_none()
+        if row and row.content:
+            return {"date": str(row.date), "content": json.loads(row.content)}
+        return {"date": str(today), "content": None}

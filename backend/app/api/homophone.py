@@ -17,70 +17,75 @@ router = APIRouter(prefix="/api/study/homophone", tags=["homophone"])
 
 BEIJING_TZ = timezone(timedelta(hours=8))
 
-HOMOPHONE_GENERATE_PROMPT = """你是一位小学语文老师。请生成5道"同音字组词"练习题。
+HOMOPHONE_GENERATE_PROMPT = """你是一位小学语文老师。请生成一组"同音字填空"练习题。
 
-要求：
-1. 每道题选择一个常见汉字作为目标字（1-6年级课本常用字）
-2. 难度适合小学生，不要选太生僻的字
-3. 每个目标字给出拼音以便学生确认读音
+规则：选择5组同音字（每组2-3个常见同音字），每组用一个词语来考学生，把同音字部分挖空让学生填。
+
+例如选了拼音"tóng"的同音字组：同(同学)、童(童话)、铜(铜牌)
+出题格式：把词语中的同音字挖掉，展示为 __学、__话、__牌
 
 请严格按照以下JSON格式返回，不要包含其他内容：
 {
   "questions": [
     {
-      "target_char": "同",
       "pinyin": "tóng",
-      "hint": "请写出与'同'(tóng)同音的字，并组词",
-      "expected_count": 3
+      "words": [
+        {"blank": "__学", "answer": "同", "hint": "和'学'组成词语"},
+        {"blank": "__话", "answer": "童", "hint": "和'话'组成词语"},
+        {"blank": "__牌", "answer": "铜", "hint": "和'牌'组成词语"}
+      ]
+    },
+    {
+      "pinyin": "qīng",
+      "words": [
+        {"blank": "__草", "answer": "青", "hint": "和'草'组成词语"},
+        {"blank": "__水", "answer": "清", "hint": "和'水'组成词语"},
+        {"blank": "__天", "answer": "晴", "hint": "和'天'组成词语"}
+      ]
     }
   ]
 }
 
 注意：
-- 题目数量为5道
-- expected_count表示期望学生写出几个同音字组词（2-3个）
-- 不要重复使用同一个目标字
-- 优先选择有多种同音字的常用汉字，如：同、青、工、力、马、中、元、方、几、十"""
+- 生成5组同音字（5个不同拼音）
+- 每组2-3个同音字词语
+- blank字段用"__"代替被挖掉的同音字
+- answer是正确答案（被挖掉的那个字）
+- hint给学生一点提示
+- 优先中小学课本常见字：同/童/铜、青/清/晴、工/公/功、力/立/丽、马/吗/妈、中/钟/忠、元/园/圆"""
 
-HOMOPHONE_GRADE_PROMPT = """你是一位小学语文老师，正在批改同音字组词练习。
+HOMOPHONE_GRADE_PROMPT = """你是一位小学语文老师，正在批改同音字填空题。
 
-请判断学生的每个答案是否正确。判断标准：
-1. 学生写的字是否与目标字同音（声母、韵母、声调都要相同，包括轻声和变调）
-2. 学生写的词语是否包含该字（该字必须是词语的组成部分）
-3. 学生写的字不能与目标字是同一个字（必须是不同的同音字）
-4. 学生的多个答案之间不能有重复的同音字
+请判断学生填的每个字是否正确。判断标准：
+1. 学生填的字与题目拼音是否同音（声母、韵母、声调都要相同）
+2. 学生填的字和后面的字组成的词语是否合理、常见
 
-题目列表：
+题目（含正确答案）：
 {questions_json}
 
 学生的答案：
 {answers_json}
 
 请按以下JSON格式返回批改结果：
-{
+{{
   "grading": [
-    {
-      "target_char": "同",
+    {{
+      "pinyin": "tóng",
       "results": [
-        {"char": "童", "word": "童话", "correct": true, "feedback": "正确！童和同同音。"},
-        {"char": "铜", "word": "铜牌", "correct": true, "feedback": "正确！"},
-        {"char": "同", "word": "相同", "correct": false, "feedback": "同字和目标字相同，不是同音字。"}
+        {{"blank": "__学", "filled": "同", "correct": true, "feedback": "正确！"}},
+        {{"blank": "__话", "filled": "铜", "correct": false, "feedback": "铜话不是词语。"}}
       ],
-      "missing": [
-        {"char": "桐", "word": "梧桐", "hint": "桐(tóng)，组词：梧桐"}
-      ]
-    }
+      "summary": "这组2题答对1题"
+    }}
   ],
-  "summary": "表现不错！5道题共批改X个答案。正确N个，还需努力，加油！",
-  "total_correct": 0,
-  "total_items": 0
-}
+  "overall": "太棒了！继续加油！",
+  "total_correct": 7,
+  "total_items": 10
+}}
 
 注意：
-- results中的每项对应学生的一个答案，judge是否正确
-- feedback要具体说明对错原因（10字以内）
-- missing列出该目标字存在的其他有效同音字（学生没写到的），帮助学习
-- summary要温暖鼓励
+- feedback要具体说明为什么对/错（15字以内）
+- overall给总体评语，温暖鼓励
 - total_correct和total_items要准确统计"""
 
 
@@ -91,12 +96,24 @@ async def generate_exercise(
 ):
     """Generate 5 homophone questions via LLM, save to DB."""
     try:
-        raw = await llm_router.chat([{"role": "user", "content": HOMOPHONE_GENERATE_PROMPT}])
-        data = json.loads(raw.strip()) if raw else {}
+        raw = await llm_router.chat([{"role": "user", "content": HOMOPHONE_GENERATE_PROMPT}], max_tokens=1024)
+        raw = (raw or "").strip()
+        # Strip markdown code blocks if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1]  # remove opening ```json
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+        logger.info("homophone generate raw: %s", raw[:200])
+        data = json.loads(raw) if raw else {}
         questions = data.get("questions", [])
         if not questions:
             raise ValueError("empty questions")
-    except Exception:
+    except json.JSONDecodeError as e:
+        logger.warning("homophone generate JSON parse error: %s", e)
+        raise HTTPException(400, "生成失败，请重试")
+    except Exception as e:
+        logger.warning("homophone generate error: %s", e)
         raise HTTPException(400, "生成失败，请重试")
 
     exercise = HomophoneExercise(
@@ -107,6 +124,11 @@ async def generate_exercise(
     db.add(exercise)
     await db.commit()
     await db.refresh(exercise)
+
+    # Strip answers before sending to frontend
+    for q in questions:
+        for w in q.get("words", []):
+            w.pop("answer", None)
 
     return {"id": str(exercise.id), "questions": questions}
 
@@ -147,15 +169,26 @@ async def submit_answers(
             questions_json=json.dumps(questions, ensure_ascii=False, indent=2),
             answers_json=json.dumps(answers, ensure_ascii=False, indent=2),
         )
-        raw = await llm_router.chat([{"role": "user", "content": grade_prompt}])
-        grading_data = json.loads(raw.strip()) if raw else {}
-    except Exception:
+        raw = await llm_router.chat([{"role": "user", "content": grade_prompt}], max_tokens=2048)
+        logger.info("homophone grade raw (%d chars): %s", len(raw or ""), (raw or "")[:800])
+        raw = (raw or "").strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+        grading_data = json.loads(raw) if raw else {}
+    except json.JSONDecodeError as e:
+        logger.warning("homophone grade JSON error: %s\nRaw:\n%s", e, (raw if 'raw' in dir() else '')[:1000])
+        raise HTTPException(400, "批改失败，请重试")
+    except Exception as e:
+        logger.warning("homophone grade error: %s", e)
         raise HTTPException(400, "批改失败，请重试")
 
     grading = grading_data.get("grading", [])
     total_correct = grading_data.get("total_correct", 0)
     total_items = grading_data.get("total_items", 0)
-    summary = grading_data.get("summary", "")
+    summary = grading_data.get("overall", "")
 
     # Compute score from grading if not provided
     if not total_correct and not total_items:

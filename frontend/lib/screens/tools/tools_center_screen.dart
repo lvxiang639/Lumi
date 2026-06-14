@@ -10,6 +10,7 @@ import '../countdown_page.dart';
 import '../knowledge_page.dart';
 import '../agent_list_page.dart';
 import '../study_page.dart';
+import '../ocr_page.dart';
 import '../../services/routes.dart';
 import '../../theme/app_colors.dart';
 
@@ -59,7 +60,7 @@ class ToolsCenterScreen extends StatelessWidget {
         page = const CountdownPage();
         break;
       case '辅导': page = const StudyPage(); break;
-      case 'OCR': page = const StudyPage(); break;
+      case 'OCR': page = const OcrPage(); break;
       case 'Agent': page = const AgentListPage(); break;
       case '知识库':
         page = const KnowledgePage();

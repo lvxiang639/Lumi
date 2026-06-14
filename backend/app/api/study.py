@@ -16,28 +16,6 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/study", tags=["study"])
 
-# Pre-warm PaddleOCR at module load (prevents first-request hang)
-_OCR_READY = False
-
-def _warm_ocr():
-    global _OCR_READY
-    try:
-        from paddleocr import PaddleOCR
-        import numpy as np
-        ocr = PaddleOCR(lang='ch', use_textline_orientation=True)
-        # Run a tiny warm-up inference
-        dummy = np.zeros((50, 200, 3), dtype=np.uint8)
-        ocr.predict(dummy)
-        _ocr_sync._ocr = ocr
-        _OCR_READY = True
-        logger.info("PaddleOCR warmed up and ready")
-    except Exception as e:
-        logger.warning(f"PaddleOCR warm-up failed: {e}")
-
-# Start warm-up in background thread
-import threading
-threading.Thread(target=_warm_ocr, daemon=True).start()
-
 SOLVE_PROMPT = """你是一位耐心的辅导老师。学生的题目如下，请先分步讲解思路，最后给出答案。
 
 题目: {question}
@@ -88,7 +66,13 @@ async def solve_question(
     prompt = SOLVE_PROMPT.format(question=text, subject=subject)
     try:
         raw = await llm_router.chat([{"role": "user", "content": prompt}])
-        result = json.loads(raw.strip()) if raw else {}
+        raw = (raw or "").strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+        result = json.loads(raw) if raw else {}
     except Exception:
         result = {"subject": subject, "tags": "", "steps": [text], "key_point": "", "answer": ""}
 

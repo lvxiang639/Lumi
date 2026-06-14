@@ -78,6 +78,7 @@ class ChatProvider extends ChangeNotifier {
     ));
     _isProcessing = true;
     _streamingText = "";
+    _quickReplies = [];
     notifyListeners();
     _ws.sendText(text);
   }

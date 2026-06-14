@@ -3,7 +3,7 @@ import logging
 import uuid
 from uuid import UUID
 # import base64  # VOICE FEATURE DISABLED
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -145,7 +145,7 @@ class ChatOrchestrator:
                 await self._load_persona(user_uuid)
                 or "你是一个贴心的AI助手，名叫灵犀。"
             )
-            now_dt = datetime.now()
+            now_dt = datetime.now(timezone(timedelta(hours=8)))  # Beijing time
             wdays = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
             time_str = f"{now_dt.strftime('%Y年%m月%d日 %H:%M:%S')} ({wdays[now_dt.weekday()]})"
             system_prefix = f"现在是{time_str}。{persona}"

@@ -651,15 +651,36 @@ def _clean_llm_content(text: str) -> str:
 
 
 async def generate_daily_content() -> dict | None:
-    """Generate today's daily content from DB-configured content types. Cached per day."""
+    """Generate today's daily content. DB-backed — restart-safe, no duplicate LLM calls."""
+    import json
     now = datetime.now(BEIJING_TZ)
     today_key = now.strftime("%Y-%m-%d")
+
+    # 1. Check in-memory cache
     if hasattr(generate_daily_content, '_cache'):
         cached_date, cached_data = generate_daily_content._cache
         if cached_date == today_key:
             return cached_data
 
-    # Load enabled content configs from DB
+    # 2. Check DB — if already generated today (survives restart)
+    try:
+        async with async_session() as db:
+            from app.models.daily_content import DailyContent
+            today_date = now.date()
+            r = await db.execute(
+                select(DailyContent).where(DailyContent.date == today_date)
+            )
+            row = r.scalar_one_or_none()
+            if row and row.content:
+                data = json.loads(row.content)
+                generate_daily_content._cache = (today_key, data)
+                logger.info("daily content: loaded from DB cache")
+                return data
+    except Exception:
+        pass
+
+    # 3. Generate fresh via LLM
+    logger.info("daily content: generating fresh via LLM")
     configs = []
     try:
         async with async_session() as db:
@@ -703,6 +724,24 @@ async def generate_daily_content() -> dict | None:
             pass
 
     generate_daily_content._cache = (today_key, result)
+
+    # Save to DB so offline users can see it when they open the app
+    try:
+        async with async_session() as db:
+            from app.models.daily_content import DailyContent
+            today_date = now.date()
+            existing = await db.execute(
+                select(DailyContent).where(DailyContent.date == today_date)
+            )
+            row = existing.scalar_one_or_none()
+            if row:
+                row.content = json.dumps(result, ensure_ascii=False)
+            else:
+                db.add(DailyContent(date=today_date, content=json.dumps(result, ensure_ascii=False)))
+            await db.commit()
+    except Exception:
+        logger.exception("failed to save daily content to DB")
+
     return result
 
 
@@ -803,7 +842,8 @@ async def push_chinese_literature():
             elif content.startswith("🏛"):
                 label = "🏛️ 历史典故"
 
-            payload = {"type": "proactive", "delta": label, "skill": "chinese_literature", "data": {"literature": {"display_name": label, "content": content}}}
+            # delta = full content for discover card, data = structured for future use
+            payload = {"type": "proactive", "delta": content, "skill": "chinese_literature", "data": {"literature": {"display_name": label, "content": content}}}
             await send_to_user(uid, payload)
 
             async with async_session() as db:

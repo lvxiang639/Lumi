@@ -87,15 +87,6 @@ class AssistantMenu extends StatelessWidget {
               },
               brightness: brightness,
             ),
-            if (onDiary != null)
-              _menuItem(
-                icon: Icons.book_outlined,
-                title: '生成日记',
-                subtitle: '把对话写成一篇温暖的日记',
-                color: const Color(0xFF8B5CF6),
-                onTap: () { Navigator.pop(context); onDiary!(); },
-                brightness: brightness,
-              ),
             if (onShare != null)
               _menuItem(
                 icon: Icons.share_outlined,

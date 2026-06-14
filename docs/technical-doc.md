@@ -51,68 +51,79 @@ lingxi/
 | MinIO | 9000/9001 | 文件存储/管理界面 |
 | SearXNG | 8080 | 元搜索引擎，挂载 `searxng-settings.yml` 启用百度 |
 
-### 2.2 API 层（10 模块）
+### 2.2 API 层（17 模块）
 
 | 文件 | 路由 | 职责 |
 |------|------|------|
-| `auth.py` | `/api/auth` | 手机号登录/注册、Token 刷新、个人资料 |
+| `auth.py` | `/api/auth` | 手机/邮箱登录注册、Token 刷新、个人资料 |
 | `characters.py` | `/api/characters` | 角色初始化、配置、背包、装备切换 |
-| `conversations.py` | `/api/conversations` | 会话列表/消息历史/删除/改标题 |
-| `shop.py` | `/api/shop` | 服装/声音商店列表、购买 |
+| `conversations.py` | `/api/conversations` | 会话 CRUD、导出、日记、邮件摘要 |
+| `shop.py` | `/api/shop` | 服装/声音商店 |
 | `calendar.py` | `/api/calendar` | 日历事件 CRUD |
-| `expenses.py` | `/api/expenses` | 记账 CRUD + 分类统计 |
-| `sync.py` | `/api/data` | 批量同步（last_write_wins） |
-| `ws_chat.py` | `/ws/chat` | WebSocket 实时对话，JWT 鉴权 |
+| `expenses.py` | `/api/expenses` | 记账 CRUD + 分类统计 + 周洞察 |
+| `sync.py` | `/api/data` | 批量同步 |
+| `ws_chat.py` | `/ws/chat` | WebSocket 实时对话 |
+| `tools.py` | `/api/tools` | 文件转换、OCR 识别 |
+| `notes.py` | `/api/notes` | 笔记 CRUD + 心情记录 |
+| `countdown.py` | `/api/countdown` | 倒数日 CRUD |
+| `knowledge.py` | `/api/knowledge` | 知识库上传 + RAG 问答 |
+| `study.py` | `/api/study` | 解题辅导 + 薄弱分析 + 练习题 |
+| `homophone.py` | `/api/study/homophone` | 同音字填空闯关 |
+| `agents.py` | `/api/agents` | AI Agent CRUD + 执行 |
+| `admin.py` | `/admin` | 管理面板 |
 | `deps.py` | — | `get_current_user` 依赖注入 |
-| `seed.py` | — | 启动时插入默认服装和声音包 |
 
-### 2.3 数据模型（9 表）
+### 2.3 数据模型（21+ 表）
 
-| 表 | 关键字段 | 关系 |
-|------|------|------|
-| `users` | phone(unique), nickname, avatar | 1:N conversations/calendar_events/expense_records, 1:1 character |
-| `conversations` | user_id, title, updated_at | 1:N messages |
-| `messages` | conv_id, role(user/assistant), type(text/voice), content | — |
-| `characters` | user_id(unique), name, outfit_id, voice_pack_id | FK→outfits, voice_packs |
-| `user_inventory` | user_id, item_type, item_id, equipped | 关联 outfits/voice_packs |
-| `outfits` | name, model_file, price | — |
-| `voice_packs` | name, cosyvoice_id, price | — |
-| `calendar_events` | user_id, title, time, repeat_rule, notified | — |
-| `expense_records` | user_id, amount, category, remark, recorded_at | — |
+| 域 | 表 |
+|------|------|
+| 用户 | users, user_memories, user_emotion_states |
+| 对话 | conversations, messages, conv_memories |
+| 日历 | calendar_events |
+| 记账 | expense_records |
+| 角色 | characters, outfits, voice_packs, user_inventory |
+| 工具 | converted_files, sent_emails, notes, mood_logs, countdowns, ocr_records |
+| 知识 | knowledge_bases, knowledge_chunks |
+| 学习 | study_records, practice_pushes, homophone_exercises |
+| 推送 | proactive_pushes, reminder_schedules, daily_contents, daily_content_configs |
+| Agent | user_agents, agent_steps |
+| 管理 | fcm_tokens |
 
 ### 2.4 服务层
 
-**AI 服务（3 个）：**
+**AI 服务：**
 
 | 文件 | 功能 |
 |------|------|
-| `asr_service.py` | DashScope SDK `qwen3-asr-flash`，接受 WAV base64，返回文本 |
-| `llm_service.py` | `deepseek-v4-flash`（默认）+ `qwen-plus`（工具调用），OpenAI 兼容流式 |
-| `tts_service.py` | `qwen3-tts-flash`（DashScope SDK）+ `synthesize_cosyvoice`（角色定制） |
+| `llm_service.py` | DeepSeek + Qwen，OpenAI 兼容，Semaphore(8) 限流，支持自定义 max_tokens |
+| `chat_orchestrator.py` | 意图分类 → 技能执行 → LLM 流式 → TTS → 快捷回复 → 消息持久化 |
+| `emotion_service.py` | 对话情绪分析，6 种情绪 |
+| `memory_service.py` | 长期记忆提取和注入 |
 
 **技能系统（skills/）：**
 
 | 技能 | 实现 |
 |------|------|
-| `weather` | LLM 提取城市 → wttr.in JSON API → 返回温度/湿度/体感 |
-| `search` | **三步：** LLM 提取搜索词 → SearXNG(Google+Bing+百度) → LLM 总结结果 |
-| `calendar` | LLM 提取标题+时间+重复规则 → 写入 `calendar_events` 表 |
-| `expense` | LLM 提取金额+类别+备注 → 写入 `expense_records` 表 |
+| `weather` | LLM 提取城市 → wttr.in → 返回天气 |
+| `search` | LLM 提取关键词 → SearXNG(多引擎) → LLM 总结 |
+| `calendar` | LLM 提取时间+标题 → 写入 calendar_events |
+| `expense` | LLM 提取金额+类别 → 写入 expense_records |
+| `convert` | 文件 PDF↔DOCX 转换 |
+| `briefing` | 晨间简报：天气+日历+记账汇总 |
+| `email` | 对话总结发送到邮箱 |
 
-每个技能的 LLM 提取提示词使用 `{{ }}` 转义 JSON 花括号，避免 `str.format()` 冲突。
+**主动推送系统：**
 
-**对话编排：**
-
-`chat_orchestrator.py` — 意图分类 → 技能执行/流式 LLM → **查角色 VoicePack** → TTS → 消息持久化。
-
-关键细节：
-- TTS 前查询 `Character` 表获取已装备的 `voice_pack.cosyvoice_id`
-- 查询使用 `selectinload(Character.voice_pack)` 预加载关联，避免异步 lazy load 报错
-- 若有 CosyVoice 端点则走定制音色，否则传给 `qwen3-tts-flash` 作为 voice 参数
+| 组件 | 功能 |
+|------|------|
+| `proactive_service.py` | ~3h 轮询：天气预警+日历提醒+记账提醒+情绪关怀+记忆话题 |
+| `push_daily_content()` | 每日精选：运势+笑话+冷知识+小贴士+名言（一次 LLM 调用） |
+| `push_chinese_literature()` | 语文高频推送(~3h)：古诗词/成语/典故随机 |
+| `generate_daily_content()` | 三级缓存：内存→DB→LLM生成，重启不重复调 LLM |
 
 **通知服务：**
 
-`notification_service.py` — asyncio 后台任务，每 60 秒轮询 `notified=False AND time <= now()` 的事件，标记已提醒。在 `main.py` startup/shutdown 事件中管理生命周期。
+`notification_service.py` — 后台轮询日历事件提醒。`main.py` startup/shutdown 管理生命周期。
 
 ### 2.5 核心模块
 
@@ -180,16 +191,31 @@ Flutter App                        FastAPI Backend
 
 ## 五、前端架构
 
-| 层 | 文件 | 说明 |
-|------|------|------|
-| 入口 | `main.dart`, `app.dart`, `config.dart` | MultiProvider + MaterialApp，默认 `localhost:8000` |
-| 模型 | `models/*.dart` | 8 个数据类，`fromJson()` 反序列化 |
-| 服务 | `services/*.dart` | api_client, auth, ws, audio_recorder(wav), tts_player, calendar, expense, sync |
-| 状态 | `providers/*.dart` | 5 个 ChangeNotifier：auth/chat/character/calendar/expense |
-| 页面 | `screens/*.dart` | login, home(4 tab), chat, calendar, expense, character, shop |
-| 组件 | `widgets/*.dart` | chat_bubble, voice_record_button, live2d_view(占位) |
+| 层 | 说明 |
+|------|------|
+| 入口 | `main.dart`, `app.dart`, `config.dart` — MultiProvider + MaterialApp |
+| 模型 | `models/*.dart` — User, ExpenseRecord 等数据类 |
+| 服务 | `services/*.dart` — ApiClient, WsService, 录音, TTS |
+| 状态 | `providers/*.dart` — Auth, Chat, Character, Calendar, Discover |
+| 页面 | `screens/*.dart` — 20+ 页面，详见下方 |
+| 组件 | `widgets/*.dart` — 聊天气泡/输入栏/背景涂鸦/宠物猫/离线提示 |
 
-**重要：录音使用 WAV 格式（`AudioEncoder.wav`），匹配后端 ASR 服务。Web 平台不支持录音，须用原生平台运行。**
+**页面清单：**
+```
+MainScreen (4 Tab)
+├── ConversationListScreen  聊天列表
+├── DiscoverScreen          发现页（推送/每日精选/语文内容）
+├── ToolsCenterScreen       工具中心（12 工具网格）
+└── ProfileScreen           个人中心
+
+工具页（12 个）:
+Calendar / Expense / Notes / Mood / Email / File / Summary
+Countdown / Knowledge / Ocr / Study(含同音字Tab) / AgentList
+
+其他: Login / Chat / Shop / Privacy / Homophone
+```
+
+**重要：录音使用 WAV 格式。Web 平台不支持录音。**
 
 ---
 
@@ -197,9 +223,7 @@ Flutter App                        FastAPI Backend
 
 | 位置 | 方式 |
 |------|------|
-| 新技能 | 实现 `BaseSkill` → 注册到 `skill_registry.py` → `classify_intent()` 加标签 |
+| 新技能 | 实现 `BaseSkill` → 注册 `skill_registry.py` → `classify_intent()` 加标签 |
+| 新工具页 | 创建 Screen → 注册到 `tools_center_screen.dart` |
 | 新 LLM | `llm_service.py` 添加 AsyncOpenAI client |
-| 新服装/声音 | 插入 `outfits`/`voice_packs` 表 |
-| 离线 ASR | `asr_local_service.dart` 集成 whisper.cpp FFI |
-| Live2D | 替换 `live2d_view.dart` 占位符为 Cubism SDK |
-| 推送通知 | `notification_service.py` 接入 APNs/FCM |
+| 新模型 | 创建 model → `__init__.py` 注册 → 建表 |

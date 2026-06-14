@@ -20,8 +20,7 @@ class _HomophonePageState extends State<HomophonePage> {
   // Current exercise
   String? _exerciseId;
   List<dynamic> _questions = [];
-  List<List<TextEditingController>> _charCtls = [];
-  List<List<TextEditingController>> _wordCtls = [];
+  List<TextEditingController> _fillCtls = [];  // one per blank
 
   // Grading result
   List<dynamic>? _grading;
@@ -45,30 +44,18 @@ class _HomophonePageState extends State<HomophonePage> {
   }
 
   void _disposeControllers() {
-    for (final row in _charCtls) {
-      for (final c in row) { c.dispose(); }
-    }
-    for (final row in _wordCtls) {
-      for (final c in row) { c.dispose(); }
-    }
-    _charCtls.clear();
-    _wordCtls.clear();
+    for (final c in _fillCtls) { c.dispose(); }
+    _fillCtls.clear();
   }
 
   void _initControllers() {
     _disposeControllers();
     for (int i = 0; i < _questions.length; i++) {
       final q = _questions[i] as Map<String, dynamic>;
-      final cnt = (q['expected_count'] as int?) ?? 3;
-      final chars = <TextEditingController>[];
-      final words = <TextEditingController>[];
-      for (int j = 0; j < cnt + 1; j++) {
-        // +1 extra row for flexibility
-        chars.add(TextEditingController());
-        words.add(TextEditingController());
+      final words = (q['words'] as List?) ?? [];
+      for (int j = 0; j < words.length; j++) {
+        _fillCtls.add(TextEditingController());
       }
-      _charCtls.add(chars);
-      _wordCtls.add(words);
     }
   }
 
@@ -100,24 +87,25 @@ class _HomophonePageState extends State<HomophonePage> {
   }
 
   Future<void> _submit() async {
-    // Build answers
+    // Build answers in new format
     final answers = <Map<String, dynamic>>[];
     for (int i = 0; i < _questions.length; i++) {
       final q = _questions[i] as Map<String, dynamic>;
+      final words = (q['words'] as List?) ?? [];
       final items = <Map<String, String>>[];
-      for (int j = 0; j < _charCtls[i].length; j++) {
-        final ch = _charCtls[i][j].text.trim();
-        final wd = _wordCtls[i][j].text.trim();
-        if (ch.isNotEmpty && wd.isNotEmpty) {
-          items.add({'char': ch, 'word': wd});
+      for (int j = 0; j < words.length; j++) {
+        final w = words[j] as Map<String, dynamic>;
+        final filled = _fillCtls[_ctlIndex(i, j)].text.trim();
+        if (filled.isNotEmpty) {
+          items.add({'blank': w['blank'] as String? ?? '', 'filled': filled});
         }
       }
       if (items.isNotEmpty) {
-        answers.add({'target_char': q['target_char'] ?? '', 'items': items});
+        answers.add({'pinyin': q['pinyin'] ?? '', 'items': items});
       }
     }
     if (answers.isEmpty) {
-      _snack('请至少填写一组答案');
+      _snack('请至少填写一个空');
       return;
     }
 
@@ -227,101 +215,103 @@ class _HomophonePageState extends State<HomophonePage> {
     ],
   );
 
-  Widget _practicingView(Brightness b) => Column(children: [
-    // Progress bar
-    LinearProgressIndicator(value: null, color: AppColors.accent, backgroundColor: AppColors.accent.withValues(alpha: 0.1)),
-    Expanded(
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _questions.length,
-        itemBuilder: (_, i) {
-          final q = _questions[i] as Map<String, dynamic>;
-          final target = q['target_char'] as String? ?? '';
-          final pinyin = q['pinyin'] as String? ?? '';
-          final hint = q['hint'] as String? ?? '';
+  int _ctlIndex(int groupIdx, int wordIdx) {
+    int idx = 0;
+    for (int i = 0; i < groupIdx; i++) {
+      final q = _questions[i] as Map<String, dynamic>;
+      idx += ((q['words'] as List?) ?? []).length;
+    }
+    return idx + wordIdx;
+  }
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(12)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              // Question header
-              Row(children: [
-                Container(
-                  width: 48, height: 48,
-                  decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                  child: Center(child: Text(target, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: Color(0xFF6366F1)))),
-                ),
-                const SizedBox(width: 12),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('第 ${i + 1} 题', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 11)),
-                  Text(hint, style: TextStyle(color: AppColors.text(b), fontSize: 13, fontWeight: FontWeight.w500)),
-                  Text('拼音: $pinyin', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12)),
+  Widget _practicingView(Brightness b) => Column(children: [
+      LinearProgressIndicator(value: null, color: AppColors.accent, backgroundColor: AppColors.accent.withValues(alpha: 0.1)),
+      Expanded(
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: _questions.length,
+          itemBuilder: (_, i) {
+            final q = _questions[i] as Map<String, dynamic>;
+            final pinyin = q['pinyin'] as String? ?? '';
+            final words = (q['words'] as List?) ?? [];
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(12)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                    child: Text(pinyin, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF6366F1))),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('第 ${i + 1} 组 · 同音字填空', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 13)),
                 ]),
+                const SizedBox(height: 14),
+                ...List.generate(words.length, (j) {
+                  final w = words[j] as Map<String, dynamic>;
+                  final blank = w['blank'] as String? ?? '';
+                  final hint = w['hint'] as String? ?? '';
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(children: [
+                      Container(
+                        width: 64,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: b == Brightness.light ? const Color(0xFFF0F0F5) : const Color(0xFF1E2229),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(blank, textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.text(b), fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 2)),
+                      ),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                        width: 48,
+                        child: TextField(
+                          controller: _fillCtls[_ctlIndex(i, j)],
+                          style: TextStyle(color: AppColors.accent, fontSize: 20, fontWeight: FontWeight.w700),
+                          textAlign: TextAlign.center,
+                          maxLength: 1,
+                          decoration: InputDecoration(
+                            counterText: '',
+                            hintText: '字',
+                            hintStyle: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.4), fontSize: 14),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(hint, style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.6), fontSize: 12))),
+                    ]),
+                  );
+                }),
               ]),
-              const SizedBox(height: 12),
-              // Answer rows
-              ...List.generate(_charCtls[i].length, (j) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        controller: _charCtls[i][j],
-                        style: TextStyle(color: AppColors.text(b), fontSize: 16),
-                        textAlign: TextAlign.center,
-                        decoration: InputDecoration(
-                          hintText: '字',
-                          hintStyle: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 14),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text('—', style: TextStyle(color: Colors.grey, fontSize: 16)),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 3,
-                      child: TextField(
-                        controller: _wordCtls[i][j],
-                        style: TextStyle(color: AppColors.text(b), fontSize: 16),
-                        textAlign: TextAlign.center,
-                        decoration: InputDecoration(
-                          hintText: '组词',
-                          hintStyle: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 14),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                        ),
-                      ),
-                    ),
-                  ]),
-                );
-              }),
-            ]),
-          );
-        },
-      ),
-    ),
-    // Submit button
-    Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.all(14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: const Text('提交批改', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            );
+          },
         ),
       ),
-    ),
-  ]);
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _submit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.all(14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('提交批改', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          ),
+        ),
+      ),
+    ]);
 
   Widget _reviewingView(Brightness b) => Column(children: [
     // Score banner
@@ -346,9 +336,8 @@ class _HomophonePageState extends State<HomophonePage> {
         itemCount: _grading?.length ?? 0,
         itemBuilder: (_, i) {
           final g = _grading![i] as Map<String, dynamic>;
-          final target = g['target_char'] as String? ?? '';
+          final pinyin = g['pinyin'] as String? ?? '';
           final results = (g['results'] as List?) ?? [];
-          final missing = (g['missing'] as List?) ?? [];
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -356,46 +345,33 @@ class _HomophonePageState extends State<HomophonePage> {
             decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(12)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Container(width: 32, height: 32,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                  child: Center(child: Text(target, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF6366F1))))),
+                  child: Text(pinyin, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF6366F1)))),
                 const SizedBox(width: 10),
-                Text('第 ${i + 1} 题', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 13)),
+                Text('第 ${i + 1} 组', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 13)),
               ]),
               const SizedBox(height: 10),
-              // Results
               ...results.map((r) {
                 final item = r as Map<String, dynamic>;
                 final correct = item['correct'] == true;
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsets.only(bottom: 6),
                   child: Row(children: [
                     Icon(correct ? Icons.check_circle : Icons.cancel, size: 16, color: correct ? Colors.green : Colors.red),
                     const SizedBox(width: 6),
-                    Text('${item['char'] ?? ''} — ${item['word'] ?? ''}',
-                      style: TextStyle(color: correct ? Colors.green : Colors.red, fontSize: 14, fontWeight: FontWeight.w500)),
+                    Text(item['blank'] as String? ?? '',
+                      style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 4),
+                    Text('→ ${item['filled'] ?? ''}',
+                      style: TextStyle(color: correct ? Colors.green : Colors.red, fontSize: 16, fontWeight: FontWeight.w700)),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(item['feedback'] as String? ?? '', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 11))),
+                    Expanded(child: Text(item['feedback'] as String? ?? '',
+                      style: TextStyle(color: AppColors.textSecondary(b), fontSize: 11))),
                   ]),
                 );
               }),
-              // Missing hints
-              if (missing.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('💡 还可以写的同音字:', style: TextStyle(color: AppColors.accent, fontSize: 11, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    ...missing.map((m) {
-                      final item = m as Map<String, dynamic>;
-                      return Text('${item['char'] ?? ''} — ${item['word'] ?? ''}  ${item['hint'] ?? ''}',
-                        style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12));
-                    }),
-                  ]),
-                ),
-              ],
             ]),
           );
         },
@@ -435,8 +411,9 @@ class _HomophonePageState extends State<HomophonePage> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) {
         final questions = (h['questions'] as List?) ?? [];
+        final completed = h['status'] == 'completed';
         return DraggableScrollableSheet(
-          initialChildSize: 0.5, maxChildSize: 0.8, minChildSize: 0.3, expand: false,
+          initialChildSize: 0.5, maxChildSize: 0.9, minChildSize: 0.3, expand: false,
           builder: (ctx2, sc) => Container(
             decoration: BoxDecoration(color: AppColors.card(b), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
             child: Column(children: [
@@ -445,22 +422,52 @@ class _HomophonePageState extends State<HomophonePage> {
                 Expanded(child: Text('练习详情', style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600))),
                 GestureDetector(onTap: () => Navigator.pop(ctx), child: Icon(Icons.close, size: 20, color: AppColors.textSecondary(b))),
               ])),
-              Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Text('得分: ${h['score'] ?? '未完成'}  ·  ${_fmtTime(h['created_at'])}', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12))),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text('得分: ${h['score'] ?? '未完成'}  ·  ${_fmtTime(h['created_at'])}',
+                  style: TextStyle(color: completed ? AppColors.accent : AppColors.textSecondary(b), fontSize: 12))),
               const SizedBox(height: 12),
               const Divider(),
-              Expanded(child: SingleChildScrollView(controller: sc, padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                ...questions.map((q) {
-                  final m = q as Map<String, dynamic>;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(children: [
-                      Container(width: 28, height: 28, decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)), child: Center(child: Text(m['target_char'] as String? ?? '', style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF6366F1))))),
-                      const SizedBox(width: 8),
-                      Text('${m['hint'] ?? ''}  (${m['pinyin'] ?? ''})', style: TextStyle(color: AppColors.text(b), fontSize: 13)),
-                    ]),
-                  );
-                }),
-              ]))),
+              Expanded(child: SingleChildScrollView(controller: sc, padding: const EdgeInsets.all(20),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  if (questions.isEmpty)
+                    Text('暂无题目数据', style: TextStyle(color: AppColors.textSecondary(b)))
+                  else
+                    ...questions.map((q) {
+                      final m = q as Map<String, dynamic>;
+                      final pinyin = m['pinyin'] as String? ?? '';
+                      final words = (m['words'] as List?) ?? [];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: b == Brightness.light ? const Color(0xFFF8F9FA) : const Color(0xFF1A1D21), borderRadius: BorderRadius.circular(10)),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(color: const Color(0xFF6366F1).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                              child: Text(pinyin, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF6366F1), fontSize: 14))),
+                            const SizedBox(width: 8),
+                            Text('${words.length} 个词语', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12)),
+                          ]),
+                          const SizedBox(height: 8),
+                          ...words.map((w) {
+                            final wm = w as Map<String, dynamic>;
+                            final blank = wm['blank'] as String? ?? '';
+                            final answer = wm['answer'] as String? ?? '';
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 3),
+                              child: Row(children: [
+                                Text(blank, style: TextStyle(color: AppColors.text(b), fontSize: 15, fontWeight: FontWeight.w600)),
+                                const SizedBox(width: 6),
+                                if (answer.isNotEmpty)
+                                  Text('→ $answer', style: TextStyle(color: AppColors.accent, fontSize: 15, fontWeight: FontWeight.w700)),
+                              ]),
+                            );
+                          }),
+                        ]),
+                      );
+                    }),
+                ]))),
             ]),
           ),
         );

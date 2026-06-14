@@ -23,7 +23,8 @@ class LLMRouter:
         )
 
     async def chat(
-        self, messages: list[dict], force_model: str | None = None
+        self, messages: list[dict], force_model: str | None = None,
+        max_tokens: int = 512,
     ) -> str:
         if force_model == "qwen":
             client = self.qwen
@@ -39,7 +40,7 @@ class LLMRouter:
                     stream=False,
                     temperature=0.6,
                     top_p=0.9,
-                    max_tokens=512,
+                    max_tokens=max_tokens,
                     frequency_penalty=0.3,
                 )
                 choices = response.choices

@@ -35,6 +35,8 @@ from app.models.study_record import StudyRecord, PracticePush
 from app.models.homophone_exercise import HomophoneExercise
 from app.models.user_agent import UserAgent, AgentStep
 from app.models.daily_content_config import DailyContentConfig
+from app.models.daily_content import DailyContent
+from app.models.ocr_record import OcrRecord
 from app.database import Base
 
 __all__ = [
