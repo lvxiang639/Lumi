@@ -39,20 +39,13 @@ async def solve_question(
     """Solve a question — OCR if image, AI tutor, auto-save record."""
     text = question
 
-    # OCR from image
+    # OCR from image — PaddleOCR (free, best Chinese recognition)
     if image and not text:
         try:
             content = await image.read()
-            import io, base64
-            img_b64 = base64.b64encode(content).decode()
-            from openai import AsyncOpenAI
-            from app.config import settings
-            client = AsyncOpenAI(api_key=settings.qwen_api_key, base_url=settings.qwen_base_url)
-            resp = await client.chat.completions.create(
-                model=settings.qwen_model_name,
-                messages=[{"role": "user", "content": [{"type": "text", "text": "请识别图片中的题目，只返回题目文字"}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}]}],
-                max_tokens=200)
-            text = resp.choices[0].message.content or ""
+            import asyncio
+            loop = asyncio.get_running_loop()
+            text = await loop.run_in_executor(None, _ocr_sync, content)
         except Exception:
             text = question
 
@@ -175,3 +168,31 @@ async def generate_practice(current_user: User = Depends(get_current_user), db: 
         return {"questions": saved}
     except Exception:
         return {"questions": [], "message": "生成失败"}
+
+
+# ── PaddleOCR helper (free, offline, best Chinese recognition) ──
+
+def _ocr_sync(image_bytes: bytes) -> str:
+    """Run PaddleOCR on an image and return recognized text."""
+    try:
+        from paddleocr import PaddleOCR
+        import io
+        from PIL import Image
+        import numpy as np
+
+        if not hasattr(_ocr_sync, '_ocr'):
+            _ocr_sync._ocr = PaddleOCR(lang='ch', use_angle_cls=True, show_log=False)
+
+        img = Image.open(io.BytesIO(image_bytes))
+        img_np = np.array(img)
+        result = _ocr_sync._ocr.ocr(img_np, cls=True)
+
+        lines = []
+        if result and result[0]:
+            for line in result[0]:
+                text = line[1][0] if len(line) > 1 else ''
+                if text.strip():
+                    lines.append(text.strip())
+        return '\n'.join(lines) if lines else ''
+    except ImportError:
+        return ''  # PaddleOCR not installed — fallback to text input
