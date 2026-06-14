@@ -79,7 +79,17 @@ class DiscoverProvider extends ChangeNotifier {
       final raw = prefs.getString(_storageKey);
       if (raw != null) {
         final list = json.decode(raw) as List;
-        _items.addAll(list.map((e) => DiscoverItem.fromJson(e as Map<String, dynamic>)));
+        final items = list.map((e) => DiscoverItem.fromJson(e as Map<String, dynamic>)).toList();
+        // Clean up duplicates (e.g. daily_content received via both WS and HTTP)
+        final seen = <String>{};
+        items.removeWhere((item) {
+          if (item.skill == 'daily_content') {
+            if (seen.contains(item.skill)) return true;
+            seen.add(item.skill!);
+          }
+          return false;
+        });
+        _items.addAll(items);
         _unreadCount = prefs.getInt('discover_unread') ?? 0;
         notifyListeners();
       }
@@ -143,6 +153,18 @@ class DiscoverProvider extends ChangeNotifier {
   }
 
   void addItem(String text, {String? skill, Map<String, dynamic>? data}) {
+    // Dedup: skip duplicate daily_content (already received via HTTP or previous WS push)
+    if (skill == 'daily_content') {
+      final todayKey = DateTime.now().toIso8601String().substring(0, 10);
+      final exists = _items.any((item) =>
+        item.skill == 'daily_content' &&
+        (item.id == 'daily_$todayKey' || item.data?['_date'] == todayKey));
+      if (exists) return;
+      // Set _date so future HTTP fetch can also dedup
+      if (data != null) {
+        data['_date'] = todayKey;
+      }
+    }
     _items.insert(0, DiscoverItem(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       text: text,
