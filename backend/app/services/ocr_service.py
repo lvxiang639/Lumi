@@ -93,11 +93,19 @@ class OCRService:
             img = Image.open(io.BytesIO(image_bytes))
             img_np = np.array(img)
 
-            # PPStructureV3.predict() returns list of layout elements
+            # PPStructureV3.predict() returns a list of LayoutParsingResultV2 (one per page)
             result = structure.predict(img_np)
 
-            elements = self._extract_elements(result)
-            markdown = self._build_markdown(elements)
+            # result[0] is the page result, an AttrDict with:
+            #   .parsing_res_list -> list of LayoutBlock (label, content, bbox, index, order_index)
+            #   .table_res_list, .formula_res_list, .chart_res_list
+            #   ._to_markdown() -> dict with markdown content
+            if not result or len(result) == 0:
+                return {"markdown": "", "elements": []}
+
+            page = result[0]
+            elements = self._extract_elements(page)
+            markdown = self._build_markdown(page, elements)
 
             return {
                 "markdown": markdown,
@@ -110,53 +118,114 @@ class OCRService:
             logger.exception("PPStructureV3 analysis failed")
             return {"markdown": "", "elements": [], "error": "版面分析失败"}
 
-    def _extract_elements(self, result) -> list:
-        """Convert PPStructureV3 raw result to a list of element dicts.
+    def _extract_elements(self, page) -> list:
+        """Extract elements from a LayoutParsingResultV2 page result.
 
-        PPStructureV3 returns a list where each item has:
-          - type: 'text' | 'table' | 'figure' | 'formula' | ...
-          - bbox: [x1, y1, x2, y2]
-          - res: extracted content (varies by type)
+        page.parsing_res_list contains LayoutBlock objects with:
+          label, content, bbox, index, order_index
+        page also has separate table_res_list, formula_res_list, chart_res_list.
         """
         elements = []
-        for item in result:
-            elem = {}
-            if isinstance(item, dict):
-                elem["type"] = item.get("type", "text")
-                elem["bbox"] = item.get("bbox", [])
-                elem["content"] = item.get("res", "")
-            elif hasattr(item, 'json'):
-                # Handle PaddleOCR result objects
-                data = item.json if callable(item.json) else item.json
-                elem["type"] = data.get("type", "text")
-                elem["bbox"] = data.get("bbox", [])
-                elem["content"] = data.get("res", "")
-            else:
-                elem["type"] = "text"
-                elem["bbox"] = []
-                elem["content"] = str(item)
-            elements.append(elem)
+
+        # Collect from parsing_res_list (main structured blocks)
+        parsing_blocks = getattr(page, 'parsing_res_list', []) or []
+        if isinstance(parsing_blocks, list):
+            for block in parsing_blocks:
+                # LayoutBlock is an AttrDict: .label, .content, .bbox, .index, .order_index
+                label = getattr(block, 'label', 'text')
+                content = getattr(block, 'content', '')
+                bbox = getattr(block, 'bbox', None)
+                if hasattr(bbox, 'tolist'):
+                    bbox = bbox.tolist()
+                elif bbox is None:
+                    bbox = []
+
+                if content:
+                    elements.append({
+                        "type": str(label),
+                        "bbox": bbox if isinstance(bbox, list) else [],
+                        "content": str(content),
+                    })
+
+        # Collect tables from table_res_list
+        tables = getattr(page, 'table_res_list', []) or []
+        if isinstance(tables, list):
+            for t in tables:
+                html = getattr(t, 'html', '') or str(t)
+                bbox = getattr(t, 'bbox', None)
+                if hasattr(bbox, 'tolist'):
+                    bbox = bbox.tolist()
+                if html:
+                    elements.append({
+                        "type": "table",
+                        "bbox": bbox if isinstance(bbox, list) else [],
+                        "content": str(html),
+                    })
+
+        # Collect formulas from formula_res_list
+        formulas = getattr(page, 'formula_res_list', []) or []
+        if isinstance(formulas, list):
+            for f in formulas:
+                latex = getattr(f, 'latex', '') or str(f)
+                bbox = getattr(f, 'bbox', None)
+                if hasattr(bbox, 'tolist'):
+                    bbox = bbox.tolist()
+                if latex:
+                    elements.append({
+                        "type": "formula",
+                        "bbox": bbox if isinstance(bbox, list) else [],
+                        "content": str(latex),
+                    })
+
+        # Collect charts from chart_res_list
+        charts = getattr(page, 'chart_res_list', []) or []
+        if isinstance(charts, list):
+            for c in charts:
+                content = str(c)
+                bbox = getattr(c, 'bbox', None)
+                if hasattr(bbox, 'tolist'):
+                    bbox = bbox.tolist()
+                elements.append({
+                    "type": "chart",
+                    "bbox": bbox if isinstance(bbox, list) else [],
+                    "content": content,
+                })
+
         return elements
 
-    def _build_markdown(self, elements: list) -> str:
-        """Build a Markdown string from structured layout elements."""
+    def _build_markdown(self, page, elements: list) -> str:
+        """Build Markdown from the page result, using built-in _to_markdown if available."""
+        # Try the built-in markdown conversion first
+        if hasattr(page, '_to_markdown'):
+            try:
+                md_result = page._to_markdown()
+                if isinstance(md_result, dict):
+                    # _to_markdown returns dict with markdown text
+                    raw = md_result.get('markdown_texts', md_result.get('markdown', ''))
+                    if isinstance(raw, list):
+                        text = '\n\n'.join(str(t) for t in raw)
+                    else:
+                        text = str(raw) if raw else ''
+                    if text:
+                        return str(text)
+            except Exception:
+                pass
+
+        # Fallback: build from elements
         parts = []
         for elem in elements:
             t = elem.get("type", "text")
             content = elem.get("content", "")
             if not content:
                 continue
-
-            if t == "text":
+            if t in ("text", "paragraph", "header", "footer", "aside_text"):
                 parts.append(content)
             elif t == "table":
                 parts.append(f"\n{content}\n")
             elif t == "formula":
                 parts.append(f"$$\n{content}\n$$")
-            elif t == "figure":
-                parts.append(f"> [图片区域]\n")
-            elif t == "chart":
-                parts.append(f"\n{content}\n")
+            elif t in ("figure", "image", "chart"):
+                parts.append(f"> [{t}]\n")
             else:
                 parts.append(content)
         return "\n\n".join(parts)
