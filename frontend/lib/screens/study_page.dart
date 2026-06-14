@@ -119,27 +119,63 @@ class _StudyPageState extends State<StudyPage> {
     itemBuilder: (_, i) {
       final r = _records[i];
       final mastered = r['status'] == '已掌握';
-      return Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(10), border: mastered ? Border.all(color: Colors.green.withValues(alpha: 0.3)) : null),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: _subjectColor(r['subject'] as String?).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)), child: Text(r['subject'] ?? '', style: TextStyle(fontSize: 11, color: _subjectColor(r['subject'] as String?)))),
-            const SizedBox(width: 8),
-            Text(r['tags'] ?? '', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 11)),
-            const Spacer(),
-            Text(mastered ? '✅' : '❌', style: const TextStyle(fontSize: 16)),
+      return GestureDetector(
+        onTap: () => _showDetail(r, b),
+        child: Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(10), border: mastered ? Border.all(color: Colors.green.withValues(alpha: 0.3)) : null),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: _subjectColor(r['subject'] as String?).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)), child: Text(r['subject'] ?? '', style: TextStyle(fontSize: 11, color: _subjectColor(r['subject'] as String?)))),
+              const SizedBox(width: 8), Text(r['tags'] ?? '', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 11)),
+              const Spacer(), Text(mastered ? '✅' : '❌', style: const TextStyle(fontSize: 16)),
+            ]),
+            const SizedBox(height: 6),
+            Text(r['question'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            Row(children: [
+              Text(_fmtTime(r['created_at']), style: TextStyle(color: AppColors.textSecondary(b), fontSize: 10)),
+              const Spacer(),
+              if (!mastered) GestureDetector(onTap: () => _markMastered(r['id'] as String), child: Text('标记已掌握', style: TextStyle(color: AppColors.accent, fontSize: 11))),
+            ]),
           ]),
-          const SizedBox(height: 6),
-          Text(r['question'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 13), maxLines: 3, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 4),
-          Row(children: [
-            Text(_fmtTime(r['created_at']), style: TextStyle(color: AppColors.textSecondary(b), fontSize: 10)),
-            const Spacer(),
-            if (!mastered) GestureDetector(onTap: () => _markMastered(r['id'] as String), child: Text('标记已掌握', style: TextStyle(color: AppColors.accent, fontSize: 11))),
-          ]),
-        ]),
+        ),
       );
     },
   );
+
+  void _showDetail(Map<String, dynamic> r, Brightness b) {
+    Map<String, dynamic> answer = {};
+    try { answer = json.decode(r['answer'] as String? ?? '{}') as Map<String, dynamic>; } catch (_) {}
+    final steps = (answer['steps'] as List?) ?? [];
+    final keyPoint = answer['key_point'] as String? ?? '';
+    final answerText = answer['answer'] as String? ?? '';
+
+    showModalBottomSheet(context: context, isScrollControlled: true, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => DraggableScrollableSheet(initialChildSize: 0.7, maxChildSize: 0.9, minChildSize: 0.3, expand: false,
+        builder: (ctx, scrollCtrl) => Container(decoration: BoxDecoration(color: AppColors.card(b), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+          child: Column(children: [
+            Container(width: 36, height: 4, margin: const EdgeInsets.only(top: 10, bottom: 14), decoration: BoxDecoration(color: AppColors.border(b), borderRadius: BorderRadius.circular(2))),
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(children: [
+              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: _subjectColor(r['subject'] as String?).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)), child: Text(r['subject'] ?? '', style: TextStyle(fontSize: 12, color: _subjectColor(r['subject'] as String?)))),
+              const SizedBox(width: 8), Text(r['tags'] ?? '', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12)),
+            ])),
+            const SizedBox(height: 12),
+            Expanded(child: SingleChildScrollView(controller: scrollCtrl, padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: b == Brightness.light ? const Color(0xFFF8F9FA) : const Color(0xFF1A1D21), borderRadius: BorderRadius.circular(10)),
+                child: Text(r['question'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.6))),
+              const SizedBox(height: 16),
+              if (steps.isNotEmpty) ...[
+                Text('💡 解题思路', style: TextStyle(color: AppColors.accent, fontSize: 15, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                ...steps.map((s) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(s.toString(), style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.6)))),
+              ],
+              if (keyPoint.isNotEmpty) ...[const SizedBox(height: 12), Text('🔑 $keyPoint', style: TextStyle(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w600))],
+              if (answerText.isNotEmpty) ...[const SizedBox(height: 12), Text('✅ $answerText', style: TextStyle(color: Colors.green, fontSize: 15, fontWeight: FontWeight.w600))],
+            ]))),
+          ])),
+        ),
+      ),
+    );
+  }
 
   Widget _analysisTab(Brightness b) {
     if (_analysis == null) return const Center(child: CircularProgressIndicator());

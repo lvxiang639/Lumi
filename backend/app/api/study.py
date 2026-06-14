@@ -105,7 +105,7 @@ async def list_records(
     q = q.order_by(StudyRecord.created_at.desc()).offset((page-1)*limit).limit(limit)
     r = await db.execute(q)
     rows = r.scalars().all()
-    return {"items": [{"id": str(rc.id), "child_name": rc.child_name, "subject": rc.subject, "tags": rc.tags, "question": rc.question[:200], "status": rc.status, "created_at": rc.created_at.isoformat() if rc.created_at else ""} for rc in rows]}
+    return {"items": [{"id": str(rc.id), "child_name": rc.child_name, "subject": rc.subject, "tags": rc.tags, "question": rc.question[:200], "answer": rc.answer, "status": rc.status, "created_at": rc.created_at.isoformat() if rc.created_at else ""} for rc in rows]}
 
 
 @router.put("/records/{record_id}")
