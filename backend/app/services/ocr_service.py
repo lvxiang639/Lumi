@@ -195,10 +195,10 @@ class OCRService:
 
     def _build_markdown(self, page, elements: list) -> str:
         """Build Markdown from the page result, using built-in _to_markdown if available."""
-        # Try the built-in markdown conversion first
+        # Try the built-in markdown conversion first (pretty=False → no HTML divs)
         if hasattr(page, '_to_markdown'):
             try:
-                md_result = page._to_markdown()
+                md_result = page._to_markdown(pretty=False)
                 if isinstance(md_result, dict):
                     # _to_markdown returns dict with markdown text
                     raw = md_result.get('markdown_texts', md_result.get('markdown', ''))
