@@ -89,7 +89,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     final brightness = Theme.of(context).brightness;
 
     return Scaffold(
-      backgroundColor: AppColors.bg(brightness),
+      backgroundColor: brightness == Brightness.light ? Colors.white : AppColors.bg(brightness),
       appBar: AppBar(
         title: const Text('灵犀'),
         actions: [
@@ -310,9 +310,11 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
 
   Widget _emptyState(Brightness b) => Center(
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(Icons.chat_bubble_outline, size: 56, color: AppColors.textSecondary(b).withValues(alpha: 0.3)),
+      Container(width: 64, height: 64, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)), child: Icon(Icons.chat_bubble_outline, size: 32, color: AppColors.accent.withValues(alpha: 0.5))),
       const SizedBox(height: 16),
-      Text('开始第一段对话吧', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 15)),
+      Text('开始第一段对话吧', style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 6),
+      Text('点击右上角 + 开始新对话', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 13)),
       const SizedBox(height: 20),
       ElevatedButton.icon(onPressed: _newConversation, icon: const Icon(Icons.add), label: const Text('新建对话')),
     ]),

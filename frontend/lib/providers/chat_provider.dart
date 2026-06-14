@@ -120,7 +120,6 @@ class ChatProvider extends ChangeNotifier {
         }
         _isProcessing = false;
         currentSkill = null;
-        _quickReplies = [];
         if (msg.data['conversation_id'] != null) {
           _conversationId = msg.data['conversation_id'] as String;
           _ws.conversationId = _conversationId;

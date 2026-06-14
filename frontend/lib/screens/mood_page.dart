@@ -50,6 +50,14 @@ class _MoodPageState extends State<MoodPage> {
         orElse: () => _emotions[3])['emoji'] as String;
   }
 
+  String _fmtTime(dynamic dt) {
+    if (dt == null) return '';
+    try {
+      final d = DateTime.parse(dt as String);
+      return '${d.month}/${d.day} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    } catch (_) { return ''; }
+  }
+
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
@@ -139,47 +147,43 @@ class _MoodPageState extends State<MoodPage> {
                   child: CircularProgressIndicator(
                       color: AppColors.accent))
               : _moods.isEmpty
-                  ? Center(
-                      child: Text('还没有心情记录',
-                          style: TextStyle(
-                              color: AppColors.textSecondary(
-                                  brightness))))
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(
-                          16, 4, 16, 24),
-                      itemCount: _moods.length,
-                      itemBuilder: (ctx, i) {
-                        final m = _moods[i];
-                        final emotion =
-                            m['emotion'] as String? ?? 'calm';
-                        return Container(
-                          margin:
-                              const EdgeInsets.only(bottom: 4),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: AppColors.card(brightness),
-                            borderRadius:
-                                BorderRadius.circular(10),
-                          ),
-                          child: Row(children: [
-                            Text(_emojiFor(emotion),
-                                style: const TextStyle(
-                                    fontSize: 20)),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                  m['note'] as String? ??
-                                      emotion,
-                                  style: TextStyle(
-                                      color: AppColors
-                                          .textSecondary(
-                                              brightness),
-                                      fontSize: 12)),
+                  ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Container(width: 64, height: 64, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)), child: Icon(Icons.mood_outlined, size: 32, color: AppColors.accent.withValues(alpha: 0.5))),
+                      const SizedBox(height: 16),
+                      Text('还没有心情记录', style: TextStyle(color: AppColors.text(brightness), fontSize: 16, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Text('点击上方表情记录此刻心情', style: TextStyle(color: AppColors.textSecondary(brightness), fontSize: 13)),
+                    ]))
+                  : RefreshIndicator(
+                      color: AppColors.accent,
+                      backgroundColor: AppColors.card(brightness),
+                      onRefresh: _load,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                        itemCount: _moods.length,
+                        itemBuilder: (ctx, i) {
+                          final m = _moods[i];
+                          final emotion = m['emotion'] as String? ?? 'calm';
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.card(brightness),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                          ]),
-                        );
-                      },
+                            child: Row(children: [
+                              Text(_emojiFor(emotion), style: const TextStyle(fontSize: 20)),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Text(m['note'] as String? ?? emotion, style: TextStyle(color: AppColors.text(brightness), fontSize: 13)),
+                                  Text(_fmtTime(m['created_at']), style: TextStyle(color: AppColors.textSecondary(brightness).withValues(alpha: 0.5), fontSize: 10)),
+                                ]),
+                              ),
+                            ]),
+                          );
+                        },
+                      ),
                     ),
         ),
       ]),

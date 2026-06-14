@@ -414,15 +414,11 @@ class _ExpensePageState extends State<ExpensePage> {
   Widget _emptyState(Brightness b) {
     return Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.account_balance_wallet_outlined,
-            size: 56,
-            color: AppColors.textSecondary(b)
-                .withValues(alpha: 0.3)),
+        Container(width: 64, height: 64, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)), child: Icon(Icons.account_balance_wallet_outlined, size: 32, color: AppColors.accent.withValues(alpha: 0.5))),
         const SizedBox(height: 16),
-        Text('还没有记账记录',
-            style: TextStyle(
-                color: AppColors.textSecondary(b),
-                fontSize: 15)),
+        Text('还没有记账记录', style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Text('点击右下角按钮记一笔', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 13)),
         const SizedBox(height: 20),
         ElevatedButton.icon(
           onPressed: _add,

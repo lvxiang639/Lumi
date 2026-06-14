@@ -76,7 +76,13 @@ class _NotesPageState extends State<NotesPage> {
       backgroundColor: AppColors.bg(brightness),
       appBar: AppBar(title: Text('笔记', style: TextStyle(color: AppColors.text(brightness), fontSize: 16, fontWeight: FontWeight.w600))),
       body: _loading ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
-          : _notes.isEmpty ? Center(child: Text('还没有笔记', style: TextStyle(color: AppColors.textSecondary(brightness))))
+          : _notes.isEmpty ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 64, height: 64, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)), child: Icon(Icons.note_alt_outlined, size: 32, color: AppColors.accent.withValues(alpha: 0.5))),
+                  const SizedBox(height: 16),
+                  Text('还没有笔记', style: TextStyle(color: AppColors.text(brightness), fontSize: 16, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Text('点击右下角按钮创建笔记', style: TextStyle(color: AppColors.textSecondary(brightness), fontSize: 13)),
+                ]))
           : RefreshIndicator(color: AppColors.accent, backgroundColor: AppColors.card(brightness), onRefresh: _load,
               child: ListView.builder(padding: const EdgeInsets.fromLTRB(16, 8, 16, 80), itemCount: _notes.length, itemBuilder: (_, i) {
                 final n = _notes[i];

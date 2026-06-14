@@ -71,55 +71,103 @@ class _AgentListPageState extends State<AgentListPage> {
   }
 
 
-  Widget _agentList(Brightness b) => ListView.builder(
-    padding: const EdgeInsets.all(16),
-    itemCount: _agents.length,
-    itemBuilder: (_, i) {
-      final a = _agents[i];
-      return Container(
-        margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(12)),
-        child: Row(children: [
-          Text(a['icon'] as String? ?? '🤖', style: const TextStyle(fontSize: 28)),
-          const SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Text(a['name'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w600)),
-              if (a['is_public'] == true) ...[const SizedBox(width: 6), Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1), decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: const Text('系统', style: TextStyle(fontSize: 9, color: AppColors.accent)))],
-            ]),
-            const SizedBox(height: 2),
-            Text(a['description'] as String? ?? '', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12)),
-          ])),
-          IconButton(icon: Icon(Icons.play_arrow, color: AppColors.accent, size: 22), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AgentDetailPage(agentId: a['id'] as String))).then((_) => _load())),
-          IconButton(icon: const Icon(Icons.edit_outlined, size: 16, color: Colors.grey), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AgentEditPage(agentId: a['id'] as String))).then((_) => _load())),
-          if (a['is_public'] != true) IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red, size: 16), onPressed: () => _delete(a['id'] as String)),
-        ]),
-      );
-    },
+  Widget _agentList(Brightness b) => RefreshIndicator(
+    onRefresh: () => _load(),
+    child: ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _agents.length,
+      itemBuilder: (_, i) {
+        final a = _agents[i];
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AgentDetailPage(agentId: a['id'] as String))).then((_) => _load()),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                Text(a['icon'] as String? ?? '🤖', style: const TextStyle(fontSize: 28)),
+                const SizedBox(width: 14),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Text(a['name'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w600)),
+                    if (a['is_public'] == true) ...[const SizedBox(width: 6), Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1), decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)), child: const Text('系统', style: TextStyle(fontSize: 9, color: AppColors.accent)))],
+                  ]),
+                  const SizedBox(height: 2),
+                  Text(a['description'] as String? ?? '', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12)),
+                ])),
+                IconButton(icon: Icon(Icons.play_arrow, color: AppColors.accent, size: 22), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AgentDetailPage(agentId: a['id'] as String))).then((_) => _load())),
+                IconButton(icon: const Icon(Icons.edit_outlined, size: 16, color: Colors.grey), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AgentEditPage(agentId: a['id'] as String))).then((_) => _load())),
+                if (a['is_public'] != true) IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red, size: 16), onPressed: () => _delete(a['id'] as String)),
+              ]),
+            ),
+          ),
+        );
+      },
+    ),
   );
 
-  Widget _historyList(Brightness b) => _history.isEmpty ? Center(child: Text('暂无使用记录', style: TextStyle(color: AppColors.textSecondary(b)))) : ListView.builder(
-    padding: const EdgeInsets.all(16),
-    itemCount: _history.length,
-    itemBuilder: (_, i) {
-      final h = _history[i];
-      return Container(
-        margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(10)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.history, size: 14, color: Colors.grey),
-            const SizedBox(width: 6),
-            Text(h['agent_name'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 13, fontWeight: FontWeight.w600)),
-            const Spacer(),
-            Text(_fmtTime(h['created_at']), style: TextStyle(color: AppColors.textSecondary(b), fontSize: 10)),
-          ]),
-          const SizedBox(height: 4),
-          Text((h['result'] as String? ?? '').replaceAll('\n', ' '), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textSecondary(b), fontSize: 11)),
-        ]),
+  Widget _historyList(Brightness b) => _history.isEmpty
+    ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 64, height: 64, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)), child: Icon(Icons.history, size: 32, color: AppColors.accent.withValues(alpha: 0.5))),
+        const SizedBox(height: 16),
+        Text('暂无使用记录', style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Text('使用 Agent 后，记录会显示在这里', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 13)),
+      ]))
+    : RefreshIndicator(
+        onRefresh: () => _load(),
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: _history.length,
+          itemBuilder: (_, i) {
+            final h = _history[i];
+            return GestureDetector(
+              onTap: () => _showHistoryDetail(h, b),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(10)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Icon(Icons.history, size: 14, color: Colors.grey),
+                    const SizedBox(width: 6),
+                    Text(h['agent_name'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 13, fontWeight: FontWeight.w600)),
+                    const Spacer(),
+                    Text(_fmtTime(h['created_at']), style: TextStyle(color: AppColors.textSecondary(b), fontSize: 10)),
+                  ]),
+                  const SizedBox(height: 4),
+                  Text((h['result'] as String? ?? '').replaceAll('\n', ' '), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textSecondary(b), fontSize: 11)),
+                ]),
+              ),
+            );
+          },
+        ),
       );
-    },
-  );
+
+
+  void _showHistoryDetail(Map<String, dynamic> h, Brightness b) {
+    showModalBottomSheet(
+      context: context, isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.5, maxChildSize: 0.8, minChildSize: 0.3, expand: false,
+        builder: (ctx, sc) => Container(
+          decoration: BoxDecoration(color: AppColors.card(b), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+          child: Column(children: [
+            Container(width: 36, height: 4, margin: const EdgeInsets.only(top: 10, bottom: 14), decoration: BoxDecoration(color: AppColors.border(b), borderRadius: BorderRadius.circular(2))),
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(children: [
+              Expanded(child: Text(h['agent_name'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600))),
+              GestureDetector(onTap: () => Navigator.pop(ctx), child: Icon(Icons.close, size: 20, color: AppColors.textSecondary(b))),
+            ])),
+            const SizedBox(height: 12),
+            Expanded(child: SingleChildScrollView(controller: sc, padding: const EdgeInsets.all(20), child: SelectableText(h['result'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.6)))),
+          ]),
+        ),
+      ),
+    );
+  }
+
 
   String _fmtTime(dynamic dt) {
     try { final d = DateTime.parse(dt as String); return '${d.month}/${d.day} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}'; } catch (_) { return ''; }

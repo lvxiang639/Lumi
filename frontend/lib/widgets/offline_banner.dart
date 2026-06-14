@@ -1,6 +1,8 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' show InternetAddress;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../theme/app_colors.dart';
 
 class OfflineBanner extends StatefulWidget {
@@ -24,8 +26,16 @@ class _OfflineBannerState extends State<OfflineBanner> {
 
   Future<void> _check() async {
     try {
-      final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3));
-      final online = result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+      bool online;
+      if (kIsWeb) {
+        // Web: use HTTP head request (no CORS issue — any response = online)
+        final resp = await http.head(Uri.parse('https://www.google.com')).timeout(const Duration(seconds: 3));
+        online = resp.statusCode < 500;
+      } else {
+        // Native: DNS lookup
+        final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3));
+        online = result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+      }
       if (online != _online && mounted) {
         setState(() => _online = online);
       }

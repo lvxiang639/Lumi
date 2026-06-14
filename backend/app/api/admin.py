@@ -102,8 +102,13 @@ async def delete_row(
     if table_name not in allowed: raise HTTPException(400, "Not allowed")
     try:
         uid = UUID(row_id)
+        # Nullify FK refs before deleting conversations
+        if table_name == "conversations":
+            await db.execute(text("UPDATE user_memories SET source_conv_id = NULL WHERE source_conv_id = :id"), {"id": uid})
         await db.execute(text(f"DELETE FROM {table_name} WHERE id = :id"), {"id": uid})
     except Exception:
+        if table_name == "conversations":
+            await db.execute(text("UPDATE user_memories SET source_conv_id = NULL WHERE source_conv_id = :id"), {"id": row_id})
         await db.execute(text(f"DELETE FROM {table_name} WHERE id = :id"), {"id": row_id})
     await db.commit()
     return {"status": "deleted"}

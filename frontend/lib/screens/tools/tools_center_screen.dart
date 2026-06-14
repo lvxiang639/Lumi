@@ -59,6 +59,7 @@ class ToolsCenterScreen extends StatelessWidget {
         page = const CountdownPage();
         break;
       case '辅导': page = const StudyPage(); break;
+      case 'OCR': page = const StudyPage(); break;
       case 'Agent': page = const AgentListPage(); break;
       case '知识库':
         page = const KnowledgePage();

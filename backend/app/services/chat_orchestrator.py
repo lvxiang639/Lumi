@@ -400,7 +400,9 @@ class ChatOrchestrator:
         return consolidated
 
     async def _suggest_replies(self, user_msg: str, ai_response: str, send_message) -> None:
-        """Generate 2-3 quick reply suggestions based on conversation context."""
+        """Generate 2-3 quick reply suggestions based on conversation context.
+        Falls back to simple context-based replies on LLM failure."""
+        suggestions = None
         try:
             prompt = (
                 f"基于以下对话，生成2-3个用户可以快速回复的选项（每个不超过15字）。"
@@ -411,16 +413,22 @@ class ChatOrchestrator:
             if raw:
                 import json
                 try:
-                    suggestions = json.loads(raw.strip())
-                    if isinstance(suggestions, list) and len(suggestions) > 0:
-                        await send_message({
-                            "type": "quick_replies",
-                            "replies": suggestions[:3],
-                        })
+                    parsed = json.loads(raw.strip())
+                    if isinstance(parsed, list) and len(parsed) > 0:
+                        suggestions = parsed[:3]
                 except (json.JSONDecodeError, ValueError):
-                    pass
-        except Exception:
-            pass  # suggestions are optional, never fail the main flow
+                    logger.warning("quick_reply json parse failed: %s", raw[:100])
+        except Exception as e:
+            logger.warning("quick_reply LLM failed: %s", e)
+
+        # Fallback: context-free generic replies
+        if not suggestions:
+            suggestions = ["继续说", "详细讲讲", "举个例子"]
+
+        await send_message({
+            "type": "quick_replies",
+            "replies": suggestions[:3],
+        })
 
     async def _get_or_create_conv(
         self,

@@ -2,7 +2,7 @@ import logging
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, update
 from app.database import get_db
 from app.models import Conversation, Message, User, SentEmail, ConvMemory
 from app.api.deps import get_current_user
@@ -185,6 +185,13 @@ async def delete_conversation(
     conv = result.scalar_one_or_none()
     if not conv:
         raise HTTPException(404, "Conversation not found")
+    # Nullify source_conv_id in related user_memories to avoid FK violation
+    from app.models.user_memory import UserMemory
+    await db.execute(
+        update(UserMemory)
+        .where(UserMemory.source_conv_id == conv_id)
+        .values(source_conv_id=None)
+    )
     await db.delete(conv)
     await db.commit()
     return {"status": "deleted"}

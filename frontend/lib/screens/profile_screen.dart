@@ -110,6 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         decoration: BoxDecoration(
           color: AppColors.accent.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border(b), width: 0.5),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -160,18 +161,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             children: [
               _settingItem(Icons.auto_awesome, '角色管理', b,
-                  () => _showCharacterSheet()),
+                  () => _showCharacterSheet(), iconColor: AppColors.accent),
               _divider(b),
               _settingItem(Icons.psychology_outlined, 'AI 人格', b,
-                  () => _showPersonaSheet()),
+                  () => _showPersonaSheet(), iconColor: const Color(0xFF8B5CF6)),
               _divider(b),
               _settingItem(Icons.email_outlined, '邮箱设置', b, () {
                 _showEmailDialog();
-              }),
+              }, iconColor: AppColors.accentBlue),
               _divider(b),
               _settingItem(Icons.summarize_outlined, '对话摘要列表', b, () {
                 _showSummaryList();
-              }),
+              }, iconColor: const Color(0xFFF59E0B)),
               _divider(b),
               _settingItem(Icons.info_outline, '关于灵犀', b, () {
                 _showAboutDialog();
@@ -188,10 +189,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _settingItem(
-      IconData icon, String title, Brightness b, VoidCallback onTap) {
+      IconData icon, String title, Brightness b, VoidCallback onTap, {Color? iconColor}) {
     return ListTile(
       leading:
-          Icon(icon, color: AppColors.textSecondary(b), size: 22),
+          Icon(icon, color: iconColor ?? AppColors.textSecondary(b), size: 22),
       title: Text(title,
           style:
               TextStyle(color: AppColors.text(b), fontSize: 15)),
@@ -273,10 +274,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       {'name': '二次元', 'desc': '萌系元气娘，喵~的说', 'icon': '🎀'},
       {'name': '小猫', 'desc': '猫视角看世界，喵~', 'icon': '🐈'},
     ];
-    // Load current persona from auth provider
-    String selected = '默认';
-    // Try to read from user data if available
-    selected = '默认'; // default fallback
+    final auth = context.read<AuthProvider>();
+    String selected = auth.user?.persona.isNotEmpty == true ? auth.user!.persona : '默认';
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.card(brightness),

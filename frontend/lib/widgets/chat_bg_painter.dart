@@ -40,7 +40,7 @@ class ChatBgPainter extends CustomPainter {
       final cx = ox + 10 + rng.nextDouble() * (size - 20);
       final cy = oy + 10 + rng.nextDouble() * (size - 20);
       final s = 12.0 + rng.nextDouble() * 20.0; // scale (4x original)
-      final kind = rng.nextInt(14);
+      final kind = rng.nextInt(21);
 
       switch (kind) {
         case 0: _cat(canvas, cx, cy, s, stroke); break;
@@ -57,6 +57,14 @@ class ChatBgPainter extends CustomPainter {
         case 11: _moon(canvas, cx, cy, s, stroke); break;
         case 12: _book(canvas, cx, cy, s, stroke); break;
         case 13: _key(canvas, cx, cy, s, stroke); break;
+        // ── Electronics ──
+        case 14: _phone(canvas, cx, cy, s, stroke); break;
+        case 15: _laptop(canvas, cx, cy, s, stroke); break;
+        case 16: _headphones(canvas, cx, cy, s, stroke); break;
+        case 17: _watch(canvas, cx, cy, s, stroke); break;
+        case 18: _camera(canvas, cx, cy, s, stroke); break;
+        case 19: _gamepad(canvas, cx, cy, s, stroke); break;
+        case 20: _tablet(canvas, cx, cy, s, stroke); break;
       }
     }
   }
@@ -252,6 +260,95 @@ class ChatBgPainter extends CustomPainter {
     // Teeth
     path.addRect(Rect.fromCenter(center: Offset(cx + s * 0.3, cy + s * 0.1), width: s * 0.06, height: s * 0.15));
     path.addRect(Rect.fromCenter(center: Offset(cx + s * 0.2, cy + s * 0.1), width: s * 0.06, height: s * 0.12));
+    canvas.drawPath(path, p);
+  }
+
+  // ── Electronics ──
+
+  void _phone(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    final w = s * 0.16, h = s * 0.38;
+    // Body — rounded rect
+    path.addRRect(RRect.fromLTRBR(cx - w, cy - h, cx + w, cy + h, Radius.circular(s * 0.08)));
+    // Screen
+    path.addRRect(RRect.fromLTRBR(cx - w * 0.7, cy - h * 0.75, cx + w * 0.7, cy + h * 0.65, Radius.circular(s * 0.04)));
+    // Home button
+    canvas.drawCircle(Offset(cx, cy + h * 0.8), s * 0.04, p);
+    canvas.drawPath(path, p);
+  }
+
+  void _laptop(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    final w = s * 0.38, h = s * 0.18;
+    // Screen
+    path.addRRect(RRect.fromLTRBR(cx - w * 0.7, cy - s * 0.35, cx + w * 0.7, cy + s * 0.05, Radius.circular(s * 0.04)));
+    // Base — trapezoid approximation
+    path.addRRect(RRect.fromLTRBR(cx - w, cy + s * 0.05, cx + w, cy + h + s * 0.2, Radius.circular(s * 0.06)));
+    canvas.drawPath(path, p);
+  }
+
+  void _headphones(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    // Headband — arc
+    path.addArc(Rect.fromCenter(center: Offset(cx, cy - s * 0.15), width: s * 0.55, height: s * 0.55), 3.5, 5.8);
+    // Left cup
+    path.addRRect(RRect.fromLTRBR(cx - s * 0.3, cy + s * 0.05, cx - s * 0.12, cy + s * 0.35, Radius.circular(s * 0.06)));
+    // Right cup
+    path.addRRect(RRect.fromLTRBR(cx + s * 0.12, cy + s * 0.05, cx + s * 0.3, cy + s * 0.35, Radius.circular(s * 0.06)));
+    canvas.drawPath(path, p);
+  }
+
+  void _watch(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    final w = s * 0.2, h = s * 0.22;
+    // Band top
+    path.addRect(Rect.fromCenter(center: Offset(cx, cy - h * 0.8), width: s * 0.08, height: s * 0.12));
+    // Band bottom
+    path.addRect(Rect.fromCenter(center: Offset(cx, cy + h * 0.8), width: s * 0.08, height: s * 0.12));
+    // Face
+    path.addRRect(RRect.fromLTRBR(cx - w, cy - h, cx + w, cy + h, Radius.circular(s * 0.12)));
+    // Inner circle
+    canvas.drawCircle(Offset(cx, cy), s * 0.1, p);
+    canvas.drawPath(path, p);
+  }
+
+  void _camera(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    final w = s * 0.3, h = s * 0.22;
+    // Body
+    path.addRRect(RRect.fromLTRBR(cx - w, cy - h * 0.3, cx + w, cy + h, Radius.circular(s * 0.08)));
+    // Lens
+    canvas.drawCircle(Offset(cx, cy + h * 0.2), s * 0.14, p);
+    // Flash nub
+    path.addOval(Rect.fromCenter(center: Offset(cx + w * 0.5, cy - h * 0.5), width: s * 0.1, height: s * 0.06));
+    canvas.drawPath(path, p);
+  }
+
+  void _gamepad(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    final w = s * 0.32, h = s * 0.2;
+    // Main body — rounded cross shape
+    path.addRRect(RRect.fromLTRBR(cx - w, cy - h * 0.3, cx + w, cy + h, Radius.circular(s * 0.1)));
+    // Left grip
+    path.addOval(Rect.fromCenter(center: Offset(cx - w, cy + h * 0.4), width: s * 0.18, height: s * 0.22));
+    // Right grip
+    path.addOval(Rect.fromCenter(center: Offset(cx + w, cy + h * 0.4), width: s * 0.18, height: s * 0.22));
+    // D-pad
+    path.addRect(Rect.fromCenter(center: Offset(cx - s * 0.1, cy), width: s * 0.08, height: s * 0.12));
+    path.addRect(Rect.fromCenter(center: Offset(cx - s * 0.1, cy), width: s * 0.12, height: s * 0.08));
+    // Buttons
+    canvas.drawCircle(Offset(cx + s * 0.1, cy), s * 0.04, p);
+    canvas.drawCircle(Offset(cx + s * 0.18, cy - s * 0.02), s * 0.03, p);
+    canvas.drawPath(path, p);
+  }
+
+  void _tablet(Canvas canvas, double cx, double cy, double s, Paint p) {
+    final path = Path();
+    final w = s * 0.28, h = s * 0.4;
+    // Body
+    path.addRRect(RRect.fromLTRBR(cx - w, cy - h, cx + w, cy + h, Radius.circular(s * 0.1)));
+    // Screen
+    path.addRRect(RRect.fromLTRBR(cx - w * 0.78, cy - h * 0.82, cx + w * 0.78, cy + h * 0.78, Radius.circular(s * 0.06)));
     canvas.drawPath(path, p);
   }
 

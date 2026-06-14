@@ -46,6 +46,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       case 'morning_briefing': return '晨间简报';
       case 'daily_content': return '每日精选';
       case 'news': return '本地资讯';
+      case 'chinese_literature': return '每日语文';
       default: return '灵犀';
     }
   }
@@ -61,6 +62,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       case 'morning_briefing': return '🌅';
       case 'daily_content': return '📰';
       case 'news': return '📰';
+      case 'chinese_literature': return '📜';
       default: return '🦏';
     }
   }

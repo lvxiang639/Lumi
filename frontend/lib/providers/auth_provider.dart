@@ -41,6 +41,16 @@ class AuthProvider extends ChangeNotifier {
     if (email != null) body['email'] = email;
     if (persona != null) body['persona'] = persona;
     await _auth.updateProfile(body: body);
+    if (_user != null) {
+      _user = User(
+        id: _user!.id,
+        phone: _user!.phone,
+        nickname: nickname ?? _user!.nickname,
+        avatar: avatar ?? _user!.avatar,
+        persona: persona ?? _user!.persona,
+      );
+      notifyListeners();
+    }
   }
 
   Future<bool> login(String phone) async {

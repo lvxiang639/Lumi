@@ -1,9 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.logging import setup_logging
 from app.api.auth import router as auth_router
+import time, logging
 
 setup_logging()
+logger = logging.getLogger("main")
 from app.api.characters import router as character_router
 from app.api.conversations import router as conversation_router
 from app.api.shop import router as shop_router
@@ -16,6 +18,7 @@ from app.api.ws_chat import router as ws_router
 from app.api.countdown import router as countdown_router
 from app.api.knowledge import router as knowledge_router
 from app.api.study import router as study_router
+from app.api.homophone import router as homophone_router
 from app.api.agents import router as agents_router
 from app.api.admin import router as admin_router
 
@@ -28,6 +31,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Request logging middleware ──
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration = (time.time() - start) * 1000
+    logger.info(f"{request.method:6} {response.status_code} {duration:6.0f}ms {request.url.path}")
+    return response
 
 app.include_router(auth_router)
 app.include_router(character_router)
@@ -44,6 +56,7 @@ app.include_router(knowledge_router)
 app.include_router(admin_router)
 app.include_router(agents_router)
 app.include_router(study_router)
+app.include_router(homophone_router)
 
 
 @app.on_event("startup")

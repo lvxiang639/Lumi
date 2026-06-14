@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import '../config.dart';
 import '../theme/app_colors.dart';
+import 'homophone_page.dart';
 
 class StudyPage extends StatefulWidget {
   const StudyPage({super.key});
@@ -37,15 +38,30 @@ class _StudyPageState extends State<StudyPage> {
 
   Future<void> _solve({String? imagePath}) async {
     setState(() => _loading = true);
-    final tok = (await SharedPreferences.getInstance()).getString('access_token') ?? '';
-    var req = http.MultipartRequest('POST', Uri.parse('${AppConfig.apiBaseUrl}/api/study/solve'))
-      ..headers['Authorization'] = 'Bearer $tok'
-      ..fields['question'] = _qCtrl.text
-      ..fields['child_name'] = _childName;
-    if (imagePath != null) req.files.add(await http.MultipartFile.fromPath('image', imagePath));
-    final resp = await http.Response.fromStream(await req.send());
-    if (resp.statusCode == 200) { _result = json.decode(resp.body); _qCtrl.clear(); _load(); }
-    setState(() => _loading = false);
+    try {
+      final tok = (await SharedPreferences.getInstance()).getString('access_token') ?? '';
+      var req = http.MultipartRequest('POST', Uri.parse('${AppConfig.apiBaseUrl}/api/study/solve'))
+        ..headers['Authorization'] = 'Bearer $tok'
+        ..fields['question'] = _qCtrl.text
+        ..fields['child_name'] = _childName;
+      if (imagePath != null) req.files.add(await http.MultipartFile.fromPath('image', imagePath));
+      final resp = await http.Response.fromStream(await req.send()).timeout(const Duration(seconds: 60));
+      if (resp.statusCode == 200) {
+        _result = json.decode(resp.body);
+        _qCtrl.clear();
+        _load();
+      } else {
+        if (mounted) _snack('请求失败: ${resp.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) _snack('请求失败: ${e.toString().replaceAll("Exception: ", "")}');
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating));
   }
 
   Future<void> _pickImage() async {
@@ -73,8 +89,8 @@ class _StudyPageState extends State<StudyPage> {
     final b = Theme.of(context).brightness;
     return Scaffold(backgroundColor: AppColors.bg(b), appBar: AppBar(title: const Text('📚 学习辅导')),
       body: Column(children: [
-        Row(children: [_tb('解题', 0), _tb('记录', 1), _tb('分析', 2)]),
-        Expanded(child: _tab == 0 ? _solveTab(b) : _tab == 1 ? _recordsTab(b) : _analysisTab(b)),
+        Row(children: [_tb('解题', 0), _tb('记录', 1), _tb('分析', 2), _tb('同音字', 3)]),
+        Expanded(child: _tab == 0 ? _solveTab(b) : _tab == 1 ? _recordsTab(b) : _tab == 2 ? _analysisTab(b) : const HomophonePage()),
       ]),
     );
   }

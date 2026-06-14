@@ -83,29 +83,32 @@ class _KnowledgePageState extends State<KnowledgePage> {
           ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
           : _items.isEmpty
               ? _emptyState(b)
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _items.length,
-                  itemBuilder: (_, i) {
-                    final item = _items[i];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(12)),
-                      child: Row(children: [
-                        Container(width: 42, height: 42,
-                          decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-                          child: const Icon(Icons.library_books, color: Color(0xFF8B5CF6), size: 22)),
-                        const SizedBox(width: 14),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(item['title'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w500)),
-                          const SizedBox(height: 2),
-                          Text('${item['chunk_count'] ?? 0} 个文本块', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 11)),
-                        ])),
-                        IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18), onPressed: () => _delete(item['id'] as String)),
-                      ]),
-                    );
-                  },
+              : RefreshIndicator(
+                  onRefresh: () => _load(),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _items.length,
+                    itemBuilder: (_, i) {
+                      final item = _items[i];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(12)),
+                        child: Row(children: [
+                          Container(width: 42, height: 42,
+                            decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                            child: const Icon(Icons.library_books, color: Color(0xFF8B5CF6), size: 22)),
+                          const SizedBox(width: 14),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(item['title'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 2),
+                            Text('${item['chunk_count'] ?? 0} 个文本块', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 11)),
+                          ])),
+                          IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18), onPressed: () => _delete(item['id'] as String)),
+                        ]),
+                      );
+                    },
+                  ),
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: _uploading ? null : _upload,
@@ -117,11 +120,11 @@ class _KnowledgePageState extends State<KnowledgePage> {
 
   Widget _emptyState(Brightness b) => Center(
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(Icons.library_books_outlined, size: 56, color: AppColors.textSecondary(b).withValues(alpha: 0.3)),
+      Container(width: 64, height: 64, decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)), child: Icon(Icons.library_books_outlined, size: 32, color: AppColors.accent.withValues(alpha: 0.5))),
       const SizedBox(height: 16),
-      Text('创建你的知识库', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 15)),
-      const SizedBox(height: 4),
-      Text('上传 PDF/Word/TXT，AI 基于文档回答', style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 12)),
+      Text('创建你的知识库', style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 6),
+      Text('上传 PDF/Word/TXT，AI 基于文档回答', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 13)),
       const SizedBox(height: 20),
       ElevatedButton.icon(onPressed: _upload, icon: const Icon(Icons.upload_file), label: const Text('上传文档')),
     ]),

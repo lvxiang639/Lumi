@@ -119,7 +119,7 @@ class _ChatScreenState extends State<ChatScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: AppColors.card(Theme.of(context).brightness),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),

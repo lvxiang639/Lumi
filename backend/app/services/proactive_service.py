@@ -67,12 +67,16 @@ DAILY_TOPIC_PROMPT = """生成一个有趣的每日话题（20字以内），可
 
 每日话题:"""
 
-CONTENT_CARD_PROMPT = """生成一张每日内容卡片，包含以下三项（每项一行，格式: emoji 标题: 内容）：
+CONTENT_CARD_PROMPT = """生成一张每日内容卡片，包含以下五项（每行一项，格式: emoji 标题: 内容）：
 1. 🔮 今日运势: 一句简短有趣的运势（15字以内，随机生成，轻松幽默）
-2. 💡 冷知识: 一个有趣的冷知识（20字以内，要出乎意料）
-3. 🌟 今日一言: 一句正能量名言（20字以内，标注出处）
+2. 😂 每日一笑: 一个简短笑话（30字以内，轻松不低俗）
+3. 💡 冷知识: 一个有趣的冷知识（20字以内，要出乎意料）
+4. 🛠️ 生活小贴士: 一个实用小技巧（20字以内）
+5. 🌟 今日一言: 一句正能量名言（20字以内，标注出处）
 
 内容卡片:"""
+
+# ── Proactive service ──
 
 
 class ProactiveService:
@@ -86,6 +90,7 @@ class ProactiveService:
             try:
                 await self._check_all()
                 await push_daily_content()
+                await push_chinese_literature()
             except Exception:
                 logger.exception("proactive poll error")
             await asyncio.sleep(self._interval)
@@ -311,13 +316,14 @@ class ProactiveService:
     async def _check_calendar(
         self, user_id: str, now: datetime, db
     ) -> dict | None:
-        """Check for events in the next 60 minutes."""
+        """Check for events in the next 60 minutes. Skip events >1 day in the past."""
+        day_ago = now - timedelta(days=1)
         window = now + timedelta(hours=1)
         r = await db.execute(
             select(CalendarEvent)
             .where(
                 CalendarEvent.user_id == user_id,
-                CalendarEvent.time >= now,
+                CalendarEvent.time >= now,  # only future events
                 CalendarEvent.time <= window,
             )
             .order_by(CalendarEvent.time)
@@ -607,6 +613,8 @@ proactive_service = ProactiveService()
 GREETING_PROMPT = """你是一只关心主人的小猫灵犀。根据以下用户信息和当前时间，想一个简短温暖的欢迎语（不超过35字）。
 要自然、可爱，不要刻意复述记忆。如果没有特别的信息就返回空。
 
+注意: 不要提及已经过期的日历事件（如过去的家长会、接机、会议等）。只关注当前和未来的事。
+
 当前时间: {now}
 用户信息:
 {memories}
@@ -737,11 +745,82 @@ async def push_daily_content():
             pass
 
 
+async def push_chinese_literature():
+    """Push Chinese literature (poetry/idiom/history) at higher frequency (~3h).
+    Separate throttle: 2h cooldown, max 5/day. Runs alongside daily_content."""
+    now = datetime.now(BEIJING_TZ)
+    # Only push during waking hours 8:00-22:00
+    if now.hour < 8 or now.hour >= 22:
+        return
+
+    content = None
+    for uid in online_users():
+        try:
+            from uuid import UUID
+            from app.models.proactive_push import ProactivePush
+            from app.database import async_session
+
+            # Check throttle: max 1 per 2 hours, 5 per day
+            async with async_session() as db:
+                today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                two_hours_ago = now - timedelta(hours=2)
+                r = await db.execute(
+                    select(func.count(ProactivePush.id)).where(
+                        ProactivePush.user_id == UUID(uid),
+                        ProactivePush.push_type == "chinese_literature",
+                        ProactivePush.created_at >= today_start,
+                    )
+                )
+                count_today = r.scalar() or 0
+                if count_today >= 5:
+                    continue
+                r2 = await db.execute(
+                    select(func.count(ProactivePush.id)).where(
+                        ProactivePush.user_id == UUID(uid),
+                        ProactivePush.push_type == "chinese_literature",
+                        ProactivePush.created_at >= two_hours_ago,
+                    )
+                )
+                if (r2.scalar() or 0) > 0:
+                    continue
+        except Exception:
+            continue
+
+        try:
+            # Generate content once and reuse for all users
+            if content is None:
+                raw = await llm_router.chat([{"role": "user", "content": CHINESE_LITERATURE_PROMPT}])
+                content = _clean_llm_content(raw or "")[:400]
+
+            if not content:
+                continue
+
+            label = "📜 每日语文"
+            if content.startswith("📜"):
+                label = "📜 古诗词鉴赏"
+            elif content.startswith("📚"):
+                label = "📚 每日成语"
+            elif content.startswith("🏛"):
+                label = "🏛️ 历史典故"
+
+            payload = {"type": "proactive", "delta": label, "skill": "chinese_literature", "data": {"literature": {"display_name": label, "content": content}}}
+            await send_to_user(uid, payload)
+
+            async with async_session() as db:
+                db.add(ProactivePush(user_id=UUID(uid), push_type="chinese_literature", message_preview=content[:50]))
+                await db.commit()
+        except Exception:
+            pass
+
+
 async def seed_daily_content_configs():
     """Insert default daily content configs. Safe to call — uses ON CONFLICT DO NOTHING pattern."""
     defaults = [
         ("daily_topic", "💬 每日话题", DAILY_TOPIC_PROMPT, 1),
         ("content_card", "🌟 今日卡片", CONTENT_CARD_PROMPT, 2),
+        ("chinese_poetry", "📜 每日古诗词", CHINESE_POETRY_PROMPT, 3),
+        ("chinese_idiom", "📚 每日成语", CHINESE_IDIOM_PROMPT, 4),
+        ("chinese_history", "🏛️ 每日典故", CHINESE_HISTORY_PROMPT, 5),
     ]
     try:
         async with async_session() as db:
@@ -761,12 +840,68 @@ DAILY_TOPIC_PROMPT = """生成一个有趣的每日话题（20字以内），可
 
 每日话题:"""
 
-CONTENT_CARD_PROMPT = """生成一张每日内容卡片，包含以下三项（每行一项，格式: emoji 标题: 内容）：
-1. 🔮 今日运势: 一句简短有趣的运势（15字以内，随机生成，轻松幽默）
-2. 💡 冷知识: 一个有趣的冷知识（20字以内，要出乎意料）
-3. 🌟 今日一言: 一句正能量名言（20字以内，标注出处）
+CHINESE_POETRY_PROMPT = """你是一位语文老师。请推荐一首经典古诗词（中小学必背优先），格式如下：
 
-内容卡片:"""
+📜 《诗词名》 — 作者（朝代）
+原文（选最经典的两句）
+🎓 赏析: 一句话解释含义和意境（25字以内）
+
+示例：
+📜 《静夜思》 — 李白（唐）
+床前明月光，疑是地上霜。
+🎓 赏析: 以月光寄托思乡之情，语言朴素意境深远。
+
+今日古诗词:"""
+
+CHINESE_IDIOM_PROMPT = """你是一位语文老师。请推荐一个常用成语，包含出处和用法，格式如下：
+
+📚 成语名
+💬 释义: 一句话解释（15字以内）
+📖 出处: 原始出处（10字以内）
+✍️ 例句: 一个生活化的例句（20字以内）
+
+示例：
+📚 画龙点睛
+💬 释义: 在关键处加上精辟语句使内容更生动
+📖 出处: 《历代名画记》
+✍️ 例句: 这篇文章结尾那句话真是画龙点睛之笔！
+
+今日成语:"""
+
+CHINESE_HISTORY_PROMPT = """你是一位历史老师。请分享一个有趣的历史典故，格式如下：
+
+🏛️ 典故名
+📅 朝代
+📝 故事: 用通俗语言简述（50字以内，要有趣）
+💡 启示: 一句话启示（15字以内）
+
+示例：
+🏛️ 破釜沉舟
+📅 秦朝末年
+📝 项羽率军渡河后下令砸锅沉船，只留三天口粮，以示决一死战。将士们见无退路，奋勇杀敌，最终大败秦军。
+💡 启示: 断绝退路才能全力以赴
+
+今日典故:"""
+
+CHINESE_LITERATURE_PROMPT = """你是一位语文老师。请随机选择以下一种类型生成内容（每种概率相等）:
+
+类型A — 古诗词:
+📜 《诗词名》 — 作者（朝代）
+原文（选最经典两句）
+🎓 一句话赏析（25字以内）
+
+类型B — 成语:
+📚 成语名
+💬 释义（15字以内）| 📖 出处 | ✍️ 例句（20字以内）
+
+类型C — 历史典故:
+🏛️ 典故名 · 📅 朝代
+📝 简述（50字以内，有趣）
+💡 启示（15字以内）
+
+注意: 只返回一种类型的内容，不要同时返回多种。优先选择中小学课本常见的篇目。
+
+今日语文:"""
 
 
 async def send_connect_greeting(user_id: str) -> str | None:

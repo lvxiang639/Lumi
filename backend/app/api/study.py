@@ -1,6 +1,6 @@
 """Study tutor API — solve, record, analyze, practice."""
 
-import json, logging
+import json, logging, asyncio, io
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
@@ -15,6 +15,28 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/study", tags=["study"])
+
+# Pre-warm PaddleOCR at module load (prevents first-request hang)
+_OCR_READY = False
+
+def _warm_ocr():
+    global _OCR_READY
+    try:
+        from paddleocr import PaddleOCR
+        import numpy as np
+        ocr = PaddleOCR(lang='ch', use_textline_orientation=True)
+        # Run a tiny warm-up inference
+        dummy = np.zeros((50, 200, 3), dtype=np.uint8)
+        ocr.predict(dummy)
+        _ocr_sync._ocr = ocr
+        _OCR_READY = True
+        logger.info("PaddleOCR warmed up and ready")
+    except Exception as e:
+        logger.warning(f"PaddleOCR warm-up failed: {e}")
+
+# Start warm-up in background thread
+import threading
+threading.Thread(target=_warm_ocr, daemon=True).start()
 
 SOLVE_PROMPT = """你是一位耐心的辅导老师。学生的题目如下，请先分步讲解思路，最后给出答案。
 
@@ -39,18 +61,23 @@ async def solve_question(
     """Solve a question — OCR if image, AI tutor, auto-save record."""
     text = question
 
-    # OCR from image — PaddleOCR (free, best Chinese recognition)
+    # OCR from image — PaddleOCR first, Qwen fallback
     if image and not text:
+        content = await image.read()
         try:
-            content = await image.read()
-            import asyncio
             loop = asyncio.get_running_loop()
             text = await loop.run_in_executor(None, _ocr_sync, content)
         except Exception:
-            text = question
+            text = ""
+        # Fallback to Qwen multimodal OCR
+        if not text.strip():
+            try:
+                text = await _qwen_ocr(content)
+            except Exception:
+                pass
 
     if not text.strip():
-        raise HTTPException(400, "请提供题目内容")
+        raise HTTPException(400, "请提供题目内容或确认图片中有文字")
 
     # Detect subject if not provided
     if not subject:
@@ -173,26 +200,48 @@ async def generate_practice(current_user: User = Depends(get_current_user), db: 
 # ── PaddleOCR helper (free, offline, best Chinese recognition) ──
 
 def _ocr_sync(image_bytes: bytes) -> str:
-    """Run PaddleOCR on an image and return recognized text."""
+    """Run PaddleOCR on an image — model pre-warmed at startup."""
     try:
-        from paddleocr import PaddleOCR
-        import io
         from PIL import Image
         import numpy as np
 
         if not hasattr(_ocr_sync, '_ocr'):
-            _ocr_sync._ocr = PaddleOCR(lang='ch', use_angle_cls=True, show_log=False)
+            from paddleocr import PaddleOCR
+            _ocr_sync._ocr = PaddleOCR(lang='ch', use_textline_orientation=True)
 
         img = Image.open(io.BytesIO(image_bytes))
         img_np = np.array(img)
-        result = _ocr_sync._ocr.ocr(img_np, cls=True)
+        result = _ocr_sync._ocr.predict(img_np)
 
         lines = []
-        if result and result[0]:
-            for line in result[0]:
-                text = line[1][0] if len(line) > 1 else ''
-                if text.strip():
+        for r in result:
+            data = r.json if hasattr(r, 'json') else {}
+            res = data.get('res', data)
+            texts = res.get('rec_texts', [])
+            for text in texts:
+                if text and text.strip():
                     lines.append(text.strip())
         return '\n'.join(lines) if lines else ''
     except ImportError:
-        return ''  # PaddleOCR not installed — fallback to text input
+        return ''
+    except Exception:
+        return ''
+
+
+async def _qwen_ocr(image_bytes: bytes) -> str:
+    """Fallback OCR using Qwen multimodal API."""
+    import base64
+    from openai import AsyncOpenAI
+    from app.config import settings
+
+    b64 = base64.b64encode(image_bytes).decode()
+    client = AsyncOpenAI(api_key=settings.qwen_api_key, base_url=settings.qwen_base_url)
+    resp = await client.chat.completions.create(
+        model=settings.qwen_model_name,
+        messages=[{"role": "user", "content": [
+            {"type": "text", "text": "请识别图片中的所有文字，只返回文字内容，不要解释。"},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+        ]}],
+        max_tokens=512,
+    )
+    return (resp.choices[0].message.content or "").strip()

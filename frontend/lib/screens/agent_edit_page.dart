@@ -16,8 +16,11 @@ class _AgentEditPageState extends State<AgentEditPage> {
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _promptCtrl = TextEditingController();
+  final _iconCtrl = TextEditingController(text: '🤖');
   String _icon = '🤖';
   List<Map<String, dynamic>> _steps = [];
+  final Map<int, TextEditingController> _stepQCtrl = {};
+  final Map<int, TextEditingController> _stepCCtrl = {};
   bool _loading = false;
 
   bool get _isEdit => widget.agentId != null;
@@ -37,7 +40,14 @@ class _AgentEditPageState extends State<AgentEditPage> {
       _descCtrl.text = d['description'] ?? '';
       _promptCtrl.text = d['system_prompt'] ?? '';
       _icon = d['icon'] ?? '🤖';
+      _iconCtrl.text = _icon;
       _steps = (d['steps'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      // Init step controllers
+      _stepQCtrl.clear(); _stepCCtrl.clear();
+      for (int i = 0; i < _steps.length; i++) {
+        _stepQCtrl[i] = TextEditingController(text: _steps[i]['question'] as String? ?? '');
+        _stepCCtrl[i] = TextEditingController(text: _steps[i]['choices'] as String? ?? '');
+      }
       setState(() {});
     }
   }
@@ -59,11 +69,19 @@ class _AgentEditPageState extends State<AgentEditPage> {
   }
 
   void _addStep() {
+    final i = _steps.length;
+    _stepQCtrl[i] = TextEditingController(text: '');
+    _stepCCtrl[i] = TextEditingController(text: '');
     setState(() => _steps.add({'question': '', 'answer_type': 'text', 'choices': ''}));
   }
 
   @override
-  void dispose() { _nameCtrl.dispose(); _descCtrl.dispose(); _promptCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _nameCtrl.dispose(); _descCtrl.dispose(); _promptCtrl.dispose(); _iconCtrl.dispose();
+    for (final c in _stepQCtrl.values) { c.dispose(); }
+    for (final c in _stepCCtrl.values) { c.dispose(); }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +92,7 @@ class _AgentEditPageState extends State<AgentEditPage> {
       body: ListView(padding: const EdgeInsets.all(16), children: [
         _field('名称', _nameCtrl),
         _field('描述', _descCtrl),
-        _field('图标(emoji)', TextEditingController(text: _icon), onChanged: (v) => _icon = v),
+        _field('图标(emoji)', _iconCtrl, onChanged: (v) => _icon = v),
         const SizedBox(height: 8),
         Text('系统提示词', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12)),
         const SizedBox(height: 4),
@@ -90,7 +108,7 @@ class _AgentEditPageState extends State<AgentEditPage> {
                 const Spacer(),
                 GestureDetector(onTap: () => setState(() => _steps.removeAt(i)), child: const Icon(Icons.close, size: 16, color: Colors.red)),
               ]),
-              TextField(controller: TextEditingController(text: s['question'] as String? ?? ''), onChanged: (v) => _steps[i]['question'] = v, style: TextStyle(color: AppColors.text(b), fontSize: 13), decoration: const InputDecoration(hintText: '问题', border: UnderlineInputBorder())),
+              TextField(controller: _stepQCtrl[i], onChanged: (v) => _steps[i]['question'] = v, style: TextStyle(color: AppColors.text(b), fontSize: 13), decoration: const InputDecoration(hintText: '问题', border: UnderlineInputBorder())),
               const SizedBox(height: 4),
               Row(children: [
                 DropdownButton<String>(
@@ -101,7 +119,7 @@ class _AgentEditPageState extends State<AgentEditPage> {
                 ),
                 if (s['answer_type'] == 'choice') ...[
                   const SizedBox(width: 8),
-                  Expanded(child: TextField(controller: TextEditingController(text: s['choices'] as String? ?? ''), onChanged: (v) => _steps[i]['choices'] = v, style: TextStyle(color: AppColors.text(b), fontSize: 12), decoration: const InputDecoration(hintText: '选项,逗号分隔', border: UnderlineInputBorder()))),
+                  Expanded(child: TextField(controller: _stepCCtrl[i], onChanged: (v) => _steps[i]['choices'] = v, style: TextStyle(color: AppColors.text(b), fontSize: 12), decoration: const InputDecoration(hintText: '选项,逗号分隔', border: UnderlineInputBorder()))),
                 ],
               ]),
             ])),
