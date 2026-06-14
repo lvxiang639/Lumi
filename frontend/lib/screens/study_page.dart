@@ -130,6 +130,7 @@ class _StudyPageState extends State<StudyPage> {
             ]),
             const SizedBox(height: 6),
             Text(r['question'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Builder(builder: (_) { final a = _getAnswerPreview(r); if (a != null) return Padding(padding: const EdgeInsets.only(top: 3), child: Text('✅ $a', style: TextStyle(color: Colors.green, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)); return const SizedBox.shrink(); }),
             const SizedBox(height: 4),
             Row(children: [
               Text(_fmtTime(r['created_at']), style: TextStyle(color: AppColors.textSecondary(b), fontSize: 10)),
