@@ -143,22 +143,34 @@ class _StudyPageState extends State<StudyPage> {
     final steps = (a['steps'] as List?) ?? [];
     final kp = a['key_point'] as String? ?? '';
     final at = a['answer'] as String? ?? '';
-
-    final widgets = <Widget>[
-      Container(padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: b == Brightness.light ? const Color(0xFFF8F9FA) : const Color(0xFF1A1D21), borderRadius: BorderRadius.circular(10)), child: Text(r['question'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.6))),
-    ];
-    if (steps.isNotEmpty) { widgets.add(Text('💡 解题思路', style: TextStyle(color: AppColors.accent, fontSize: 15, fontWeight: FontWeight.w600))); for (final s in steps) widgets.add(Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(s.toString(), style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.6)))); }
-    if (kp.isNotEmpty) widgets.add(Text('🔑 $kp', style: TextStyle(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w600)));
-    if (at.isNotEmpty) widgets.add(Text('✅ $at', style: TextStyle(color: Colors.green, fontSize: 15, fontWeight: FontWeight.w600)));
-
-    showModalBottomSheet(context: context, isScrollControlled: true, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))), builder: (ctx) => DraggableScrollableSheet(initialChildSize: 0.7, maxChildSize: 0.9, minChildSize: 0.3, expand: false, builder: (ctx, sc) => Container(decoration: BoxDecoration(color: AppColors.card(b), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))), child: Column(children: [
-      Container(width: 36, height: 4, margin: const EdgeInsets.only(top: 10, bottom: 14), decoration: BoxDecoration(color: AppColors.border(b), borderRadius: BorderRadius.circular(2))),
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(children: [Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: _sc(r['subject'] as String?).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)), child: Text(r['subject'] ?? '', style: TextStyle(fontSize: 12, color: _sc(r['subject'] as String?)))), const SizedBox(width: 8), Text(r['tags'] ?? '', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12))])),
-      const SizedBox(height: 12),
-      Expanded(child: SingleChildScrollView(controller: sc, padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets))),
-    ])))));
+    showModalBottomSheet(
+      context: context, isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) {
+        final ws = <Widget>[
+          Container(padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: b == Brightness.light ? const Color(0xFFF8F9FA) : const Color(0xFF1A1D21), borderRadius: BorderRadius.circular(10)), child: Text(r['question'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.6))),
+        ];
+        if (steps.isNotEmpty) { ws.add(Text('💡 解题思路', style: TextStyle(color: AppColors.accent, fontSize: 15, fontWeight: FontWeight.w600))); for (final s in steps) ws.add(Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(s.toString(), style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.6)))); }
+        if (kp.isNotEmpty) ws.add(Text('🔑 $kp', style: TextStyle(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w600)));
+        if (at.isNotEmpty) ws.add(Text('✅ $at', style: TextStyle(color: Colors.green, fontSize: 15, fontWeight: FontWeight.w600)));
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7, maxChildSize: 0.9, minChildSize: 0.3, expand: false,
+          builder: (ctx2, sc) => Container(
+            decoration: BoxDecoration(color: AppColors.card(b), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+            child: Column(children: [
+              Container(width: 36, height: 4, margin: const EdgeInsets.only(top: 10, bottom: 14), decoration: BoxDecoration(color: AppColors.border(b), borderRadius: BorderRadius.circular(2))),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(children: [
+                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: _sc(r['subject'] as String?).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)), child: Text(r['subject'] ?? '', style: TextStyle(fontSize: 12, color: _sc(r['subject'] as String?)))),
+                const SizedBox(width: 8), Text(r['tags'] ?? '', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12)),
+              ])),
+              const SizedBox(height: 12),
+              Expanded(child: SingleChildScrollView(controller: sc, padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: ws))),
+            ]),
+          ),
+        );
+      },
+    );
   }
-
   Widget _analysisTab(Brightness b) {
     if (_analysis == null) return const Center(child: CircularProgressIndicator());
     final weak = (_analysis!['weak_points'] as List?) ?? [];
