@@ -149,9 +149,31 @@ class _StudyPageState extends State<StudyPage> {
     final keyPoint = answer['key_point'] as String? ?? '';
     final answerText = answer['answer'] as String? ?? '';
 
-    showModalBottomSheet(context: context, isScrollControlled: true, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => DraggableScrollableSheet(initialChildSize: 0.7, maxChildSize: 0.9, minChildSize: 0.3, expand: false,
-        builder: (ctx, scrollCtrl) => Container(decoration: BoxDecoration(color: AppColors.card(b), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
+    final stepWidgets = <Widget>[
+      Container(
+        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(color: b == Brightness.light ? const Color(0xFFF8F9FA) : const Color(0xFF1A1D21), borderRadius: BorderRadius.circular(10)),
+        child: Text(r['question'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.6)),
+      ),
+    ];
+
+    if (steps.isNotEmpty) {
+      stepWidgets.add(Text('解题思路', style: TextStyle(color: AppColors.accent, fontSize: 15, fontWeight: FontWeight.w600)));
+      for (final s in steps) {
+        stepWidgets.add(Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(s.toString(), style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.6))));
+      }
+    }
+    if (keyPoint.isNotEmpty) stepWidgets.add(Text('$keyPoint', style: TextStyle(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w600)));
+    if (answerText.isNotEmpty) stepWidgets.add(Text('$answerText', style: TextStyle(color: Colors.green, fontSize: 15, fontWeight: FontWeight.w600)));
+
+    showModalBottomSheet(
+      context: context, isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7, maxChildSize: 0.9, minChildSize: 0.3, expand: false,
+        builder: (ctx, scrollCtrl) => Container(
+          decoration: BoxDecoration(color: AppColors.card(b), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
           child: Column(children: [
             Container(width: 36, height: 4, margin: const EdgeInsets.only(top: 10, bottom: 14), decoration: BoxDecoration(color: AppColors.border(b), borderRadius: BorderRadius.circular(2))),
             Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(children: [
@@ -159,24 +181,12 @@ class _StudyPageState extends State<StudyPage> {
               const SizedBox(width: 8), Text(r['tags'] ?? '', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12)),
             ])),
             const SizedBox(height: 12),
-            Expanded(child: SingleChildScrollView(controller: scrollCtrl, padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: b == Brightness.light ? const Color(0xFFF8F9FA) : const Color(0xFF1A1D21), borderRadius: BorderRadius.circular(10)),
-                child: Text(r['question'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.6))),
-              const SizedBox(height: 16),
-              if (steps.isNotEmpty) ...[
-                Text('💡 解题思路', style: TextStyle(color: AppColors.accent, fontSize: 15, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                ...steps.map((s) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(s.toString(), style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.6)))),
-              ],
-              if (keyPoint.isNotEmpty) ...[const SizedBox(height: 12), Text('🔑 $keyPoint', style: TextStyle(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w600))],
-              if (answerText.isNotEmpty) ...[const SizedBox(height: 12), Text('✅ $answerText', style: TextStyle(color: Colors.green, fontSize: 15, fontWeight: FontWeight.w600))],
-            ]))),
-          ])),
+            Expanded(child: SingleChildScrollView(controller: scrollCtrl, padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: stepWidgets))),
+          ]),
         ),
       ),
     );
   }
-
   Widget _analysisTab(Brightness b) {
     if (_analysis == null) return const Center(child: CircularProgressIndicator());
     final weak = (_analysis!['weak_points'] as List?) ?? [];
