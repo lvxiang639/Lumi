@@ -216,5 +216,14 @@ class _StudyPageState extends State<StudyPage> {
     switch (s) { case '数学': return const Color(0xFF3B82F6); case '语文': return const Color(0xFF10B981); case '英语': return const Color(0xFFF59E0B); default: return AppColors.accent; }
   }
 
+
+  String? _getAnswerPreview(Map<String, dynamic> r) {
+    try {
+      final a = json.decode(r['answer'] as String? ?? '{}') as Map<String, dynamic>;
+      final ans = a['answer'] as String?;
+      return (ans != null && ans.isNotEmpty) ? ans : null;
+    } catch (_) { return null; }
+  }
+
   String _fmtTime(dynamic dt) { try { final d = DateTime.parse(dt as String); return '${d.month}/${d.day} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}'; } catch (_) { return ''; } }
 }

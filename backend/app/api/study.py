@@ -16,14 +16,15 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/study", tags=["study"])
 
-SOLVE_PROMPT = """你是一位耐心的辅导老师。学生的题目如下，请分步引导思考，不要直接给答案。
+SOLVE_PROMPT = """你是一位耐心的辅导老师。学生的题目如下，请先分步讲解思路，最后给出答案。
 
 题目: {question}
 科目: {subject}
 
 请按以下格式回复（JSON）:
 {{"subject": "数学", "tags": "标签1,标签2", "steps": ["第1步: ...", "第2步: ..."], "key_point": "关键方法一句话", "answer": "最终答案"}}
-"""
+
+注意: answer 字段必须填最终答案，不能为空。"""
 
 
 @router.post("/solve")
