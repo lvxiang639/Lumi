@@ -149,11 +149,11 @@ class _StudyPageState extends State<StudyPage> {
             ]),
           ]),
         ),
-      );
     },
-  );
-
-  void _showDetail(Map<String, dynamic> r, Brightness b) {
+  ),
+  ),
+]);
+  }
     Map<String, dynamic> answer = {};
     try { answer = json.decode(r['answer'] as String? ?? '{}') as Map<String, dynamic>; } catch (_) {}
     final steps = (answer['steps'] as List?) ?? [];
