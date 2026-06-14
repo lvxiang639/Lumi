@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -42,7 +43,7 @@ class _OcrPageState extends State<OcrPage> {
     if (result == null || result.files.single.path == null) return;
 
     final path = result.files.single.path!;
-    final bytes = await result.files.single.readAsBytes();
+    final bytes = File(path).readAsBytesSync();
     setState(() { _loading = true; _text = null; _imageBytes = bytes; });
 
     try {
