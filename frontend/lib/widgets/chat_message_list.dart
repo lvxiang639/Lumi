@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/notes_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/markdown_styles.dart';
 
 class ChatMessageList extends StatelessWidget {
   final List msgs;
@@ -75,8 +78,18 @@ class ChatMessageList extends StatelessWidget {
               ),
               border: isUser ? null : Border.all(color: AppColors.border(brightness)),
             ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
-              SelectableText(content, style: TextStyle(color: AppColors.text(brightness), fontSize: 15, height: 1.5)),
+            child: Column(crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              if (isUser)
+                SelectableText(content, style: TextStyle(color: AppColors.text(brightness), fontSize: 15, height: 1.5))
+              else
+                MarkdownBody(
+                  data: content,
+                  selectable: true,
+                  styleSheet: chatMarkdownStyle(brightness),
+                  onTapLink: (text, href, title) {
+                    if (href != null) _openLink(ctx, href);
+                  },
+                ),
               if (createdAt != null) ...[
                 const SizedBox(height: 2),
                 Text(_formatTime(createdAt), style: TextStyle(color: AppColors.textSecondary(brightness).withValues(alpha: 0.5), fontSize: 10)),
@@ -126,6 +139,20 @@ class ChatMessageList extends StatelessWidget {
         ]),
       ),
     );
+  }
+
+  Future<void> _openLink(BuildContext ctx, String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(content: Text('无法打开链接'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating));
+      }
+    }
   }
 
   Future<void> _saveNote(BuildContext ctx, String content) async {
