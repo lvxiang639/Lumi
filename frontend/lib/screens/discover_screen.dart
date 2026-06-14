@@ -155,6 +155,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           ),
           const Spacer(),
           GestureDetector(
+            onTap: () { Clipboard.setData(ClipboardData(text: item.text)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制'), duration: Duration(seconds: 1))); },
+            child: Icon(Icons.copy, size: 16, color: AppColors.textSecondary(b).withValues(alpha: 0.5)),
+          ),
+          const SizedBox(width: 16),
+          GestureDetector(
             onTap: () { Clipboard.setData(ClipboardData(text: item.text)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已复制，去聊天页发送吧 💬'), duration: Duration(seconds: 1))); },
             child: Icon(Icons.share_outlined, size: 18, color: AppColors.accent),
           ),
