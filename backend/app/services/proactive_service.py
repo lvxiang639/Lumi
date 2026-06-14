@@ -176,10 +176,15 @@ class ProactiveService:
                 for item in cd:
                     checks.append({"type": "countdown", "title": item["title"], "label": item["label"]})
 
-            # Book recommendation (personalized, once/day via DB throttle)
+            # Book recommendation
             book = await self._check_book_recommendation(user_id, now, db)
             logger.info("proactive check: book -> %s", "HIT" if book else "SKIP")
             if book: checks.append(book)
+
+            # Practice push (study weak points)
+            practice = await self._check_practice_push(user_id, now, db)
+            logger.info("proactive check: practice -> %s", "HIT" if practice else "SKIP")
+            if practice: checks.append(practice)
 
             logger.info("proactive check: %d checks hit for %s", len(checks), user_id[:8])
             if checks:
@@ -222,6 +227,8 @@ class ProactiveService:
                 lines.append(f"📚 书籍推荐")
             elif t == "countdown":
                 lines.append(f"倒数日:{c.get('title', '')}{c.get('label', '')}")
+            elif t == "practice":
+                lines.append(f"有{c.get('questions', [])} 道练习题待完成")
         if not lines:
             return None
         time_str = now.strftime("%H:%M")
@@ -451,6 +458,16 @@ class ProactiveService:
         today_key = now.strftime("%m-%d")
         name = HOLIDAYS.get(today_key)
         return {"type": "holiday", "name": name} if name else None
+
+    async def _check_practice_push(self, user_id: str, now: datetime, db) -> dict | None:
+        """Check for unsolved practice questions and push them."""
+        from uuid import UUID
+        from app.models.study_record import PracticePush
+        r = await db.execute(select(PracticePush).where(PracticePush.user_id == UUID(user_id), PracticePush.solved == False).limit(3))
+        practices = r.scalars().all()
+        if not practices: return None
+        lines = [f"📝 {p.question[:100]}" for p in practices]
+        return {"type": "practice", "questions": lines}
 
     async def _check_book_recommendation(self, user_id: str, now: datetime, db) -> dict | None:
         """Personalized book recommendation based on user memories. Once/day per user."""

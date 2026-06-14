@@ -65,11 +65,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: AppColors.accent.withValues(alpha: 0.1),
-                child:
-                    const Text('🐱', style: TextStyle(fontSize: 28)),
+              Container(
+                width: 56, height: 56,
+                decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF6C63FF), Color(0xFF8B7FFF)]), borderRadius: BorderRadius.circular(16)),
+                child: const Center(child: Text('🐱', style: TextStyle(fontSize: 28))),
               ),
               const SizedBox(width: 16),
               Expanded(
