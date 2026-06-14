@@ -276,7 +276,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ];
     // Load current persona from auth provider
     String selected = '默认';
-    final auth = context.read<AuthProvider>();
     // Try to read from user data if available
     selected = '默认'; // default fallback
     showModalBottomSheet(

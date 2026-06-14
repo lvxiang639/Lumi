@@ -51,11 +51,10 @@ class _AgentEditPageState extends State<AgentEditPage> {
       'icon': _icon, 'system_prompt': _promptCtrl.text,
       'steps': _steps,
     };
-    final method = _isEdit ? 'PUT' : 'POST';
     final url = '${AppConfig.apiBaseUrl}/api/agents${_isEdit ? "/${widget.agentId}" : ""}';
-    final r = _isEdit
-        ? await http.put(Uri.parse(url), headers: {'Authorization': 'Bearer $tok', 'Content-Type': 'application/json'}, body: json.encode(body))
-        : await http.post(Uri.parse(url), headers: {'Authorization': 'Bearer $tok', 'Content-Type': 'application/json'}, body: json.encode(body));
+    await (_isEdit
+        ? http.put(Uri.parse(url), headers: {'Authorization': 'Bearer $tok', 'Content-Type': 'application/json'}, body: json.encode(body))
+        : http.post(Uri.parse(url), headers: {'Authorization': 'Bearer $tok', 'Content-Type': 'application/json'}, body: json.encode(body)));
     if (mounted) { Navigator.pop(context, true); }
   }
 
