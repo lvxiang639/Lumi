@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -125,6 +126,15 @@ class _OcrPageState extends State<OcrPage> {
                   Container(width: 36, height: 4, margin: const EdgeInsets.only(top: 10, bottom: 14), decoration: BoxDecoration(color: AppColors.border(b), borderRadius: BorderRadius.circular(2))),
                   Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(children: [
                     const Expanded(child: Text('OCR 结果', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+                    GestureDetector(
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: data['text'] as String? ?? ''));
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('已复制到剪贴板'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating));
+                      },
+                      child: Icon(Icons.copy, size: 18, color: AppColors.textSecondary(b)),
+                    ),
+                    const SizedBox(width: 12),
                     GestureDetector(onTap: () => Navigator.pop(ctx), child: Icon(Icons.close, size: 20, color: AppColors.textSecondary(b))),
                   ])),
                   const SizedBox(height: 12),
@@ -156,6 +166,11 @@ class _OcrPageState extends State<OcrPage> {
   void _snack(String msg) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating));
+  }
+
+  void _copyText(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    _snack('已复制到剪贴板');
   }
 
   @override
@@ -213,6 +228,11 @@ class _OcrPageState extends State<OcrPage> {
                 Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle)),
                 const SizedBox(width: 6),
                 Text('识别文字', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => _copyText(_text ?? ''),
+                  child: Icon(Icons.copy, size: 16, color: AppColors.textSecondary(b)),
+                ),
               ]),
               const SizedBox(height: 8),
               SelectableText(_text ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.6)),
@@ -233,6 +253,11 @@ class _OcrPageState extends State<OcrPage> {
                 _tabBtn('Markdown', 0, b),
                 const SizedBox(width: 8),
                 _tabBtn('元素列表 (${_structureElements?.length ?? 0})', 1, b),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => _copyText(_activeTab == 0 ? (_structureMarkdown ?? '') : (_structureElements?.map((e) => e['content'] ?? '').join('\n\n') ?? '')),
+                  child: Icon(Icons.copy, size: 16, color: AppColors.textSecondary(b)),
+                ),
               ]),
               const SizedBox(height: 12),
               if (_activeTab == 0)
@@ -338,6 +363,12 @@ class _OcrPageState extends State<OcrPage> {
           if (bbox != null && bbox.length == 4)
             Text('  [${(bbox[0] as num).toInt()},${(bbox[1] as num).toInt()} ${(bbox[2] as num).toInt()}x${(bbox[3] as num).toInt()}]',
               style: TextStyle(color: AppColors.textSecondary(b), fontSize: 10)),
+          const Spacer(),
+          if (content.isNotEmpty)
+            GestureDetector(
+              onTap: () => _copyText(content),
+              child: Icon(Icons.copy, size: 14, color: AppColors.textSecondary(b)),
+            ),
         ]),
         if (content.isNotEmpty) ...[
           const SizedBox(height: 6),

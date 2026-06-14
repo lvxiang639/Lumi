@@ -24,3 +24,4 @@ greenlet==3.5.1
 duckduckgo_search>=8.0
 paddlepaddle>=3.0.0
 paddleocr>=3.0.0
+paddlex[ocr]>=3.0.0
