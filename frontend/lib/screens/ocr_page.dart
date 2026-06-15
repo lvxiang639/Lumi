@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -49,11 +48,12 @@ class _OcrPageState extends State<OcrPage> {
   }
 
   Future<void> _pickAndAnalyze() async {
-    final result = await FilePicker.pickFiles(type: FileType.image);
-    if (result == null || result.files.single.path == null) return;
+    final result = await FilePicker.pickFiles(type: FileType.image, withData: true);
+    if (result == null || result.files.single.bytes == null) return;
 
-    final path = result.files.single.path!;
-    final bytes = File(path).readAsBytesSync();
+    final file = result.files.single;
+    final bytes = file.bytes!;
+    final fileName = file.name;
     setState(() {
       _loading = true;
       _text = null;
@@ -67,9 +67,9 @@ class _OcrPageState extends State<OcrPage> {
       final tok = (await SharedPreferences.getInstance()).getString('access_token') ?? '';
 
       if (_mode == OcrMode.text) {
-        await _doTextOcr(tok, path);
+        await _doTextOcr(tok, bytes, fileName);
       } else {
-        await _doStructureAnalysis(tok, path);
+        await _doStructureAnalysis(tok, bytes, fileName);
       }
     } catch (e) {
       _snack('识别失败: $e');
@@ -77,10 +77,10 @@ class _OcrPageState extends State<OcrPage> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _doTextOcr(String tok, String path) async {
+  Future<void> _doTextOcr(String tok, Uint8List bytes, String filename) async {
     var req = http.MultipartRequest('POST', Uri.parse('${AppConfig.apiBaseUrl}/api/tools/ocr'))
       ..headers['Authorization'] = 'Bearer $tok'
-      ..files.add(await http.MultipartFile.fromPath('file', path));
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
     final resp = await http.Response.fromStream(await req.send()).timeout(const Duration(seconds: 30));
     if (resp.statusCode == 200) {
       final data = json.decode(resp.body);
@@ -91,10 +91,10 @@ class _OcrPageState extends State<OcrPage> {
     }
   }
 
-  Future<void> _doStructureAnalysis(String tok, String path) async {
+  Future<void> _doStructureAnalysis(String tok, Uint8List bytes, String filename) async {
     var req = http.MultipartRequest('POST', Uri.parse('${AppConfig.apiBaseUrl}/api/tools/ocr/structure'))
       ..headers['Authorization'] = 'Bearer $tok'
-      ..files.add(await http.MultipartFile.fromPath('file', path));
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
     final resp = await http.Response.fromStream(await req.send()).timeout(const Duration(seconds: 30));
     if (resp.statusCode == 200) {
       final data = json.decode(resp.body);

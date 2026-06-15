@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,14 +36,18 @@ class _KnowledgePageState extends State<KnowledgePage> {
   }
 
   Future<void> _upload() async {
-    final result = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['pdf', 'docx', 'txt']);
-    if (result == null || result.files.single.path == null) return;
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'docx', 'txt'],
+      withData: true,  // Read bytes in picker (iOS security-scoped compatible)
+    );
+    if (result == null || result.files.single.bytes == null) return;
     final file = result.files.single;
     setState(() => _uploading = true);
     try {
       final tok = (await SharedPreferences.getInstance()).getString('access_token') ?? '';
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/knowledge/upload');
-      final bytes = File(file.path!).readAsBytesSync();
+      final bytes = file.bytes!;
       final req = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $tok'
         ..fields['title'] = file.name
