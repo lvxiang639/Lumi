@@ -38,7 +38,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       case 'morning_briefing': return '晨间简报';
       case 'daily_content': return '每日精选';
       case 'news': return '本地资讯';
-      case 'chinese_literature': return '每日语文';
+      case 'chinese_literature': return '国学经典';
       default: return '灵犀';
     }
   }

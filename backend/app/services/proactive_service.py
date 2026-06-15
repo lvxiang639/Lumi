@@ -90,7 +90,7 @@ class ProactiveService:
             try:
                 await self._check_all()
                 await push_daily_content()
-                await push_chinese_literature()
+                # Chinese literature is now part of daily_content (poetry/idiom/history entries)
             except Exception:
                 logger.exception("proactive poll error")
             await asyncio.sleep(self._interval)
@@ -834,7 +834,7 @@ async def push_chinese_literature():
             if not content:
                 continue
 
-            label = "📜 每日语文"
+            label = "📜 国学经典"
             if content.startswith("📜"):
                 label = "📜 古诗词鉴赏"
             elif content.startswith("📚"):
