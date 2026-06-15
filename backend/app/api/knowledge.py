@@ -1,5 +1,6 @@
 """Knowledge base API — thin controller."""
 
+import json
 import logging
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
@@ -8,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
 from app.models import User
-from app.models.knowledge_base import KnowledgeBase
+from app.models.knowledge_base import KnowledgeBase, KnowledgeChatMessage
 from app.api.deps import get_current_user
 from app.domain.knowledge.service import KnowledgeService
 from app.domain.knowledge.repository import KnowledgeRepository
@@ -135,13 +136,20 @@ async def rag_chat(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Chat with a knowledge base — retrieve + LLM answer."""
+    """Chat with a knowledge base — retrieve + LLM answer. Saves Q&A history."""
     svc = _get_service(db)
+
+    # Save user question
+    db.add(KnowledgeChatMessage(kb_id=kb_id, user_id=current_user.id, role="user", content=query))
 
     # Retrieve relevant chunks
     chunks = await svc.retrieve(kb_id, current_user.id, query, top_k=3)
+    sources = [c[:100] + "..." for c in chunks] if chunks else []
     if not chunks:
-        return {"answer": "在知识库中没有找到相关内容。", "sources": []}
+        answer = "在知识库中没有找到相关内容。"
+        db.add(KnowledgeChatMessage(kb_id=kb_id, user_id=current_user.id, role="assistant", content=answer, sources=json.dumps(sources)))
+        await db.commit()
+        return {"answer": answer, "sources": sources}
 
     # Build RAG prompt
     context = "\n\n---\n\n".join(chunks)
@@ -156,9 +164,49 @@ async def rag_chat(
 
     try:
         answer = await llm_router.chat([{"role": "user", "content": prompt}])
-        return {"answer": answer or "无法生成回答", "sources": [c[:100] + "..." for c in chunks]}
+        answer = answer or "无法生成回答"
     except Exception:
         raise HTTPException(500, "AI回答生成失败")
+
+    # Save AI answer
+    db.add(KnowledgeChatMessage(kb_id=kb_id, user_id=current_user.id, role="assistant", content=answer, sources=json.dumps(sources)))
+    await db.commit()
+    return {"answer": answer, "sources": sources}
+
+
+@router.get("/{kb_id}/messages")
+async def get_chat_messages(
+    kb_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get chat history for a knowledge base."""
+    r = await db.execute(
+        select(KnowledgeChatMessage)
+        .where(KnowledgeChatMessage.kb_id == kb_id, KnowledgeChatMessage.user_id == current_user.id)
+        .order_by(KnowledgeChatMessage.created_at.asc())
+        .limit(100)
+    )
+    msgs = r.scalars().all()
+    return {
+        "messages": [
+            {
+                "id": str(m.id),
+                "role": m.role,
+                "content": m.content,
+                "sources": _parse_sources(m.sources),
+                "created_at": m.created_at.isoformat() if m.created_at else "",
+            }
+            for m in msgs
+        ]
+    }
+
+
+def _parse_sources(raw: str | None) -> list[str]:
+    try:
+        return json.loads(raw) if raw else []
+    except Exception:
+        return []
 
 
 def _extract_text(content: bytes, filename: str) -> str:

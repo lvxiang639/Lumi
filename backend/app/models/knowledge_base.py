@@ -28,3 +28,15 @@ class KnowledgeChunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, default=0)
     embedding: Mapped[list[float]] = mapped_column(ARRAY(Float), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class KnowledgeChatMessage(Base):
+    __tablename__ = "knowledge_chat_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    kb_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)  # 'user' | 'assistant'
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    sources: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array of source snippets
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

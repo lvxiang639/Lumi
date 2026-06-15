@@ -23,6 +23,33 @@ class _KnowledgeChatPageState extends State<KnowledgeChatPage> {
   bool _loading = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final tok = (await SharedPreferences.getInstance()).getString('access_token') ?? '';
+      final resp = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/api/knowledge/${widget.kbId}/messages'),
+        headers: {'Authorization': 'Bearer $tok'},
+      );
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        final msgs = (data['messages'] as List?) ?? [];
+        setState(() {
+          _msgs.addAll(msgs.map((m) => _ChatMsg(
+            role: m['role'] as String? ?? 'user',
+            content: m['content'] as String? ?? '',
+            sources: (m['sources'] as List?)?.cast<String>() ?? [],
+          )));
+        });
+      }
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     _ctrl.dispose();
     _scrollCtrl.dispose();
