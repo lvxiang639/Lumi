@@ -469,13 +469,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
             ],
           ),
-          bottomSheet: _buildBottomBar(chat),
+          bottomSheet: _buildBottomBar(chat, brightness),
         );
       },
     );
   }
 
-  Widget _buildBottomBar(dynamic chat) {
+  Widget _buildBottomBar(dynamic chat, Brightness brightness) {
     final replies = chat.quickReplies as List<String>;
     return Column(mainAxisSize: MainAxisSize.min, children: [
       if (replies.isNotEmpty)
@@ -526,9 +526,6 @@ class _ChatScreenState extends State<ChatScreen> {
         brightness: brightness,
       ),
     ]);
-        );
-      },
-    );
   }
 
   PreferredSizeWidget _bar(ChatProvider chat) {

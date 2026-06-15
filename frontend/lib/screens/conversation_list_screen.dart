@@ -170,7 +170,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
                         padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                         itemCount: filtered.length,
                         itemBuilder: (ctx, i) =>
-                            _convItem(brightness, filtered[i]),
+                            _convItem(ctx, brightness, filtered[i]),
                       ),
                     ),
             ),
@@ -180,7 +180,7 @@ class _ConversationListScreenState extends State<ConversationListScreen> {
     );
   }
 
-  Widget _convItem(Brightness b, dynamic conv) {
+  Widget _convItem(BuildContext ctx, Brightness b, dynamic conv) {
     final id = conv.id as String;
     final title = conv.title as String;
     final lastMessage = conv.lastMessage as String?;
