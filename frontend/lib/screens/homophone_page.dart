@@ -143,7 +143,23 @@ class _HomophonePageState extends State<HomophonePage> {
   @override
   Widget build(BuildContext context) {
     final b = Theme.of(context).brightness;
-    if (_loading) {
+    return Scaffold(
+      backgroundColor: AppColors.bg(b),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new, size: 18, color: AppColors.text(b)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text('同音字组词闯关', style: TextStyle(color: AppColors.text(b), fontSize: 16, fontWeight: FontWeight.w600)),
+        backgroundColor: AppColors.bg(b),
+        elevation: 0,
+      ),
+      body: _buildBody(b),
+    );
+  }
+
+  Widget _buildBody(Brightness b) {
+    if (_loading && _mode == _Mode.idle) {
       return const Center(child: CircularProgressIndicator(color: AppColors.accent));
     }
     switch (_mode) {
@@ -318,9 +334,11 @@ class _HomophonePageState extends State<HomophonePage> {
     Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      color: _score != null && (_score!.startsWith('0/') || _score == '')
-          ? Colors.red.shade50
-          : AppColors.accent.withValues(alpha: 0.08),
+      decoration: BoxDecoration(
+        color: _score != null && (_score!.startsWith('0/') || _score == '')
+            ? AppColors.danger.withValues(alpha: 0.08)
+            : AppColors.accent.withValues(alpha: 0.08),
+      ),
       child: Column(children: [
         Text(_score ?? '', style: TextStyle(color: AppColors.accent, fontSize: 28, fontWeight: FontWeight.w700)),
         if (_summary != null) ...[
