@@ -32,14 +32,31 @@ async def upload_document(
     if not file.filename:
         raise HTTPException(400, "文件名为空")
 
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    logger.info("kb upload: user=%s file=%s ext=%s", str(current_user.id)[:8], file.filename, ext)
+
     # Read + decode
     content = await file.read()
+    logger.info("kb upload: read %d bytes", len(content))
+
     text = _extract_text(content, file.filename)
     if not text or not text.strip():
-        raise HTTPException(400, "无法解析文档内容")
+        logger.warning("kb upload: empty text after extraction (ext=%s, size=%d)", ext, len(content))
+        raise HTTPException(400, f"无法解析文档内容（格式: .{ext}，大小: {len(content)} bytes）。请确认文件未被加密或扫描。")
 
-    svc = _get_service(db)
-    kb = await svc.ingest_document(current_user.id, title or file.filename, file.filename, text)
+    logger.info("kb upload: extracted %d chars, starting ingest", len(text))
+
+    try:
+        svc = _get_service(db)
+        kb = await svc.ingest_document(current_user.id, title or file.filename, file.filename, text)
+        logger.info("kb upload: success kb_id=%s chunks=%d", str(kb.id)[:8], kb.chunk_count)
+    except ValueError as e:
+        logger.warning("kb upload: validation error: %s", e)
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.exception("kb upload: ingest failed")
+        raise HTTPException(500, f"知识库创建失败: {e}")
+
     return {"id": str(kb.id), "title": kb.title, "chunk_count": kb.chunk_count}
 
 

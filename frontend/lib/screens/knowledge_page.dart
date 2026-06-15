@@ -47,15 +47,20 @@ class _KnowledgePageState extends State<KnowledgePage> {
         ..headers['Authorization'] = 'Bearer $tok'
         ..fields['title'] = file.name
         ..files.add(await http.MultipartFile.fromPath('file', file.path!));
-      final resp = await http.Response.fromStream(await req.send());
+      final resp = await http.Response.fromStream(await req.send()).timeout(const Duration(seconds: 120));
       if (resp.statusCode == 200) {
         _load();
         if (mounted) _snack('知识库创建成功');
       } else {
-        if (mounted) _snack('上传失败');
+        String errMsg = '上传失败';
+        try {
+          final body = json.decode(resp.body);
+          errMsg = body['detail'] as String? ?? errMsg;
+        } catch (_) {}
+        if (mounted) _snack(errMsg);
       }
-    } catch (_) {
-      if (mounted) _snack('上传失败');
+    } catch (e) {
+      if (mounted) _snack('上传失败: $e');
     }
     setState(() => _uploading = false);
   }
