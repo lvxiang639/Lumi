@@ -69,6 +69,7 @@ async def upload_document(
         logger.exception("kb upload: ingest failed")
         raise HTTPException(500, f"知识库创建失败: {e}")
 
+    await db.commit()
     return {"id": str(kb.id), "title": kb.title, "chunk_count": kb.chunk_count}
 
 
