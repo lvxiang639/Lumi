@@ -40,6 +40,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       case 'daily_content': return '每日精选';
       case 'news': return '本地资讯';
       case 'chinese_literature': return '国学经典';
+      case 'interest_push': return '你可能感兴趣';
       default: return '灵犀';
     }
   }
@@ -56,6 +57,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       case 'daily_content': return Icons.auto_awesome;
       case 'news': return Icons.newspaper;
       case 'chinese_literature': return Icons.menu_book_outlined;
+      case 'interest_push': return Icons.lightbulb_outline;
       default: return Icons.pets;
     }
   }
@@ -72,6 +74,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       case 'daily_content': return const Color(0xFF6366F1);
       case 'news': return const Color(0xFFF97316);
       case 'chinese_literature': return const Color(0xFF7C3AED);
+      case 'interest_push': return const Color(0xFFF59E0B);
       default: return AppColors.accent;
     }
   }
@@ -120,6 +123,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       final item = provider.items[i];
                       if (item.skill == 'daily_content' && item.data != null) {
                         return _dailyContentCard(item, b);
+                      }
+                      if (item.skill == 'interest_push' && item.data != null) {
+                        return _interestCard(item, b);
                       }
                       return _momentsCard(item, b);
                     },
@@ -364,6 +370,81 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 const SizedBox(height: 6),
                 Text(content, style: TextStyle(color: AppColors.text(b), fontSize: 14, height: 1.6)),
               ]),
+            );
+          }),
+          const SizedBox(height: 2),
+          Divider(height: 1, color: AppColors.border(b).withValues(alpha: 0.4)),
+          _actionBar(item, b),
+        ]),
+      ),
+    );
+  }
+
+  // ── Interest push card ──
+
+  Widget _interestCard(DiscoverItem item, Brightness b) {
+    final data = item.data!;
+    final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final color = _skillColor('interest_push');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppColors.card(b),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: b == Brightness.light ? 0.04 : 0.08), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.lightbulb_outline, color: color, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('你可能感兴趣', style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w600)),
+              Text('基于你的关注 · ${_formatTime(item.createdAt)}', style: TextStyle(color: AppColors.textSecondary(b).withValues(alpha: 0.5), fontSize: 11)),
+            ])),
+          ]),
+          const SizedBox(height: 12),
+          ...items.asMap().entries.map((e) {
+            final it = e.value;
+            final title = it['title'] as String? ?? '';
+            final summary = it['summary'] as String? ?? '';
+            final link = it['link'] as String? ?? '';
+            return GestureDetector(
+              onTap: () => _openUrl(link),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: b == Brightness.light ? const Color(0xFFF8F9FA) : const Color(0xFF1A1D21),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border(left: BorderSide(color: color.withValues(alpha: 0.6), width: 3)),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                      child: Text('${e.key + 1}', style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w700)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(title, style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    const SizedBox(width: 4),
+                    Icon(Icons.open_in_new, size: 12, color: AppColors.textSecondary(b).withValues(alpha: 0.4)),
+                  ]),
+                  if (summary.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(summary, style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ],
+                ]),
+              ),
             );
           }),
           const SizedBox(height: 2),

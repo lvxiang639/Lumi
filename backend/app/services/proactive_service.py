@@ -93,6 +93,7 @@ class ProactiveService:
                 await self._check_all()
                 await push_daily_content()
                 await push_morning_briefing()
+                await push_interest_content()
                 # Chinese literature is now part of daily_content (poetry/idiom/history entries)
             except Exception:
                 logger.exception("proactive poll error")
@@ -864,6 +865,141 @@ async def push_morning_briefing():
             logger.info("Morning briefing sent to user=%s", uid_str[:8])
         except Exception:
             logger.exception("push_morning_briefing failed for user=%s", uid_str[:8])
+
+
+INTEREST_PROMPT = """分析以下用户记忆，提取用户的潜在兴趣点，用于个性化内容推荐。
+
+用户记忆:
+{memories}
+
+请提取 2-3 个用户最可能感兴趣的话题/实体，每行一个，格式: "类别: 具体话题"
+例如:
+人物: 周杰伦
+科技: 人工智能
+投资: 特斯拉股票
+
+只输出话题，不要解释。"""
+
+
+async def push_interest_content():
+    """Push personalized interest-based content to discover page.
+
+    Extracts interests from user memories, searches for latest info,
+    pushes up to 3 items. Throttle: max 3 pushes/day, 2h cooldown.
+    """
+    now = datetime.now(BEIJING_TZ)
+    if now.hour < 8 or now.hour >= 23:
+        return
+
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    for uid_str in online_users():
+        try:
+            uid = UUID(uid_str)
+
+            # Throttle: max 3 interest pushes per day, 2h cooldown
+            async with async_session() as db:
+                # Count today's interest pushes
+                r = await db.execute(
+                    select(func.count(ProactivePush.id)).where(
+                        ProactivePush.user_id == uid,
+                        ProactivePush.push_type == "interest_push",
+                        ProactivePush.created_at >= today_start,
+                    )
+                )
+                if (r.scalar() or 0) >= 3:
+                    continue
+
+                # Check 2h cooldown
+                two_h_ago = now - timedelta(hours=2)
+                r = await db.execute(
+                    select(func.count(ProactivePush.id)).where(
+                        ProactivePush.user_id == uid,
+                        ProactivePush.push_type == "interest_push",
+                        ProactivePush.created_at >= two_h_ago,
+                    )
+                )
+                if (r.scalar() or 0) > 0:
+                    continue
+
+                # Load user memories
+                r = await db.execute(
+                    select(UserMemory).where(UserMemory.user_id == uid)
+                    .order_by(UserMemory.updated_at.desc()).limit(20)
+                )
+                memories = r.scalars().all()
+
+            if len(memories) < 2:
+                continue
+
+            # Extract interests via LLM
+            mem_text = "\n".join(f"- {m.key}: {m.value}" for m in memories[:15])
+            prompt = INTEREST_PROMPT.format(memories=mem_text)
+            interests_raw = await llm_router.chat(
+                [{"role": "user", "content": prompt}],
+                max_tokens=200,
+            )
+            if not interests_raw:
+                continue
+
+            interests = [
+                line.strip()
+                for line in interests_raw.strip().split("\n")
+                if line.strip() and ":" in line
+            ][:3]
+            if not interests:
+                continue
+
+            # Search for each interest via SearXNG
+            items = []
+            for interest in interests[:2]:  # Search top 2 interests
+                try:
+                    import httpx
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.get(
+                            f"{settings.searxng_url}/search",
+                            params={
+                                "q": interest, "format": "json",
+                                "categories": "general",
+                                "engines": settings.searxng_engines,
+                            },
+                            timeout=8,
+                        )
+                        results = resp.json().get("results", [])[:2]
+                        for r in results:
+                            items.append({
+                                "title": r.get("title", ""),
+                                "summary": (r.get("content", "") or "")[:120],
+                                "link": r.get("url", ""),
+                                "interest": interest,
+                            })
+                except Exception:
+                    continue
+
+            if not items:
+                continue
+
+            # Build push text
+            push_text = f"💡 你可能感兴趣"
+            push_data = {"interests": interests, "items": items[:3]}
+
+            await send_to_user(uid_str, {
+                "type": "proactive",
+                "delta": push_text,
+                "skill": "interest_push",
+                "data": push_data,
+            })
+
+            async with async_session() as db:
+                db.add(ProactivePush(
+                    user_id=uid, push_type="interest_push",
+                    message_preview=push_text,
+                ))
+                await db.commit()
+
+            logger.info("Interest push sent to user=%s: %d items", uid_str[:8], len(items))
+        except Exception:
+            logger.exception("push_interest_content failed for user=%s", uid_str[:8])
 
 
 async def push_chinese_literature():
