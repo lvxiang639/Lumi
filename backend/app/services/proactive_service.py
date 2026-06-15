@@ -399,7 +399,7 @@ class ProactiveService:
         if conv_count == 0:
             return None  # Not active yesterday, don't bother
 
-        return "喵~ 昨天好像忘记记账了，要现在记一下吗？💰"
+        return {"type": "expense", "text": "喵~ 昨天好像忘记记账了，要现在记一下吗？💰"}
 
     async def _check_idle(
         self, user_id: str, now: datetime, db
@@ -423,7 +423,7 @@ class ProactiveService:
         if idle_hours < 4:
             return None
 
-        return "喵~ 好久不见！你回来啦 🐱"
+        return {"type": "idle", "text": "喵~ 好久不见！你回来啦 🐱"}
 
     async def _check_memory(
         self, user_id: str, now: datetime, db
@@ -451,7 +451,7 @@ class ProactiveService:
             result = await llm_router.chat([{"role": "user", "content": prompt}])
             result = (result or "").strip()
             self._memory_cache[user_id] = (result or "__NONE__", now)
-            return result if result else None
+            return {"type": "memory", "text": result} if result else None
         except Exception:
             return None
 
@@ -479,7 +479,8 @@ class ProactiveService:
             "angry": "喵... 看起来你有点生气，深呼吸，一切都会好起来的~",
             "worried": "喵~ 你好像有点焦虑，需要我帮你做点什么吗？",
         }
-        return messages.get(state.current_emotion)
+        text = messages.get(state.current_emotion)
+        return {"type": "emotion", "text": text} if text else None
 
 
     async def _check_holiday(self, now: datetime) -> dict | None:

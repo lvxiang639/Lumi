@@ -62,15 +62,17 @@ async def upload_document(
             current_user.id, title or file.filename, file.filename,
             text, object_name=object_name or "", file_size=len(content),
         )
+        await db.commit()
         logger.info("kb upload: success kb_id=%s chunks=%d", str(kb.id)[:8], kb.chunk_count)
     except ValueError as e:
         logger.warning("kb upload: validation error: %s", e)
+        await db.rollback()
         raise HTTPException(400, str(e))
     except Exception as e:
         logger.exception("kb upload: ingest failed")
-        raise HTTPException(500, f"知识库创建失败: {e}")
+        await db.rollback()
+        raise HTTPException(500, "知识库创建失败，请重试")
 
-    await db.commit()
     return {"id": str(kb.id), "title": kb.title, "chunk_count": kb.chunk_count}
 
 

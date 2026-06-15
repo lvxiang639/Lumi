@@ -274,7 +274,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     isDense: true,
                   ),
-                  onSubmitted: (v) { if (v.trim().isNotEmpty) { context.read<DiscoverProvider>().addComment(item.id, v.trim()); _commentCtrl.clear(); } },
+                  onSubmitted: (v) { if (v.trim().isNotEmpty) { context.read<DiscoverProvider>().addComment(item.id, v.trim()); _commentCtrl.clear(); setState(() => _commentingId = null); } },
                 )),
                 const SizedBox(width: 6),
                 TextButton(

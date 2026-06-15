@@ -80,12 +80,14 @@ class DiscoverProvider extends ChangeNotifier {
       if (raw != null) {
         final list = json.decode(raw) as List;
         final items = list.map((e) => DiscoverItem.fromJson(e as Map<String, dynamic>)).toList();
-        // Clean up duplicates (e.g. daily_content received via both WS and HTTP)
+        // Clean up duplicates — key by skill + date for daily_content
         final seen = <String>{};
         items.removeWhere((item) {
           if (item.skill == 'daily_content') {
-            if (seen.contains(item.skill)) return true;
-            seen.add(item.skill!);
+            final date = item.data?['_date'] as String? ?? item.createdAt.toIso8601String().substring(0, 10);
+            final key = '${item.skill}_$date';
+            if (seen.contains(key)) return true;
+            seen.add(key);
           }
           return false;
         });
