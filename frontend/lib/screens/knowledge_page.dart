@@ -1,8 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../config.dart';
 import '../theme/app_colors.dart';
 import '../services/routes.dart';
@@ -43,10 +44,11 @@ class _KnowledgePageState extends State<KnowledgePage> {
     try {
       final tok = (await SharedPreferences.getInstance()).getString('access_token') ?? '';
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/knowledge/upload');
+      final bytes = File(file.path!).readAsBytesSync();
       final req = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $tok'
         ..fields['title'] = file.name
-        ..files.add(await http.MultipartFile.fromPath('file', file.path!));
+        ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: file.name));
       final resp = await http.Response.fromStream(await req.send()).timeout(const Duration(seconds: 120));
       if (resp.statusCode == 200) {
         _load();
