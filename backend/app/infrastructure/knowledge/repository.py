@@ -1,6 +1,7 @@
 """SQLAlchemy + FAISS implementation of KnowledgeRepository."""
 
 import logging
+import threading
 from uuid import UUID
 import numpy as np
 from sqlalchemy import select, delete
@@ -12,6 +13,7 @@ logger = logging.getLogger("knowledge_repo")
 
 # In-memory FAISS index cache: kb_id → (faiss_index, chunk_list)
 _index_cache: dict[UUID, tuple] = {}
+_index_lock = threading.Lock()
 
 
 class SqlKnowledgeRepository(KnowledgeRepository):
@@ -45,7 +47,8 @@ class SqlKnowledgeRepository(KnowledgeRepository):
     async def delete(self, kb_id: UUID, user_id: UUID) -> bool:
         r = await self.db.execute(delete(KnowledgeBase).where(KnowledgeBase.id == kb_id, KnowledgeBase.user_id == user_id))
         await self.db.commit()
-        _index_cache.pop(kb_id, None)  # Clear FAISS cache
+        with _index_lock:
+            _index_cache.pop(kb_id, None)  # Clear FAISS cache
         return r.rowcount > 0
 
     async def search_chunks(self, kb_id: UUID, embedding: list[float], top_k: int = 3) -> list[KnowledgeChunkEntity]:
@@ -57,14 +60,16 @@ class SqlKnowledgeRepository(KnowledgeRepository):
     def _search_sync(self, kb_id: UUID, embedding: list[float], top_k: int) -> list[KnowledgeChunkEntity]:
         try:
             import faiss
-            cached = _index_cache.get(kb_id)
+            with _index_lock:
+                cached = _index_cache.get(kb_id)
             if cached is None:
                 # Lazy-load from DB
                 chunks = _load_chunks_sync(kb_id)
                 if not chunks:
                     return []
                 self._build_faiss_index(kb_id, chunks)
-                cached = _index_cache.get(kb_id)
+                with _index_lock:
+                    cached = _index_cache.get(kb_id)
                 if cached is None:
                     return []
 
@@ -91,7 +96,8 @@ class SqlKnowledgeRepository(KnowledgeRepository):
             dim = vectors.shape[1]
             index = faiss.IndexFlatIP(dim)  # Inner product = cosine for normalized vectors
             index.add(vectors)
-            _index_cache[kb_id] = (index, chunks)
+            with _index_lock:
+                _index_cache[kb_id] = (index, chunks)
             logger.info("FAISS index built for kb %s: %d vectors, dim=%d", kb_id, len(vectors), dim)
         except ImportError:
             pass

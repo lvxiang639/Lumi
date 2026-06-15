@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../config.dart';
 import '../theme/app_colors.dart';
+import '../services/routes.dart';
+import 'knowledge_chat_page.dart';
 
 class KnowledgePage extends StatefulWidget {
   const KnowledgePage({super.key});
@@ -90,7 +92,11 @@ class _KnowledgePageState extends State<KnowledgePage> {
                     itemCount: _items.length,
                     itemBuilder: (_, i) {
                       final item = _items[i];
-                      return Container(
+                      final id = item['id'] as String;
+                      final title = item['title'] as String? ?? '';
+                      return GestureDetector(
+                        onTap: () => Navigator.push(context, slideRoute(KnowledgeChatPage(kbId: id, kbTitle: title))),
+                        child: Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(color: AppColors.card(b), borderRadius: BorderRadius.circular(12)),
@@ -100,13 +106,13 @@ class _KnowledgePageState extends State<KnowledgePage> {
                             child: const Icon(Icons.library_books, color: Color(0xFF8B5CF6), size: 22)),
                           const SizedBox(width: 14),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(item['title'] as String? ?? '', style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w500)),
+                            Text(title, style: TextStyle(color: AppColors.text(b), fontSize: 14, fontWeight: FontWeight.w500)),
                             const SizedBox(height: 2),
                             Text('${item['chunk_count'] ?? 0} 个文本块', style: TextStyle(color: AppColors.textSecondary(b), fontSize: 11)),
                           ])),
-                          IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18), onPressed: () => _delete(item['id'] as String)),
+                          IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18), onPressed: () => _delete(id)),
                         ]),
-                      );
+                      ));
                     },
                   ),
                 ),
