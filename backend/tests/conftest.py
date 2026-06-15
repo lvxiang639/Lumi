@@ -9,12 +9,20 @@ from app.models import Outfit, VoicePack
 
 TEST_DATABASE_URL = "sqlite+aiosqlite://"
 
+
+def _create_tables_sqlite(conn):
+    """Create all tables except those with PG-specific types (ARRAY)."""
+    from app.models.knowledge_base import KnowledgeChunk  # has ARRAY(Float) — skip
+    tables = [t for t in Base.metadata.sorted_tables if t.name != "knowledge_chunks"]
+    Base.metadata.create_all(conn, tables=tables)
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_database():
     """Create tables, seed defaults, and override DB dependency for tests."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_create_tables_sqlite)
 
     test_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
