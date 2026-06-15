@@ -127,18 +127,22 @@ def _embed_sync(text: str) -> list[float]:
     try:
         from sentence_transformers import SentenceTransformer
         if not hasattr(_embed_sync, '_model'):
+            logger.info("Loading BGE-M3 embedding model (first time)...")
             _embed_sync._model = SentenceTransformer('BAAI/bge-m3')
+            logger.info("BGE-M3 model loaded successfully")
         result = _embed_sync._model.encode(
             text[:2000],
             normalize_embeddings=True,
             show_progress_bar=False,
         )
         return result.tolist()
-    except ImportError:
+    except ImportError as e:
+        logger.warning("sentence-transformers not installed: %s", e)
         import hashlib; import random
         random.seed(hashlib.md5(text.encode()).hexdigest())
         return [random.random() for _ in range(1024)]
-    except Exception:
+    except Exception as e:
+        logger.exception("embedding failed (type=%s): %s", type(e).__name__, e)
         import hashlib; import random
         random.seed(hashlib.md5(text.encode()).hexdigest())
         return [random.random() for _ in range(1024)]

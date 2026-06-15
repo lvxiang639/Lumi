@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
+
+const _fallbackFonts = ['PingFang SC', 'Noto Sans SC', 'Heiti SC', 'STHeiti'];
 
 class AppTheme {
   AppTheme._();
@@ -8,7 +9,7 @@ class AppTheme {
   static ThemeData get light => ThemeData(
         brightness: Brightness.light,
         useMaterial3: true,
-        textTheme: GoogleFonts.notoSansScTextTheme(),
+        fontFamilyFallback: _fallbackFonts,
         scaffoldBackgroundColor: AppColors.lightBg,
         colorScheme: const ColorScheme.light(
           primary: AppColors.accent,
@@ -57,7 +58,7 @@ class AppTheme {
   static ThemeData get dark => ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        textTheme: GoogleFonts.notoSansScTextTheme(),
+        fontFamilyFallback: _fallbackFonts,
         scaffoldBackgroundColor: AppColors.darkBg,
         colorScheme: const ColorScheme.dark(
           primary: AppColors.accent,
