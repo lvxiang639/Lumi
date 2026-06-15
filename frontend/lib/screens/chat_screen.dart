@@ -396,8 +396,12 @@ class _ChatScreenState extends State<ChatScreen> {
         final streaming = chat.streamingText;
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollCtrl.hasClients) {
-            _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+          if (_scrollCtrl.hasClients && _scrollCtrl.position.hasContentDimensions) {
+            final pos = _scrollCtrl.position;
+            // Only auto-scroll if user is within 200px of bottom (not reading history)
+            if (pos.maxScrollExtent - pos.pixels < 200) {
+              _scrollCtrl.jumpTo(pos.maxScrollExtent);
+            }
           }
         });
 
@@ -463,76 +467,65 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: LinearProgressIndicator(
                       minHeight: 2, backgroundColor: Colors.transparent),
                 ),
-              // Quick reply chips — elegant pill design
-              if (chat.quickReplies.isNotEmpty)
-                Positioned(
-                  bottom: 56,
-                  left: 0, right: 0,
-                  child: SizedBox(
-                    height: 42,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      itemCount: chat.quickReplies.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 10),
-                      itemBuilder: (_, i) {
-                        final reply = chat.quickReplies[i];
-                        final emoji = _replyEmoji(reply);
-                        return GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            _textCtrl.text = reply;
-                            _send();
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeOut,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: brightness == Brightness.light
-                                    ? [const Color(0xFFF8FAFC), const Color(0xFFF1F5F9)]
-                                    : [const Color(0xFF1E293B), const Color(0xFF1A2332)],
-                                begin: Alignment.topLeft, end: Alignment.bottomRight),
-                              borderRadius: BorderRadius.circular(21),
-                              border: Border.all(
-                                color: brightness == Brightness.light
-                                    ? const Color(0xFFCBD5E1).withValues(alpha: 0.6)
-                                    : const Color(0xFF334155).withValues(alpha: 0.6)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 4, offset: const Offset(0, 2)),
-                              ],
-                            ),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              Text(emoji, style: const TextStyle(fontSize: 14)),
-                              const SizedBox(width: 6),
-                              Text(reply,
-                                  style: TextStyle(
-                                    color: AppColors.text(brightness),
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.2)),
-                            ]),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
             ],
           ),
-          bottomSheet: ChatInputBar(
-            ctrl: _textCtrl,
-            showField: _showField,
-            listening: _listening,
-            onVoice: _startVoice,
-            onToggle: () => setState(() => _showField = !_showField),
-            onSend: _send,
-            onFile: _pickFile,
-            brightness: brightness,
+          bottomSheet: _buildBottomBar(chat),
+        );
+      },
+    );
+  }
+
+  Widget _buildBottomBar(dynamic chat) {
+    final replies = chat.quickReplies as List<String>;
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      if (replies.isNotEmpty)
+        SizedBox(
+          height: 42,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            itemCount: replies.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, i) {
+              final reply = replies[i];
+              final emoji = _replyEmoji(reply);
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _textCtrl.text = reply;
+                  _send();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.card(brightness),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.border(brightness)),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 1)),
+                    ],
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(emoji, style: const TextStyle(fontSize: 14)),
+                    const SizedBox(width: 4),
+                    Text(reply, style: TextStyle(color: AppColors.text(brightness), fontSize: 13)),
+                  ]),
+                ),
+              );
+            },
           ),
+        ),
+      ChatInputBar(
+        ctrl: _textCtrl,
+        showField: _showField,
+        listening: _listening,
+        onVoice: _startVoice,
+        onToggle: () => setState(() => _showField = !_showField),
+        onSend: _send,
+        onFile: _pickFile,
+        brightness: brightness,
+      ),
+    ]);
         );
       },
     );
