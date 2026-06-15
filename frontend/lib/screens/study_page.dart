@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import '../config.dart';
 import '../theme/app_colors.dart';
+import '../services/routes.dart';
 import 'homophone_page.dart';
 
 class StudyPage extends StatefulWidget {
@@ -89,8 +90,8 @@ class _StudyPageState extends State<StudyPage> {
     final b = Theme.of(context).brightness;
     return Scaffold(backgroundColor: AppColors.bg(b), appBar: AppBar(title: const Text('📚 学习辅导')),
       body: Column(children: [
-        Row(children: [_tb('解题', 0), _tb('记录', 1), _tb('分析', 2), _tb('同音字', 3)]),
-        Expanded(child: _tab == 0 ? _solveTab(b) : _tab == 1 ? _recordsTab(b) : _tab == 2 ? _analysisTab(b) : const HomophonePage()),
+        Row(children: [_tb('解题', 0), _tb('记录', 1), _tb('分析', 2), _tb('专项', 3)]),
+        Expanded(child: _tab == 0 ? _solveTab(b) : _tab == 1 ? _recordsTab(b) : _tab == 2 ? _analysisTab(b) : _specializedTab(b)),
       ]),
     );
   }
@@ -187,6 +188,67 @@ class _StudyPageState extends State<StudyPage> {
       },
     );
   }
+  Widget _specializedTab(Brightness b) {
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      // 同音字组词闯关
+      _specializedItem(
+        icon: Icons.hearing,
+        color: const Color(0xFF7C3AED),
+        title: '同音字组词闯关',
+        desc: '根据拼音写出同音字并组词，每轮5道题',
+        onTap: () => Navigator.push(context, slideRoute(const HomophonePage())),
+      ),
+      // More specialized practice types can be added here
+    ]);
+  }
+
+  Widget _specializedItem({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String desc,
+    required VoidCallback onTap,
+  }) {
+    final b = Theme.of(context).brightness;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.card(b),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(children: [
+              Container(
+                width: 48, height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: AppColors.text(b), fontSize: 15, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text(desc, style: TextStyle(color: AppColors.textSecondary(b), fontSize: 12, height: 1.3)),
+                ],
+              )),
+              Icon(Icons.chevron_right, color: AppColors.textSecondary(b), size: 20),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _analysisTab(Brightness b) {
     if (_analysis == null) return const Center(child: CircularProgressIndicator());
     final weak = (_analysis!['weak_points'] as List?) ?? [];
