@@ -21,7 +21,9 @@ class SqlKnowledgeRepository(KnowledgeRepository):
         self.db = db
 
     async def add(self, kb: KnowledgeBaseEntity) -> KnowledgeBaseEntity:
-        record = KnowledgeBase(user_id=kb.user_id, title=kb.title, file_name=kb.file_name, chunk_count=kb.chunk_count)
+        record = KnowledgeBase(user_id=kb.user_id, title=kb.title, file_name=kb.file_name,
+                               object_name=kb.object_name, file_size=kb.file_size,
+                               chunk_count=kb.chunk_count)
         self.db.add(record)
         await self.db.flush()
         await self.db.refresh(record)
@@ -104,7 +106,9 @@ class SqlKnowledgeRepository(KnowledgeRepository):
 
     @staticmethod
     def _to_entity(row: KnowledgeBase) -> KnowledgeBaseEntity:
-        return KnowledgeBaseEntity(id=row.id, user_id=row.user_id, title=row.title, file_name=row.file_name, chunk_count=row.chunk_count, created_at=row.created_at)
+        return KnowledgeBaseEntity(id=row.id, user_id=row.user_id, title=row.title, file_name=row.file_name,
+                                   object_name=row.object_name, file_size=row.file_size or 0,
+                                   chunk_count=row.chunk_count, created_at=row.created_at)
 
 
 def _load_chunks_sync(kb_id: UUID) -> list[KnowledgeChunkEntity]:

@@ -11,7 +11,8 @@ class KnowledgeService:
     def __init__(self, repo: KnowledgeRepository):
         self.repo = repo
 
-    async def ingest_document(self, user_id: UUID, title: str, file_name: str, text: str) -> KnowledgeBaseEntity:
+    async def ingest_document(self, user_id: UUID, title: str, file_name: str, text: str,
+                              object_name: str = "", file_size: int = 0) -> KnowledgeBaseEntity:
         """Parse document, chunk it, embed chunks, store everything."""
         # 1. Chunk text
         chunks = self._chunk_text(text)
@@ -19,7 +20,9 @@ class KnowledgeService:
             raise ValueError("文档内容为空")
 
         # 2. Create knowledge base
-        kb = KnowledgeBaseEntity(user_id=user_id, title=title, file_name=file_name, chunk_count=len(chunks))
+        kb = KnowledgeBaseEntity(user_id=user_id, title=title, file_name=file_name,
+                                 object_name=object_name, file_size=file_size,
+                                 chunk_count=len(chunks))
         kb = await self.repo.add(kb)
 
         # 3. Embed + store chunks

@@ -12,6 +12,8 @@ class KnowledgeBaseEntity:
     user_id: UUID | None = None
     title: str = ""
     file_name: str = ""
+    object_name: str | None = None
+    file_size: int = 0
     chunk_count: int = 0
     created_at: datetime | None = None
 

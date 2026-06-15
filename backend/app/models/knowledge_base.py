@@ -13,6 +13,8 @@ class KnowledgeBase(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     file_name: Mapped[str] = mapped_column(String(200), default="")
+    object_name: Mapped[str | None] = mapped_column(String(500), nullable=True)  # MinIO object path
+    file_size: Mapped[int] = mapped_column(Integer, default=0)
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
