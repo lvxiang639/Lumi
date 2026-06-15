@@ -581,6 +581,9 @@ class ProactiveService:
                 )
                 resp.raise_for_status()
                 results = resp.json().get("results", [])[:3]
+                if results:
+                    logger.info("news fetch for '%s': %d results — %s", query, len(results),
+                        " | ".join(r.get("title", "")[:60] for r in results)[:200])
         except Exception:
             logger.exception("news fetch failed")
             results = []
@@ -739,6 +742,8 @@ async def generate_daily_content() -> dict | None:
                 )
                 resp.raise_for_status()
                 trends = resp.json().get("results", [])[:5]
+                logger.info("hot trends fetch: %d results — %s", len(trends),
+                    " | ".join(t.get("title", "")[:60] for t in trends)[:200])
                 result["hot_trends"] = {
                     "display_name": "🔥 热门资讯",
                     "content": [{"title": t.get("title", ""), "url": t.get("url", "")} for t in trends],
@@ -966,6 +971,15 @@ async def push_interest_content():
                             timeout=8,
                         )
                         results = resp.json().get("results", [])[:2]
+                        if results:
+                            logger.info(
+                                "interest search '%s': %d results — %s",
+                                interest[:30], len(results),
+                                " | ".join(
+                                    f"{r.get('title', '')[:60]}"
+                                    for r in results
+                                )[:200],
+                            )
                         for r in results:
                             items.append({
                                 "title": r.get("title", ""),
