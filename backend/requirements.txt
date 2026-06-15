@@ -25,3 +25,5 @@ duckduckgo_search>=8.0
 paddlepaddle>=3.0.0
 paddleocr>=3.0.0
 paddlex[ocr]>=3.0.0
+PyPDF2>=3.0.0
+python-docx>=1.0.0
