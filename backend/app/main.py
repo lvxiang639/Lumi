@@ -64,6 +64,8 @@ app.include_router(homophone_router)
 async def startup():
     from app.api.seed import seed_defaults
     await seed_defaults()
+    from app.services.proactive_service import seed_daily_content_configs
+    await seed_daily_content_configs()
     from app.services.notification_service import notification_service
     notification_service.start()
     from app.services.proactive_service import proactive_service

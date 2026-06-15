@@ -84,12 +84,15 @@ class ProactiveService:
         self._task: asyncio.Task | None = None
         self._interval = settings.notification_check_interval * 180  # ~3 hours
         self._news_cache: dict[str, tuple[list[dict], datetime]] = {}  # city → (items, time)
+        self._weather_cache: dict[str, tuple[str, datetime]] = {}  # city → (summary, time)
+        self._memory_cache: dict[str, tuple[str, datetime]] = {}  # user_id → (topic, time)
 
     async def _poll(self):
         while True:
             try:
                 await self._check_all()
                 await push_daily_content()
+                await push_morning_briefing()
                 # Chinese literature is now part of daily_content (poetry/idiom/history entries)
             except Exception:
                 logger.exception("proactive poll error")
@@ -200,8 +203,11 @@ class ProactiveService:
             logger.info("proactive check: [8/8] news for %s", user_id[:8])
             news = await self._check_news(user_id, now)
             logger.info("proactive check: news -> %s", f"{len(news)} items" if news else "SKIP")
-            if news and await self._can_push(user_id, now):
-                await self._do_push(user_id, now, "📰 本地资讯更新", skill="news", data=news)
+            if news:
+                # Only push news if user hasn't received news today
+                today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                if not await self._has_push_type(user_id, "news", today_start):
+                    await self._do_push(user_id, now, "📰 本地资讯更新", skill="news", data=news)
 
     async def _generate_push_text(self, user_id: str, now: datetime, checks: list[dict]) -> str | None:
         """Generate natural push text from structured check data via LLM."""
@@ -276,6 +282,21 @@ class ProactiveService:
                 return False
         return True
 
+    async def _has_push_type(self, user_id: str, push_type: str, since: datetime) -> bool:
+        """Check if a specific push_type already exists for user since given time."""
+        from uuid import UUID
+        from app.models.proactive_push import ProactivePush
+        uid = UUID(user_id)
+        async with async_session() as db:
+            r = await db.execute(
+                select(func.count(ProactivePush.id)).where(
+                    ProactivePush.user_id == uid,
+                    ProactivePush.push_type == push_type,
+                    ProactivePush.created_at >= since,
+                )
+            )
+            return (r.scalar() or 0) > 0
+
     async def _do_push(self, user_id: str, now: datetime, msg: str,
                        skill: str | None = None, data: dict | None = None):
         """Send push and persist record to DB."""
@@ -302,14 +323,15 @@ class ProactiveService:
             city = await get_city(user_id=user_id)
             cached = self._weather_cache.get(city)
             if cached:
-                msg, ts = cached
+                data, ts = cached
                 if (now - ts).total_seconds() < 7200:  # 2 hour cache
-                    return msg if msg != "__NONE__" else None
+                    return data if data else None
             prompt = WEATHER_PROMPT.format(now=now.strftime("%H:%M"), city=city)
             result = await llm_router.chat([{"role": "user", "content": prompt}])
             result = (result or "").strip()
-            self._weather_cache[city] = (result or "__NONE__", now)
-            return {"type": "weather", "city": city, "alert": result} if result else None
+            data = {"type": "weather", "city": city, "alert": result} if result else None
+            self._weather_cache[city] = (data, now)
+            return data
         except Exception:
             return None
 
@@ -340,9 +362,9 @@ class ProactiveService:
         try:
             result = await llm_router.chat([{"role": "user", "content": prompt}])
             result = (result or "").strip()
-            return result if result else None
+            return {"type": "calendar", "text": result} if result else None
         except Exception:
-            return f"喵~ {len(events)}个日程快到了，记得看看哦 🐱"
+            return {"type": "calendar", "text": f"喵~ {len(events)}个日程快到了，记得看看哦 🐱"}
 
     async def _check_expense(
         self, user_id: str, now: datetime, db
@@ -782,6 +804,66 @@ async def push_daily_content():
                 await db.commit()
         except Exception:
             pass
+
+
+async def push_morning_briefing():
+    """Push morning briefing to discover page at 8 AM Beijing time.
+
+    Sends weather + calendar + expense summary as a proactive push.
+    One per user per day (enforced by last_briefing_date on User model).
+    """
+    now = datetime.now(BEIJING_TZ)
+    if now.hour != 8:
+        return
+
+    from app.services.briefing_service import generate_briefing
+
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    for uid_str in online_users():
+        try:
+            uid = UUID(uid_str)
+            # Check if briefing already sent today
+            user_ok = False
+            async with async_session() as db:
+                r = await db.execute(select(User).where(User.id == uid))
+                u = r.scalar_one_or_none()
+                if u and (u.last_briefing_date is None or u.last_briefing_date < today_start):
+                    user_ok = True
+
+            if not user_ok:
+                continue
+
+            text = await generate_briefing(uid)
+            if not text:
+                continue
+
+            # Update briefing date
+            async with async_session() as db:
+                r = await db.execute(select(User).where(User.id == uid))
+                u = r.scalar_one_or_none()
+                if u:
+                    u.last_briefing_date = today_start
+                    await db.commit()
+
+            # Push to discover page
+            await send_to_user(uid_str, {
+                "type": "proactive",
+                "delta": text,
+                "skill": "morning_briefing",
+                "data": None,
+            })
+
+            # Record in push DB
+            async with async_session() as db:
+                db.add(ProactivePush(
+                    user_id=uid, push_type="morning_briefing",
+                    message_preview=text[:200],
+                ))
+                await db.commit()
+
+            logger.info("Morning briefing sent to user=%s", uid_str[:8])
+        except Exception:
+            logger.exception("push_morning_briefing failed for user=%s", uid_str[:8])
 
 
 async def push_chinese_literature():

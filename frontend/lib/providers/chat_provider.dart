@@ -96,10 +96,18 @@ class ChatProvider extends ChangeNotifier {
         // Route to Discover tab — don't show in chat
         final discoverText = msg.data['delta'] as String? ?? '';
         if (discoverText.isNotEmpty) {
+          // data can be Map (daily_content, greeting) or List (news)
+          final raw = msg.data['data'];
+          Map<String, dynamic>? routeData;
+          if (raw is Map<String, dynamic>) {
+            routeData = raw;
+          } else if (raw is List) {
+            routeData = {'items': raw};
+          }
           _routeToDiscover(
             discoverText,
             msg.data['skill'] as String?,
-            data: msg.data['data'] as Map<String, dynamic>?,
+            data: routeData,
           );
         }
         break;
