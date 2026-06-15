@@ -8,9 +8,8 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.models import User
 from app.models.knowledge_base import KnowledgeBase, KnowledgeChatMessage
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user_id
 from app.domain.knowledge.service import KnowledgeService
 from app.domain.knowledge.repository import KnowledgeRepository
 from app.infrastructure.knowledge.repository import SqlKnowledgeRepository
@@ -30,7 +29,7 @@ def _get_service(db: AsyncSession) -> KnowledgeService:
 async def upload_document(
     file: UploadFile = File(...),
     title: str = Form(""),
-    current_user: User = Depends(get_current_user),
+    current_user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload a document, parse it, and create a knowledge base."""
@@ -38,7 +37,7 @@ async def upload_document(
         raise HTTPException(400, "文件名为空")
 
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    logger.info("kb upload: user=%s file=%s ext=%s", str(current_user.id)[:8], file.filename, ext)
+    logger.info("kb upload: user=%s file=%s ext=%s", str(current_user_id)[:8], file.filename, ext)
 
     # Read + decode
     content = await file.read()
@@ -59,7 +58,7 @@ async def upload_document(
     try:
         svc = _get_service(db)
         kb = await svc.ingest_document(
-            current_user.id, title or file.filename, file.filename,
+            current_user_id, title or file.filename, file.filename,
             text, object_name=object_name or "", file_size=len(content),
         )
         await db.commit()
@@ -79,14 +78,14 @@ async def upload_document(
 @router.get("/{kb_id}/download")
 async def download_original(
     kb_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Download the original uploaded document from MinIO."""
     r = await db.execute(
         select(KnowledgeBase).where(
             KnowledgeBase.id == kb_id,
-            KnowledgeBase.user_id == current_user.id,
+            KnowledgeBase.user_id == current_user_id,
         )
     )
     kb = r.scalar_one_or_none()
@@ -109,23 +108,23 @@ async def download_original(
 
 @router.get("")
 async def list_knowledge(
-    current_user: User = Depends(get_current_user),
+    current_user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """List user's knowledge bases."""
     repo = SqlKnowledgeRepository(db)
-    items = await repo.list_by_user(current_user.id)
+    items = await repo.list_by_user(current_user_id)
     return {"items": [{"id": str(k.id), "title": k.title, "file_name": k.file_name, "chunk_count": k.chunk_count, "file_size": k.file_size, "created_at": k.created_at.isoformat() if k.created_at else ""} for k in items]}
 
 
 @router.delete("/{kb_id}")
 async def delete_knowledge(
     kb_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     repo = SqlKnowledgeRepository(db)
-    ok = await repo.delete(kb_id, current_user.id)
+    ok = await repo.delete(kb_id, current_user_id)
     if not ok:
         raise HTTPException(404, "Not found")
     return {"status": "deleted"}
@@ -135,21 +134,21 @@ async def delete_knowledge(
 async def rag_chat(
     kb_id: UUID,
     query: str = Form(...),
-    current_user: User = Depends(get_current_user),
+    current_user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Chat with a knowledge base — retrieve + LLM answer. Saves Q&A history."""
     svc = _get_service(db)
 
     # Save user question
-    db.add(KnowledgeChatMessage(kb_id=kb_id, user_id=current_user.id, role="user", content=query))
+    db.add(KnowledgeChatMessage(kb_id=kb_id, user_id=current_user_id, role="user", content=query))
 
     # Retrieve relevant chunks
-    chunks = await svc.retrieve(kb_id, current_user.id, query, top_k=3)
+    chunks = await svc.retrieve(kb_id, current_user_id, query, top_k=3)
     sources = [c[:100] + "..." for c in chunks] if chunks else []
     if not chunks:
         answer = "在知识库中没有找到相关内容。"
-        db.add(KnowledgeChatMessage(kb_id=kb_id, user_id=current_user.id, role="assistant", content=answer, sources=json.dumps(sources)))
+        db.add(KnowledgeChatMessage(kb_id=kb_id, user_id=current_user_id, role="assistant", content=answer, sources=json.dumps(sources)))
         await db.commit()
         return {"answer": answer, "sources": sources}
 
@@ -171,7 +170,7 @@ async def rag_chat(
         raise HTTPException(500, "AI回答生成失败")
 
     # Save AI answer
-    db.add(KnowledgeChatMessage(kb_id=kb_id, user_id=current_user.id, role="assistant", content=answer, sources=json.dumps(sources)))
+    db.add(KnowledgeChatMessage(kb_id=kb_id, user_id=current_user_id, role="assistant", content=answer, sources=json.dumps(sources)))
     await db.commit()
     return {"answer": answer, "sources": sources}
 
@@ -179,13 +178,13 @@ async def rag_chat(
 @router.get("/{kb_id}/messages")
 async def get_chat_messages(
     kb_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Get chat history for a knowledge base."""
     r = await db.execute(
         select(KnowledgeChatMessage)
-        .where(KnowledgeChatMessage.kb_id == kb_id, KnowledgeChatMessage.user_id == current_user.id)
+        .where(KnowledgeChatMessage.kb_id == kb_id, KnowledgeChatMessage.user_id == current_user_id)
         .order_by(KnowledgeChatMessage.created_at.asc())
         .limit(100)
     )

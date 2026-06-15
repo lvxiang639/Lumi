@@ -1,54 +1,74 @@
-"""User repository — abstracts user DB queries."""
+"""Abstract repository interface for User aggregate and related entities."""
 
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from datetime import datetime
 from uuid import UUID
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.user import User
-from app.models.user_memory import UserMemory
-from app.models.emotion_state import UserEmotionState
 
 
-class UserRepository:
-    """Repository for User aggregate root and related entities."""
+@dataclass
+class UserEntity:
+    """Domain entity for a user."""
+    id: UUID | None = None
+    phone: str = ""
+    email: str | None = None
+    nickname: str = ""
+    avatar_url: str = ""
+    persona: str = "小猫"
+    hashed_password: str | None = None
+    last_briefing_date: datetime | None = None
+    created_at: datetime | None = None
 
-    def __init__(self, db: AsyncSession):
-        self.db = db
 
-    async def get_by_id(self, user_id: UUID) -> User | None:
-        r = await self.db.execute(select(User).where(User.id == user_id))
-        return r.scalar_one_or_none()
+@dataclass
+class MemoryEntity:
+    """Domain entity for a user memory entry."""
+    id: UUID | None = None
+    user_id: UUID | None = None
+    key: str = ""
+    value: str = ""
+    source_conv_id: UUID | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
-    async def get_by_phone(self, phone: str) -> User | None:
-        r = await self.db.execute(select(User).where(User.phone == phone))
-        return r.scalar_one_or_none()
 
-    async def get_by_email(self, email: str) -> User | None:
-        r = await self.db.execute(select(User).where(User.email == email))
-        return r.scalar_one_or_none()
+@dataclass
+class EmotionEntity:
+    """Domain entity for user emotional state."""
+    id: UUID | None = None
+    user_id: UUID | None = None
+    current_emotion: str = ""     # 'happy' | 'sad' | 'angry' | 'worried' | 'neutral'
+    intensity: float = 0.0
+    updated_at: datetime | None = None
 
-    async def add(self, user: User) -> User:
-        self.db.add(user)
-        await self.db.flush()
-        return user
 
-    async def get_memories(self, user_id: UUID, limit: int = 10) -> list[UserMemory]:
-        r = await self.db.execute(
-            select(UserMemory)
-            .where(UserMemory.user_id == user_id)
-            .order_by(UserMemory.updated_at.desc())
-            .limit(limit)
-        )
-        return list(r.scalars().all())
+class UserRepository(ABC):
+    """Abstract repository for User aggregate and related entities."""
 
+    @abstractmethod
+    async def get_by_id(self, user_id: UUID) -> UserEntity | None:
+        ...
+
+    @abstractmethod
+    async def get_by_phone(self, phone: str) -> UserEntity | None:
+        ...
+
+    @abstractmethod
+    async def get_by_email(self, email: str) -> UserEntity | None:
+        ...
+
+    @abstractmethod
+    async def add(self, user: UserEntity) -> UserEntity:
+        ...
+
+    @abstractmethod
+    async def get_memories(self, user_id: UUID, limit: int = 10) -> list[MemoryEntity]:
+        ...
+
+    @abstractmethod
     async def get_memory_count(self, user_id: UUID) -> int:
-        from sqlalchemy import func
-        r = await self.db.execute(
-            select(func.count(UserMemory.id)).where(UserMemory.user_id == user_id)
-        )
-        return r.scalar() or 0
+        ...
 
-    async def get_emotion(self, user_id: UUID) -> UserEmotionState | None:
-        r = await self.db.execute(
-            select(UserEmotionState).where(UserEmotionState.user_id == user_id)
-        )
-        return r.scalar_one_or_none()
+    @abstractmethod
+    async def get_emotion(self, user_id: UUID) -> EmotionEntity | None:
+        ...
