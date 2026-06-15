@@ -9,21 +9,10 @@ from app.api.deps import get_current_user
 from app.schemas.conversation import ConversationItem, MessageItem, UpdateTitleRequest
 from app.services.llm_service import llm_router
 from app.services.email_service import send_email
+from app.domain.conversation.service import ConversationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
-
-SUMMARY_PROMPT = """请将以下对话提炼为一份简洁的摘要邮件。格式如下：
-
-- 标题行：用一句话概括对话主题
-- 关键要点：列点说明讨论的主要内容
-- 待办事项：如果有的话
-- 对话时间线：简短的时间顺序总结
-
-对话内容：
-{messages}
-
-请直接输出邮件正文（纯文本），不要加额外的解释。"""
 
 
 @router.get("")
@@ -215,45 +204,13 @@ async def update_title(
     return {"status": "ok"}
 
 
-async def _generate_summary(conv_id: UUID, db: AsyncSession):
-    """Shared helper: fetch messages and generate LLM summary, returns summary text."""
-    msgs_result = await db.execute(
-        select(Message)
-        .where(Message.conv_id == conv_id)
-        .order_by(Message.created_at)
-    )
-    messages = msgs_result.scalars().all()
-    if not messages:
-        raise HTTPException(400, "对话内容为空")
-
-    lines = []
-    for m in messages:
-        role = "用户" if m.role.value == "user" else "AI"
-        lines.append(f"{role}: {m.content or ''}")
-    dialogue = "\n".join(lines)
-
-    prompt = SUMMARY_PROMPT.format(messages=dialogue)
-    try:
-        summary = await llm_router.chat([
-            {"role": "user", "content": prompt},
-        ])
-    except Exception:
-        logger.exception("LLM summary failed")
-        raise HTTPException(500, "摘要生成失败")
-
-    if not summary.strip():
-        raise HTTPException(500, "摘要为空")
-
-    return summary.strip()
-
-
 @router.post("/{conv_id}/summary")
 async def get_conversation_summary(
     conv_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Summarize the conversation via LLM and return the summary text (no email sent)."""
+    """Summarize the conversation via LLM and return the summary text."""
     conv_result = await db.execute(
         select(Conversation).where(
             Conversation.id == conv_id,
@@ -263,8 +220,13 @@ async def get_conversation_summary(
     if not conv_result.scalar_one_or_none():
         raise HTTPException(404, "Conversation not found")
 
-    summary = await _generate_summary(conv_id, db)
-    return {"summary": summary}
+    try:
+        summary = await ConversationService.generate_summary(conv_id, db, llm_router)
+        return {"summary": summary}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
 
 
 @router.post("/{conv_id}/email-summary")
@@ -284,25 +246,16 @@ async def email_summary(
     if not conv:
         raise HTTPException(404, "Conversation not found")
 
-    if not current_user.email:
-        raise HTTPException(400, "请先在个人资料中设置邮箱地址")
-
-    summary = await _generate_summary(conv_id, db)
-
-    subject = f"对话摘要: {conv.title}"
-    success = await send_email(current_user.email, subject, summary)
-    if not success:
-        raise HTTPException(500, "邮件发送失败，请检查邮箱配置")
-
-    db.add(SentEmail(
-        user_id=current_user.id,
-        conv_title=conv.title,
-        recipient=current_user.email,
-        summary_preview=summary[:200],
-    ))
-    await db.commit()
-
-    return {"status": "sent", "email": current_user.email}
+    try:
+        email = await ConversationService.email_summary(
+            conv_id, current_user.id, current_user.email or "",
+            conv.title, db, llm_router, send_email,
+        )
+        return {"status": "sent", "email": email}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
 
 
 @router.post("/{conv_id}/diary")
