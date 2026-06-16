@@ -20,7 +20,12 @@ TOOL_MARKER = re.compile(r'^\[TOOL:(\w+)(?::([^\]]+))?\]')
 
 # Quick keyword triggers — fast path to skip LLM intent check for obvious skill requests
 SKILL_KEYWORDS = {
-    "search": ("搜索", "查一下", "帮我搜", "帮我查", "搜一下", "百度", "谷歌", "查一查", "搜搜"),
+    "search": (
+        "搜索", "查一下", "帮我搜", "帮我查", "搜一下", "百度", "谷歌", "查一查", "搜搜",
+        "多少钱", "股价", "行情", "涨了", "跌了", "价格", "最新",
+        "BTC", "ETH", "比特币", "股票", "外汇", "汇率", "黄金",
+        "新闻", "热点", "头条", "发生了什么",
+    ),
     "weather": ("天气", "下雨", "下雪", "多少度", "冷吗", "热吗", "穿什么"),
     "calendar": ("提醒我", "定个闹钟", "日程", "别忘了", "记得"),
     "expense": ("记账", "花了", "消费", "买了", "支出"),
@@ -365,8 +370,15 @@ class ChatOrchestrator:
             raw = await llm_router.chat([{"role": "user", "content": prompt}])
             if raw:
                 import json
+                clean = raw.strip()
+                # Strip ```json ... ``` wrapper if present
+                if clean.startswith("```"):
+                    clean = clean.split("\n", 1)[-1] if "\n" in clean else clean[3:]
+                    if clean.endswith("```"):
+                        clean = clean[:-3]
+                    clean = clean.strip()
                 try:
-                    parsed = json.loads(raw.strip())
+                    parsed = json.loads(clean)
                     if isinstance(parsed, list) and len(parsed) > 0:
                         suggestions = parsed[:3]
                 except (json.JSONDecodeError, ValueError):

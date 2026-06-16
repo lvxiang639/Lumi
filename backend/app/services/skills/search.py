@@ -176,6 +176,10 @@ class SearchSkill(BaseSkill):
 
         # 1. Try Sina Finance for stocks/forex
         sina_code = self._resolve_sina_code(query)
+        if not sina_code:
+            # Chinese stock name without ticker (e.g. "长电科技") — search for code first
+            sina_code = await self._find_stock_code(query)
+
         if sina_code:
             try:
                 async with httpx.AsyncClient() as client:
@@ -284,6 +288,42 @@ class SearchSkill(BaseSkill):
             if key in ql:
                 return code
 
+        return None
+
+    async def _find_stock_code(self, query: str) -> str | None:
+        """Search for a stock code by company name via SearXNG + extract from results."""
+        try:
+            # Quick local check for common Chinese stock names
+            common_stocks = {
+                "茅台": "sh600519", "平安": "sh601318", "招商银行": "sh600036",
+                "万科": "sz000002", "比亚迪": "sz002594", "宁德时代": "sz300750",
+                "中芯国际": "sh688981", "腾讯": "hk00700", "阿里巴巴": "hk09988",
+                "美团": "hk03690", "京东": "hk09618", "百度": "hk09888",
+                "小米": "hk01810", "苹果": "gb_aapl", "特斯拉": "gb_tsla",
+                "谷歌": "gb_goog", "微软": "gb_msft", "英伟达": "gb_nvda",
+                "茅台": "sh600519",
+            }
+            for name, code in common_stocks.items():
+                if name in query:
+                    return code
+
+            # Search for stock code via SearXNG
+            search_results = await self._search_searxng(f"{query} 股票代码")
+            for r in search_results:
+                content = (r.get("content", "") + r.get("title", "")).upper()
+                # Extract 6-digit A-share code
+                code_match = re.search(r'\b(\d{6})\b', content)
+                if code_match:
+                    code = code_match.group(1)
+                    if code.startswith(('60', '68')):
+                        return f"sh{code}"
+                    return f"sz{code}"
+                # Extract US ticker
+                us_match = re.search(r'\b([A-Z]{2,5})\b(?:\s*[\(（])', content)
+                if us_match:
+                    return f"gb_{us_match.group(1).lower()}"
+        except Exception:
+            pass
         return None
 
     def _parse_sina_response(self, text: str, code: str) -> list[dict]:
