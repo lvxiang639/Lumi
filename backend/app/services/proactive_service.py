@@ -820,7 +820,8 @@ async def push_morning_briefing():
     One per user per day (enforced by last_briefing_date on User model).
     """
     now = datetime.now(BEIJING_TZ)
-    if now.hour != 8:
+    # Fire at any poll after 8:00 AM (once/day enforced by last_briefing_date)
+    if now.hour < 8:
         return
 
     from app.services.briefing_service import generate_briefing
@@ -1179,11 +1180,29 @@ CHINESE_LITERATURE_PROMPT = """你是一位语文老师。请随机选择以下�
 
 async def send_connect_greeting(user_id: str) -> str | None:
     """One consolidated greeting on app open.
-    Shares the SAME throttle as periodic checks — 2h cooldown, 3/day max."""
+    Uses its OWN throttle: once per day, independent of proactive push quota."""
     now = datetime.now(BEIJING_TZ)
-    if not await proactive_service._can_push(user_id, now):
-        logger.debug("connect greeting: throttled for %s", user_id[:8])
+
+    # Greeting-only throttle: once per day, skip quiet hours
+    if now.hour >= 22 or now.hour < 8:
+        logger.debug("connect greeting: quiet hours for %s", user_id[:8])
         return None
+
+    # Check if greeting already sent today
+    from uuid import UUID
+    from app.models.proactive_push import ProactivePush
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    async with async_session() as db:
+        r = await db.execute(
+            select(func.count(ProactivePush.id)).where(
+                ProactivePush.user_id == UUID(user_id),
+                ProactivePush.push_type == "greeting",
+                ProactivePush.created_at >= today_start,
+            )
+        )
+        if (r.scalar() or 0) > 0:
+            logger.debug("connect greeting: already sent today for %s", user_id[:8])
+            return None
 
     parts = []
     async with async_session() as db:

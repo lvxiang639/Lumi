@@ -187,32 +187,60 @@ class TestStudyService:
         from app.domain.study.service import StudyService
         uid = uuid4()
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = []
-        mock_db.execute.return_value = mock_result
 
-        result = await StudyService.analyze_weak_points(uid, mock_db)
-        assert result["total"] == 0
-        assert result["weak_points"] == []
-        assert result["subjects"] == {}
+        # New analysis makes 2 queries: children + records
+        mock_empty = MagicMock()
+        mock_empty.scalars.return_value.all.return_value = []
+        call_count = [0]
+
+        async def mock_execute(q):
+            call_count[0] += 1
+            return mock_empty
+
+        mock_db.execute = mock_execute
+
+        result = await StudyService.analyze_weak_points(uid, mock_db, llm_router=None)
+        assert result["overall"]["total"] == 0
+        assert result["children"] == []
 
     @pytest.mark.asyncio
     async def test_analyze_weak_points_with_data(self):
         from app.domain.study.service import StudyService
-        uid = uuid4()
-        mock_db = AsyncMock()
-        mock_record = MagicMock()
-        mock_record.subject = "数学"
-        mock_record.tags = "分数, 函数"
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [mock_record, mock_record]
-        mock_db.execute.return_value = mock_result
+        from app.models.study_record import StudyChild, StudyRecord
+        from datetime import datetime, timezone, timedelta
+        BEIJING_TZ = timezone(timedelta(hours=8))
 
-        result = await StudyService.analyze_weak_points(uid, mock_db)
-        assert result["total"] == 2
-        assert result["subjects"]["数学"] == 2
-        assert len(result["weak_points"]) == 2
+        uid = uuid4()
+        child = StudyChild(id=uuid4(), user_id=uid, name="测试", grade="")
+        now = datetime.now(BEIJING_TZ)
+        records = [
+            StudyRecord(user_id=uid, child_id=child.id, child_name="测试",
+                        subject="数学", tags="分数,函数", question="Q1",
+                        answer='{}', status="未掌握", created_at=now),
+            StudyRecord(user_id=uid, child_id=child.id, child_name="测试",
+                        subject="数学", tags="分数,函数", question="Q2",
+                        answer='{}', status="未掌握", created_at=now),
+        ]
+
+        mock_db = AsyncMock()
+        mock_child = MagicMock()
+        mock_child.scalars.return_value.all.return_value = [child]
+        mock_rec = MagicMock()
+        mock_rec.scalars.return_value.all.return_value = records
+
+        call_count = [0]
+
+        async def mock_execute(q):
+            call_count[0] += 1
+            return mock_child if call_count[0] == 1 else mock_rec
+
+        mock_db.execute = mock_execute
+
+        result = await StudyService.analyze_weak_points(uid, mock_db, llm_router=None)
+        assert result["overall"]["total"] == 2
+        assert len(result["children"]) == 1
+        assert result["children"][0]["by_subject"]["数学"] == 2
+        assert len(result["children"][0]["weak_points"]) == 2  # 分数, 函数 each ≥2
 
     @pytest.mark.asyncio
     async def test_generate_practice_no_weak_points(self):

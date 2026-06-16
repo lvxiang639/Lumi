@@ -8,7 +8,6 @@ import '../file_page.dart';
 import '../summary_page.dart';
 import '../countdown_page.dart';
 import '../knowledge_page.dart';
-import '../agent_list_page.dart';
 import '../study_page.dart';
 import '../ocr_page.dart';
 import '../../services/routes.dart';
@@ -28,7 +27,6 @@ class ToolsCenterScreen extends StatelessWidget {
     _Tool('OCR', Icons.document_scanner, Color(0xFF06B6D4)),
     _Tool('倒数日', Icons.date_range, Color(0xFFEF4444)),
     _Tool('辅导', Icons.school, Color(0xFF3B82F6)),
-    _Tool('Agent', Icons.smart_toy, Color(0xFF6366F1)),
     _Tool('知识库', Icons.library_books, Color(0xFF8B5CF6)),
   ];
 
@@ -61,7 +59,6 @@ class ToolsCenterScreen extends StatelessWidget {
         break;
       case '辅导': page = const StudyPage(); break;
       case 'OCR': page = const OcrPage(); break;
-      case 'Agent': page = const AgentListPage(); break;
       case '知识库':
         page = const KnowledgePage();
         break;

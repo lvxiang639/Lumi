@@ -37,6 +37,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _showField = false;
   final _stt = stt.SpeechToText();
   bool _listening = false;
+  bool _didInitialScroll = false;
 
   @override
   void initState() {
@@ -398,8 +399,11 @@ class _ChatScreenState extends State<ChatScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scrollCtrl.hasClients && _scrollCtrl.position.hasContentDimensions) {
             final pos = _scrollCtrl.position;
-            // Only auto-scroll if user is within 200px of bottom (not reading history)
-            if (pos.maxScrollExtent - pos.pixels < 200) {
+            // Auto-scroll to bottom on initial history load
+            if (!_didInitialScroll && chat.historyLoaded && pos.maxScrollExtent > 0) {
+              _scrollCtrl.jumpTo(pos.maxScrollExtent);
+              _didInitialScroll = true;
+            } else if (pos.maxScrollExtent - pos.pixels < 200) {
               _scrollCtrl.jumpTo(pos.maxScrollExtent);
             }
           }

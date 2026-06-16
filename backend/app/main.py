@@ -68,10 +68,12 @@ async def startup():
     await seed_daily_content_configs()
     from app.services.notification_service import notification_service
     notification_service.start()
-    from app.services.proactive_service import proactive_service
+    from app.services.proactive_service import proactive_service, generate_daily_content
     proactive_service.start()
-    # Pre-load OCR models in background
+    # Pre-generate daily content so discover page has content immediately
     import asyncio
+    asyncio.create_task(generate_daily_content())
+    # Pre-load OCR models in background
     asyncio.create_task(_warmup_ocr())
 
 
@@ -102,7 +104,7 @@ async def health():
 async def get_daily_content(
     current_user = Depends(get_current_user),
 ):
-    """Return today's daily content for the discover page. Loads from DB."""
+    """Return today's daily content for the discover page. Generates on demand if missing."""
     import json
     from datetime import datetime, timezone, timedelta
     from app.database import async_session
@@ -119,4 +121,10 @@ async def get_daily_content(
         row = r.scalar_one_or_none()
         if row and row.content:
             return {"date": str(row.date), "content": json.loads(row.content)}
-        return {"date": str(today), "content": None}
+
+    # Not yet generated today — generate now so discover page is never empty
+    from app.services.proactive_service import generate_daily_content
+    content = await generate_daily_content()
+    if content:
+        return {"date": str(today), "content": content}
+    return {"date": str(today), "content": None}

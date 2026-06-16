@@ -68,7 +68,10 @@ class ChatOrchestrator:
 
             # Build context string from recent conversation
             if history:
-                context_lines = ["【对话上下文——请结合此前的对话内容理解用户的意图】"]
+                context_lines = [
+                    "【对话上下文——请结合此前的对话内容理解用户的意图】",
+                    "注意：如果上下文中包含已过期的日历事件（如过去的会议、提醒等），请忽略它们。",
+                ]
                 for m in history:
                     role_label = "用户" if m.role == MessageRole.user else "AI"
                     context_lines.append(f"{role_label}: {m.content or ''}")
@@ -148,7 +151,11 @@ class ChatOrchestrator:
             now_dt = datetime.now(timezone(timedelta(hours=8)))  # Beijing time
             wdays = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
             time_str = f"{now_dt.strftime('%Y年%m月%d日 %H:%M:%S')} ({wdays[now_dt.weekday()]})"
-            system_prefix = f"现在是{time_str}。{persona}"
+            system_prefix = (
+                f"现在是{time_str}。{persona}\n\n"
+                f"注意：不要提及已经过期的日历事件（如过去的会议、家长会、接机等）。"
+                f"如果对话历史中包含已过期的事件，请忽略它们，只关注当前和未来的事。"
+            )
 
             if memory_summary:
                 system_prefix += f"\n\n用户信息（自然运用，不要刻意提及）:\n{memory_summary}"
