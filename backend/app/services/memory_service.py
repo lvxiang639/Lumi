@@ -52,6 +52,108 @@ MEMORY_SUMMARY_PROMPT = """将以下用户信息压缩为简洁的要点列表�
 压缩结果（每行一条 key: value）:"""
 
 
+# ── Embedding helpers ──────────────────────────────────────────────────
+
+async def _embed_memory_text(key: str, value: str) -> list[float] | None:
+    """Compute embedding for a memory entry. Runs in executor to avoid blocking."""
+    from app.services.memory_embedder import embed_single
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, embed_single, f"{key}: {value}")
+
+
+async def compute_missing_embeddings() -> int:
+    """Backfill embeddings for memories that don't have them yet.
+    Should be called once at startup."""
+    from app.services.memory_embedder import embed_batch
+    import numpy as np
+
+    async with async_session() as db:
+        result = await db.execute(
+            select(UserMemory).where(UserMemory.embedding == None).limit(100)
+        )
+        memories = result.scalars().all()
+
+    if not memories:
+        return 0
+
+    texts = [f"{m.key}: {m.value}" for m in memories]
+    loop = asyncio.get_running_loop()
+    embeddings = await loop.run_in_executor(None, embed_batch, texts)
+
+    if embeddings is None:
+        return 0
+
+    count = 0
+    async with async_session() as db:
+        for mem, emb in zip(memories, embeddings):
+            result = await db.execute(
+                select(UserMemory).where(UserMemory.id == mem.id)
+            )
+            m = result.scalar_one_or_none()
+            if m is not None:
+                m.embedding = emb.tolist()
+                count += 1
+        await db.commit()
+
+    logger.info("Backfilled embeddings for %d memories", count)
+    return count
+
+
+# ── Relevant Memory Query (semantic search) ────────────────────────────
+
+async def get_relevant_memories(user_id: UUID, user_text: str, top_k: int = 3) -> list[str]:
+    """Get top-k semantically relevant memories using precomputed embeddings."""
+    from app.services.memory_embedder import embed_single, search
+
+    async with async_session() as db:
+        result = await db.execute(
+            select(UserMemory)
+            .where(
+                UserMemory.user_id == user_id,
+                UserMemory.embedding != None,
+            )
+            .order_by(UserMemory.updated_at.desc())
+            .limit(MAX_MEMORIES)
+        )
+        memories = result.scalars().all()
+
+    if not memories:
+        return []
+
+    # Embed query
+    loop = asyncio.get_running_loop()
+    query_vec = await loop.run_in_executor(None, embed_single, user_text)
+    if query_vec is None:
+        return []
+
+    # Search
+    items = [{"id": m.id, "text": f"{m.key}: {m.value}", "embedding": m.embedding} for m in memories]
+    results = search(query_vec, items, top_k=top_k)
+
+    if results:
+        return [r["text"] for r in results]
+
+    # Fallback: keyword match for memories without embeddings
+    query_words = set(user_text)
+    scored = []
+    result2 = await db.execute(
+        select(UserMemory)
+        .where(UserMemory.user_id == user_id)
+        .order_by(UserMemory.updated_at.desc())
+        .limit(MAX_MEMORIES)
+    )
+    all_memories = result2.scalars().all()
+    for m in all_memories:
+        text = f"{m.key}: {m.value}"
+        score = sum(1 for w in query_words if w in text)
+        if score > 0:
+            scored.append((score, text))
+    scored.sort(reverse=True)
+    return [t for _, t in scored[:top_k]]
+
+
+# ── Memory Extraction ──────────────────────────────────────────────────
+
 async def extract_memories(user_id: UUID, conv_id: UUID, dialogue: str) -> None:
     """Async: extract facts from a conversation and save to memory store."""
     if not dialogue.strip():
@@ -91,7 +193,7 @@ async def extract_memories(user_id: UUID, conv_id: UUID, dialogue: str) -> None:
 async def _save_memories(
     db: AsyncSession, user_id: UUID, conv_id: UUID, items: list[tuple[str, str]]
 ) -> None:
-    """Insert new memories, updating existing ones with the same key."""
+    """Insert new memories with precomputed embeddings, updating existing ones."""
     for key, value in items:
         result = await db.execute(
             select(UserMemory).where(
@@ -103,12 +205,18 @@ async def _save_memories(
         if existing:
             existing.value = value
             existing.source_conv_id = conv_id
+            # Update embedding when value changes
+            emb = await _embed_memory_text(key, value)
+            if emb is not None:
+                existing.embedding = emb
         else:
+            emb = await _embed_memory_text(key, value)
             db.add(UserMemory(
                 user_id=user_id,
                 key=key,
                 value=value,
                 source_conv_id=conv_id,
+                embedding=emb,
             ))
     await db.commit()
 
@@ -123,7 +231,6 @@ async def _enforce_limit(db: AsyncSession, user_id: UUID) -> None:
     if count <= MAX_MEMORIES:
         return
 
-    # Get all memories ordered by most recently updated first
     result = await db.execute(
         select(UserMemory)
         .where(UserMemory.user_id == user_id)
@@ -133,7 +240,6 @@ async def _enforce_limit(db: AsyncSession, user_id: UUID) -> None:
     all_memories = result.scalars().all()
     keep = all_memories[:MAX_MEMORIES]
 
-    # Summarize the overflow
     overflow = all_memories[MAX_MEMORIES:]
     if not overflow:
         return
@@ -148,18 +254,15 @@ async def _enforce_limit(db: AsyncSession, user_id: UUID) -> None:
         ])
     except Exception:
         logger.exception("memory compression LLM failed")
-        # Delete overflow without trying to merge
         for m in overflow:
             await db.delete(m)
         await db.commit()
         return
 
-    # Delete overflow
     for m in overflow:
         await db.delete(m)
     await db.flush()
 
-    # Insert compressed version
     if compressed and compressed.strip():
         for line in compressed.strip().split("\n"):
             line = line.strip()
@@ -169,7 +272,6 @@ async def _enforce_limit(db: AsyncSession, user_id: UUID) -> None:
             key = key.strip()
             value = value.strip()
             if key and value and len(value) >= 2:
-                # Update existing or add new
                 r = await db.execute(
                     select(UserMemory).where(
                         UserMemory.user_id == user_id,
@@ -180,27 +282,13 @@ async def _enforce_limit(db: AsyncSession, user_id: UUID) -> None:
                 if e:
                     e.value = value
                 else:
-                    db.add(UserMemory(user_id=user_id, key=key, value=value))
+                    emb = await _embed_memory_text(key, value)
+                    db.add(UserMemory(
+                        user_id=user_id, key=key, value=value,
+                        embedding=emb,
+                    ))
 
     await db.commit()
-
-
-async def get_memory_summary(user_id: UUID) -> str:
-    """Get all memories for a user as a compact string for system prompt."""
-    async with async_session() as db:
-        result = await db.execute(
-            select(UserMemory)
-            .where(UserMemory.user_id == user_id)
-            .order_by(UserMemory.updated_at.desc())
-            .limit(MAX_MEMORIES)
-        )
-        memories = result.scalars().all()
-
-    if not memories:
-        return ""
-
-    lines = [f"- {m.key}: {m.value}" for m in memories]
-    return "\n".join(lines)
 
 
 # ── ConvMemory (对话级记忆) ──
@@ -220,7 +308,6 @@ async def extract_conv_summary(user_id: UUID, conv_id: UUID, dialogue: str) -> N
     if not dialogue.strip():
         return
 
-    # Load previous summary for cumulative merging
     previous_summary = ""
     async with async_session() as db:
         from app.models import ConvMemory
@@ -248,16 +335,12 @@ async def extract_conv_summary(user_id: UUID, conv_id: UUID, dialogue: str) -> N
     if not summary or not summary.strip():
         return
 
-    summary = summary.strip()[:200]  # cap length
+    summary = summary.strip()[:200]
 
     async with async_session() as db:
         from app.models import ConvMemory
-
-        # Upsert conv_memory
         result = await db.execute(
-            select(ConvMemory).where(
-                ConvMemory.conv_id == conv_id,
-            )
+            select(ConvMemory).where(ConvMemory.conv_id == conv_id)
         )
         existing = result.scalar_one_or_none()
         if existing:
@@ -283,6 +366,24 @@ async def get_conv_memory_summary(conv_id: UUID) -> str:
         )
         row = result.scalar_one_or_none()
     return row or ""
+
+
+async def get_memory_summary(user_id: UUID) -> str:
+    """Get all memories for a user as a compact string for system prompt."""
+    async with async_session() as db:
+        result = await db.execute(
+            select(UserMemory)
+            .where(UserMemory.user_id == user_id)
+            .order_by(UserMemory.updated_at.desc())
+            .limit(MAX_MEMORIES)
+        )
+        memories = result.scalars().all()
+
+    if not memories:
+        return ""
+
+    lines = [f"- {m.key}: {m.value}" for m in memories]
+    return "\n".join(lines)
 
 
 def schedule_extraction(user_id: UUID, conv_id: UUID, dialogue: str) -> None:

@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import String, DateTime, func, Uuid, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy import Float
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -18,6 +20,9 @@ class UserMemory(Base):
     value: Mapped[str] = mapped_column(Text, nullable=False)
     source_conv_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("conversations.id"), nullable=True
+    )
+    embedding: Mapped[list[float] | None] = mapped_column(
+        ARRAY(Float, dimensions=1), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

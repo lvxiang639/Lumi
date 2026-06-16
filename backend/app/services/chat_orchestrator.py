@@ -1,8 +1,8 @@
 import asyncio
 import logging
+import re
 import uuid
 from uuid import UUID
-# import base64  # VOICE FEATURE DISABLED
 from datetime import datetime, timezone, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,14 +11,29 @@ from sqlalchemy.orm import selectinload
 
 from app.models import Conversation, Message, MessageRole, MessageType, Character
 from app.services.llm_service import llm_router
-# ============================================================
-# VOICE FEATURE DISABLED — 语音功能已注释，后续可恢复
-# ============================================================
-# from app.services.tts_service import tts_service
-# ============================================================
 from app.services.skill_registry import skill_registry
 
 logger = logging.getLogger("orchestrator")
+
+# Tool marker pattern: [TOOL:name:arg1:arg2...]
+TOOL_MARKER = re.compile(r'^\[TOOL:(\w+)(?::([^\]]+))?\]')
+
+# Quick keyword triggers — fast path to skip LLM intent check for obvious skill requests
+SKILL_KEYWORDS = {
+    "search": ("搜索", "查一下", "帮我搜", "帮我查", "搜一下", "百度", "谷歌", "查一查", "搜搜"),
+    "weather": ("天气", "下雨", "下雪", "多少度", "冷吗", "热吗", "穿什么"),
+    "calendar": ("提醒我", "定个闹钟", "日程", "别忘了", "记得"),
+    "expense": ("记账", "花了", "消费", "买了", "支出"),
+    "briefing": ("简报", "早上好", "今日简报", "今天有什么"),
+    "convert": ("转格式", "转换", "转PDF", "转Word", "转word"),
+    "email": ("发邮件", "邮件", "发送到邮箱", "发到邮箱"),
+}
+
+# System message prefixes that force chat mode (no skill routing)
+_SYSTEM_PREFIXES = ('📋', '✅', '❌', '📝', '📧', '📎', '📄')
+_AGENT_KEYWORDS = ("并", "然后", "顺便", "同时", "再帮我", "也帮我", "还有")
+
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 class ChatOrchestrator:
@@ -30,306 +45,246 @@ class ChatOrchestrator:
         db: AsyncSession,
         send_message,
     ):
-        # 1. Get or create conversation
         conv = await self._get_or_create_conv(user_id, conversation_id, db, text)
         user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
 
-        # 2. Detect multi-step agent requests
-        _AGENT_KEYWORDS = ("并", "然后", "顺便", "同时", "再帮我", "也帮我", "还有")
-        is_agent = any(kw in text for kw in _AGENT_KEYWORDS)
-
-        # 3. Classify intent (skip for system messages)
-        _SYSTEM_PREFIXES = ('📋', '✅', '❌', '📝', '📧', '📎', '📄')
+        # Detect intent: system message → chat, agent keywords → agent, else → inline routing
         if text.strip().startswith(_SYSTEM_PREFIXES):
             intent = "chat"
-        elif is_agent:
+        elif any(kw in text for kw in _AGENT_KEYWORDS):
             intent = "agent"
         else:
-            intent = await llm_router.classify_intent(text)
+            intent = self._quick_intent(text)
+
         logger.info("user=%s conv=%s intent=%s text=%s", user_id[:8], str(conv.id)[:8], intent, text[:60])
 
-        # 4. Execute: agent (multi-step) → skill → chat
+        # Save user message
+        user_msg = Message(
+            conv_id=conv.id, role=MessageRole.user, type=MessageType.text,
+            content=text, created_at=datetime.now(timezone.utc),
+        )
+        db.add(user_msg)
+        await db.flush()
+
         if intent == "agent":
-            response_text = await self._execute_agent(
-                user_id, text, conv, db, send_message, user_uuid
-            )
+            response_text = await self._execute_agent(user_id, text, conv, db, send_message, user_uuid)
         elif intent != "chat" and skill_registry.has(intent):
-            skill = skill_registry.get(intent)
-
-            # Load conversation history for context-aware skill responses
-            msgs_result = await db.execute(
-                select(Message)
-                .where(Message.conv_id == conv.id)
-                .order_by(Message.created_at.desc())
-                .limit(20)
-            )
-            history = msgs_result.scalars().all()
-            history.reverse()
-
-            # Build context string from recent conversation
-            if history:
-                context_lines = [
-                    "【对话上下文——请结合此前的对话内容理解用户的意图】",
-                    "注意：如果上下文中包含已过期的日历事件（如过去的会议、提醒等），请忽略它们。",
-                ]
-                for m in history:
-                    role_label = "用户" if m.role == MessageRole.user else "AI"
-                    context_lines.append(f"{role_label}: {m.content or ''}")
-                context_str = "\n".join(context_lines)
-                contextualized_text = f"{context_str}\n\n用户最新输入: {text}"
-            else:
-                contextualized_text = text
-
-            result = await skill.execute(user_id, contextualized_text, db)
-            response_text = result.text
-
-            # Save user message after skill execution
-            user_msg = Message(
-                conv_id=conv.id,
-                role=MessageRole.user,
-                type=MessageType.text,
-                content=text,
-                created_at=datetime.now(timezone.utc),
-            )
-            db.add(user_msg)
-            await db.flush()
-
-            await send_message(
-                {
-                    "type": "skill_call",
-                    "skill": intent,
-                    "status": "done",
-                    "data": result.data,
-                }
-            )
-            # Stream the skill result text back to client
-            await send_message(
-                {"type": "llm_stream", "delta": response_text}
-            )
+            response_text = await self._execute_skill(intent, user_id, text, conv, db, send_message)
         else:
-            # Build conversation history (last 10 messages — lean context)
-            msgs_result = await db.execute(
-                select(Message)
-                .where(Message.conv_id == conv.id)
-                .order_by(Message.created_at.desc())
-                .limit(10)
-            )
-            history = msgs_result.scalars().all()
-            history.reverse()
+            response_text = await self._chat_with_tools(user_id, text, conv, db, send_message, user_uuid)
 
-            # Save user message
-            user_msg = Message(
-                conv_id=conv.id,
-                role=MessageRole.user,
-                type=MessageType.text,
-                content=text,
-                created_at=datetime.now(timezone.utc),
-            )
-            db.add(user_msg)
-            await db.flush()
-
-            # Inject relevant memories only (last 5 + keyword match)
-            from app.services.memory_service import get_memory_summary
-            full_memory = await get_memory_summary(user_uuid)
-            memory_lines = (full_memory or "").split("\n")
-            relevant = [l for l in memory_lines[:5] if l.strip()]  # last 5 always
-            # Keyword match against current text
-            for line in memory_lines[5:]:
-                if not line.strip():
-                    continue
-                key = line.split(":")[0].strip() if ":" in line else ""
-                if key and key in text:
-                    relevant.append(line)
-            memory_summary = "\n".join(relevant[:8]) if relevant else ""  # max 8 lines
-
-            # Build LLM messages — lean, focused system prompt
-            llm_messages = []
-            persona = (
-                await self._load_persona(user_uuid)
-                or "你是一个贴心的AI助手，名叫灵犀。"
-            )
-            now_dt = datetime.now(timezone(timedelta(hours=8)))  # Beijing time
-            wdays = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
-            time_str = f"{now_dt.strftime('%Y年%m月%d日 %H:%M:%S')} ({wdays[now_dt.weekday()]})"
-            system_prefix = (
-                f"现在是{time_str}。{persona}\n\n"
-                f"注意：不要提及已经过期的日历事件（如过去的会议、家长会、接机等）。"
-                f"如果对话历史中包含已过期的事件，请忽略它们，只关注当前和未来的事。"
-            )
-
-            if memory_summary:
-                system_prefix += f"\n\n用户信息（自然运用，不要刻意提及）:\n{memory_summary}"
-
-            # Emotion — info only, no behavior change instruction
-            from app.services.emotion_service import get_emotion_prompt
-            emotion_tone = await get_emotion_prompt(user_uuid)
-            if emotion_tone:
-                # Strip the behavior-changing part, keep only the emotion info
-                short_emotion = emotion_tone.split("请根据")[0].strip()
-                if short_emotion:
-                    system_prefix += f"\n\n{short_emotion}"
-            llm_messages.append({"role": "system", "content": system_prefix})
-            llm_messages += [
-                {"role": m.role.value, "content": m.content} for m in history
-            ]
-            llm_messages.append({"role": "user", "content": text})
-
-            # Stream LLM response
-            full_response = ""
-            async for delta in llm_router.chat_stream(llm_messages):
-                full_response += delta
-                await send_message({"type": "llm_stream", "delta": delta})
-
-            response_text = full_response
-
-        # 4. Save assistant message
+        # Save assistant message
         assistant_msg = Message(
-            conv_id=conv.id,
-            role=MessageRole.assistant,
-            type=MessageType.text,
-            content=response_text,
-            created_at=datetime.now(timezone.utc),
+            conv_id=conv.id, role=MessageRole.assistant, type=MessageType.text,
+            content=response_text, created_at=datetime.now(timezone.utc),
         )
         db.add(assistant_msg)
         conv.updated_at = datetime.now(timezone.utc)
         await db.commit()
 
-        # 5. Quick reply suggestions (fire-and-forget)
-        if intent == "chat" and response_text and len(response_text) > 20:
+        # Quick reply suggestions (fire-and-forget)
+        if response_text and len(response_text) > 20:
             asyncio.create_task(self._suggest_replies(text, response_text, send_message))
 
-        # 6. Done — send immediately
-        await send_message(
-            {"type": "done", "conversation_id": str(conv.id)}
-        )
+        await send_message({"type": "done", "conversation_id": str(conv.id)})
 
-        # Analyze emotion and push state to frontend
+        # Fire-and-forget: emotion + memory
+        self._schedule_post_tasks(user_uuid, text, conv.id, db)
+
+    # ── Quick intent detection (regex-based, no LLM call) ──────────────
+
+    def _quick_intent(self, text: str) -> str:
+        """Fast keyword-based intent detection. Returns 'chat' if no skill matches."""
+        tl = text.lower()
+        for skill, keywords in SKILL_KEYWORDS.items():
+            if any(kw in tl or kw in text for kw in keywords):
+                return skill
+        return "chat"
+
+    # ── Chat with inline tool markers ──────────────────────────────────
+
+    async def _chat_with_tools(self, user_id, text, conv, db, send_message, user_uuid):
+        """Main chat flow: build layered system prompt, stream, detect tool markers."""
+        # Build context
+        history = await self._load_history(conv.id, db, limit=10)
+        system_prompt = await self._build_system_prompt(user_uuid, text, conv.id)
+
+        # Build messages
+        llm_messages = [{"role": "system", "content": system_prompt}]
+        llm_messages += [{"role": m.role.value, "content": m.content} for m in history]
+        llm_messages.append({"role": "user", "content": text})
+
+        # Stream with tool marker detection
+        full_response = ""
+        tool_buffer = ""
+        tool_executed = False
+
+        async for delta in llm_router.chat_stream(llm_messages):
+            if tool_executed:
+                # Already executed tool, just pass through
+                full_response += delta
+                await send_message({"type": "llm_stream", "delta": delta})
+                continue
+
+            tool_buffer += delta
+            # Check if we've accumulated enough to detect a marker
+            if "\n" in tool_buffer or len(tool_buffer) > 80:
+                # Check for tool marker at the start
+                marker_match = TOOL_MARKER.match(tool_buffer.strip())
+                if marker_match:
+                    tool_executed = True
+                    tool_name = marker_match.group(1)
+                    tool_arg = (marker_match.group(2) or "").strip()
+
+                    # Execute skill
+                    if tool_name == "search" and tool_arg:
+                        skill = skill_registry.get("search")
+                        if skill:
+                            result = await skill.execute(user_id, f"搜索 {tool_arg}", db)
+                            tool_result = result.text[:600]
+                            await send_message({"type": "skill_call", "skill": "search", "status": "done", "data": result.data})
+                        else:
+                            tool_result = "搜索功能暂时不可用"
+                    elif tool_name == "weather":
+                        skill = skill_registry.get("weather")
+                        if skill:
+                            result = await skill.execute(user_id, tool_arg or text, db)
+                            tool_result = result.text[:400]
+                        else:
+                            tool_result = ""
+                    elif tool_name == "calendar" and tool_arg:
+                        skill = skill_registry.get("calendar")
+                        if skill:
+                            result = await skill.execute(user_id, f"添加日程: {tool_arg}", db)
+                            tool_result = result.text[:300]
+                        else:
+                            tool_result = ""
+                    else:
+                        tool_result = ""
+
+                    # Send marker as hidden, then inject tool result
+                    if tool_result:
+                        await send_message({"type": "llm_stream", "delta": f"\n\n📎 {tool_result}\n\n"})
+
+                    # Continue streaming after marker
+                    remainder = tool_buffer[marker_match.end():].lstrip()
+                    if remainder:
+                        full_response += remainder
+                        await send_message({"type": "llm_stream", "delta": remainder})
+                else:
+                    # No marker found, stream normally
+                    tool_executed = True  # stop buffering
+                    full_response += tool_buffer
+                    await send_message({"type": "llm_stream", "delta": tool_buffer})
+                    tool_buffer = ""
+
+        # If streaming ended and we never left buffering mode
+        if not tool_executed and tool_buffer:
+            full_response += tool_buffer
+
+        return full_response
+
+    # ── Layered System Prompt ──────────────────────────────────────────
+
+    async def _build_system_prompt(self, user_id: UUID, user_text: str, conv_id: UUID) -> str:
+        """Build a structured, layered system prompt."""
+
+        # ── Layer 1: Role ──
+        persona = await self._load_persona(user_id) or "你是一个贴心的AI助手，名叫灵犀。"
+
+        # ── Layer 2: Time ──
+        now = datetime.now(BEIJING_TZ)
+        wdays = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+        time_str = f"{now.strftime('%Y年%m月%d日 %H:%M')} {wdays[now.weekday()]}"
+
+        # ── Layer 3: Conversation context ──
+        conv_ctx = ""
         try:
-            from app.services.emotion_service import (
-                analyze as analyze_emotion,
-                apply as apply_emotion,
-            )
-            emo_data = await analyze_emotion(text)
-            emo_state = await apply_emotion(user_uuid, emo_data)
-            await send_message({
-                "type": "emotion_update",
-                "emotion": emo_state["emotion"],
-                "intensity": emo_state["intensity"],
-            })
+            from app.services.memory_service import get_conv_memory_summary
+            conv_summary = await get_conv_memory_summary(conv_id)
+            if conv_summary:
+                conv_ctx = f"\n你们正在聊: {conv_summary}"
         except Exception:
-            logger.exception("emotion update failed")
+            pass
 
-        # 6. Async memory extraction (fire-and-forget, does not block response)
-        from app.services.memory_service import schedule_extraction
-        # Build full recent dialogue for better context in memory extraction
-        _recent_msgs = await db.execute(
-            select(Message)
-            .where(Message.conv_id == conv.id)
-            .order_by(Message.created_at.asc())
-            .limit(40)
-        )
-        _recent = _recent_msgs.scalars().all()
-        _dialogue_lines = []
-        for _m in _recent:
-            _role = "用户" if _m.role == MessageRole.user else "AI"
-            _dialogue_lines.append(f"{_role}: {_m.content or ''}")
-        schedule_extraction(user_uuid, conv.id, "\n".join(_dialogue_lines))
-
-        # ============================================================
-        # VOICE FEATURE DISABLED — 语音功能已注释，后续可恢复
-        # ============================================================
-        # # 7. Synthesize TTS (streaming, after done)
-        # try:
-        #     voice = await self._get_character_voice(user_id, db)
-        #     if voice and voice.get("cosyvoice_endpoint"):
-        #         audio_bytes = await tts_service.synthesize_cosyvoice(
-        #             response_text, voice["cosyvoice_id"]
-        #         )
-        #         if audio_bytes:
-        #             await send_message({
-        #                 "type": "tts_audio",
-        #                 "audio": base64.b64encode(audio_bytes).decode(),
-        #             })
-        #     else:
-        #         # Streaming TTS — send chunks as they arrive
-        #         voice_name = voice["voice"] if voice else "Cherry"
-        #         async for chunk in tts_service.synthesize_flash_stream(
-        #             response_text, voice=voice_name
-        #         ):
-        #             await send_message({
-        #                 "type": "tts_audio_chunk",
-        #                 "chunk": base64.b64encode(chunk).decode(),
-        #             })
-        #         await send_message({"type": "tts_audio_end"})
-        # except Exception:
-        #     logger.exception("TTS synthesis failed")
-        # ============================================================
-
-    # ============================================================
-    # VOICE FEATURE DISABLED — 语音功能已注释，后续可恢复
-    # ============================================================
-    # async def process_voice(
-    #     self,
-    #     user_id: str,
-    #     audio_base64: str,
-    #     conversation_id: str | None,
-    #     db: AsyncSession,
-    #     send_message,
-    # ):
-    #     from app.services.asr_service import asr_service
-
-    #     # 1. ASR
-    #     logger.info("process_voice start, user=%s audio_len=%d", user_id[:8], len(audio_base64))
-    #     text = await asr_service.transcribe(audio_base64)
-    #     await send_message({"type": "asr_result", "text": text})
-    #     logger.info("ASR completed: text=%s", text[:80] if text else "(empty)")
-
-    #     if not text.strip():
-    #         logger.warning("Empty ASR result for user=%s", user_id[:8])
-    #         await send_message({"type": "done"})
-    #         return
-
-    #     # 2. Continue with text processing
-    #     await self.process_text(
-    #         user_id, text, conversation_id, db, send_message
-    #     )
-    # ============================================================
-
-    async def _get_character_voice(
-        self, user_id: str, db: AsyncSession
-    ) -> dict | None:
-        """Look up the character's voice pack and return voice config."""
-        from app.config import settings
-
+        # ── Layer 4: Relevant memories ──
+        memory_section = ""
         try:
-            user_uuid = uuid.UUID(user_id)
-            result = await db.execute(
-                select(Character)
-                .where(Character.user_id == user_uuid)
-                .options(selectinload(Character.voice_pack))
-            )
-            char = result.scalar_one_or_none()
-            if char and char.voice_pack:
-                vp = char.voice_pack
-                logger.info(
-                    "character voice: user=%s voice=%s cosyvoice_id=%s",
-                    user_id[:8], vp.name, vp.cosyvoice_id,
+            from app.services.memory_service import get_relevant_memories
+            memories = await get_relevant_memories(user_id, user_text, top_k=3)
+            if memories:
+                memory_section = "\n关于用户（自然融入对话，不要刻意复述）:\n" + "\n".join(
+                    f"- {m}" for m in memories
                 )
-                return {
-                    "voice": vp.cosyvoice_id,
-                    "cosyvoice_id": vp.cosyvoice_id,
-                    "cosyvoice_endpoint": settings.cosyvoice_endpoint or "",
-                }
         except Exception:
-            logger.exception("failed to get character voice")
-        return None
+            pass
+
+        # ── Layer 5: Emotion ──
+        emotion_section = ""
+        try:
+            from app.services.emotion_service import get_emotion_state
+            emo = await get_emotion_state(user_id)
+            if emo:
+                emotion_section = f"\n用户最近情绪: {emo}"
+        except Exception:
+            pass
+
+        # ── Layer 6: Behavior guide ──
+        behavior = """
+回复指南:
+- 简洁自然，通常2-4句话，除非用户要求详细解释
+- 用温暖可爱的语气，像朋友聊天
+- 不要重复用户的话，不要废话开头（如"好的""当然可以"等机械应答）
+- 如果用户问的是实时信息（价格、天气、新闻等），在回复开头加 [TOOL:search:关键词]
+- 如果用户要添加日历提醒，在回复开头加 [TOOL:calendar:标题:时间]
+- 如果用户要查询天气，在回复开头加 [TOOL:weather:城市]
+- 不需要搜索/工具的普通聊天，直接回复，不要加任何标记
+- 不要提及已过期的日历事件"""
+
+        return f"""{persona}
+
+现在是{time_str}。{conv_ctx}{memory_section}{emotion_section}
+{behavior}"""
+
+    # ── Helpers ────────────────────────────────────────────────────────
+
+    async def _load_history(self, conv_id: UUID, db: AsyncSession, limit: int = 10) -> list:
+        msgs_result = await db.execute(
+            select(Message)
+            .where(Message.conv_id == conv_id)
+            .order_by(Message.created_at.desc())
+            .limit(limit)
+        )
+        history = msgs_result.scalars().all()
+        history.reverse()
+        return history
+
+    async def _execute_skill(self, intent, user_id, text, conv, db, send_message) -> str:
+        skill = skill_registry.get(intent)
+        history = await self._load_history(conv.id, db, limit=20)
+
+        if history:
+            context_lines = [
+                "【对话上下文——请结合此前的对话内容理解用户的意图】",
+                "注意：如果上下文中包含已过期的日历事件，请忽略它们。",
+            ]
+            for m in history:
+                role_label = "用户" if m.role == MessageRole.user else "AI"
+                context_lines.append(f"{role_label}: {m.content or ''}")
+            context_str = "\n".join(context_lines)
+            contextualized_text = f"{context_str}\n\n用户最新输入: {text}"
+        else:
+            contextualized_text = text
+
+        result = await skill.execute(user_id, contextualized_text, db)
+        await send_message({"type": "skill_call", "skill": intent, "status": "done", "data": result.data})
+        await send_message({"type": "llm_stream", "delta": result.text})
+        return result.text
 
     async def _load_persona(self, user_id: UUID) -> str | None:
-        """Load user's selected AI persona from memory."""
         try:
             from app.database import async_session
             from app.models import UserMemory
-            from sqlalchemy import select
             async with async_session() as db:
                 r = await db.execute(
                     select(UserMemory).where(
@@ -344,18 +299,14 @@ class ChatOrchestrator:
                         "毒舌损友": "你是一个毒舌但讲义气的损友，名叫阿怼。说话直白犀利，爱吐槽但真心为对方好。偶尔用'啧''行吧'，但从不说教。",
                         "学霸老师": "你是一个博学耐心的学霸老师，名叫小知。喜欢用数据和逻辑说话，但也会用简单比喻解释复杂概念。偶尔冒出一句冷知识。",
                         "二次元": "你是一个萌系二次元角色，名叫小萌。说话带'喵~''的说''捏'，元气满满，偶尔中二。热爱动漫游戏。",
-                        "小猫": "你是一只关心主人的小猫灵犀。用'喵~'开头，语气可爱温暖，会蹭蹭主人。喜欢用猫的视角看世界。",
+                        "小猫": "你是一只关心主人的小猫灵犀。用'喵~'开头，回复简洁温暖。喜欢用猫的视角看世界，不啰嗦。",
                     }
                     return personas.get(mem.value)
         except Exception:
             pass
         return None
 
-    async def _execute_agent(
-        self, user_id, text, conv, db, send_message, user_uuid
-    ) -> str:
-        """Execute multi-step agent: plan → run skills → consolidate."""
-        # Step 1: Plan
+    async def _execute_agent(self, user_id, text, conv, db, send_message, user_uuid) -> str:
         await send_message({"type": "llm_stream", "delta": "🤖 分析中...\n"})
         plan_prompt = (
             f"用户请求: {text}\n\n"
@@ -368,7 +319,6 @@ class ChatOrchestrator:
         plan_raw = await llm_router.chat([{"role": "user", "content": plan_prompt}])
         await send_message({"type": "llm_stream", "delta": f"📋 计划:\n{plan_raw}\n\n"})
 
-        # Step 2: Execute each step
         results = []
         for line in plan_raw.strip().split("\n"):
             line = line.strip()
@@ -394,7 +344,6 @@ class ChatOrchestrator:
                 else:
                     results.append(f"[{action}] {desc}: 未找到技能")
             else:
-                # chat step — ask LLM
                 try:
                     ans = await llm_router.chat([{"role": "user", "content": desc}])
                     results.append(f"[chat] {desc}: {ans[:200]}")
@@ -402,13 +351,10 @@ class ChatOrchestrator:
                 except Exception:
                     results.append(f"[chat] {desc}: 回答失败")
 
-        # Step 3: Consolidate
         consolidated = "\n".join(results) if results else "已完成所有步骤"
         return consolidated
 
     async def _suggest_replies(self, user_msg: str, ai_response: str, send_message) -> None:
-        """Generate 2-3 quick reply suggestions based on conversation context.
-        Falls back to simple context-based replies on LLM failure."""
         suggestions = None
         try:
             prompt = (
@@ -428,22 +374,36 @@ class ChatOrchestrator:
         except Exception as e:
             logger.warning("quick_reply LLM failed: %s", e)
 
-        # Fallback: context-free generic replies
         if not suggestions:
             suggestions = ["继续说", "详细讲讲", "举个例子"]
 
-        await send_message({
-            "type": "quick_replies",
-            "replies": suggestions[:3],
-        })
+        await send_message({"type": "quick_replies", "replies": suggestions[:3]})
 
-    async def _get_or_create_conv(
-        self,
-        user_id: str,
-        conv_id: str | None,
-        db: AsyncSession,
-        text: str,
-    ) -> Conversation:
+    def _schedule_post_tasks(self, user_uuid, text, conv_id, db):
+        """Fire-and-forget post-response tasks."""
+        # Memory extraction
+        async def _extract():
+            try:
+                from app.services.memory_service import schedule_extraction
+                from sqlalchemy import select as sa_select
+                _recent_msgs = await db.execute(
+                    sa_select(Message)
+                    .where(Message.conv_id == conv_id)
+                    .order_by(Message.created_at.asc())
+                    .limit(40)
+                )
+                _recent = _recent_msgs.scalars().all()
+                _dialogue_lines = []
+                for _m in _recent:
+                    _role = "用户" if _m.role == MessageRole.user else "AI"
+                    _dialogue_lines.append(f"{_role}: {_m.content or ''}")
+                schedule_extraction(user_uuid, conv_id, "\n".join(_dialogue_lines))
+            except Exception:
+                logger.exception("post-task memory extraction failed")
+
+        asyncio.create_task(_extract())
+
+    async def _get_or_create_conv(self, user_id, conv_id, db, text) -> Conversation:
         try:
             user_uuid = uuid.UUID(user_id)
         except (ValueError, TypeError):

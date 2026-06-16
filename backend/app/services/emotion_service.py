@@ -123,6 +123,24 @@ async def apply(user_id: UUID, emotion_data: dict) -> dict:
         return {"emotion": final_emotion, "intensity": final_intensity}
 
 
+async def get_emotion_state(user_id: UUID) -> str:
+    """Get brief emotion state label for system prompt (no LLM call)."""
+    async with async_session() as db:
+        result = await db.execute(
+            select(UserEmotionState).where(UserEmotionState.user_id == user_id)
+        )
+        state = result.scalar_one_or_none()
+
+    if not state or state.intensity <= 0.2:
+        return ""
+
+    emoji_map = {
+        "joy": "😊 开心", "sad": "😢 有点难过", "angry": "😠 生气中",
+        "calm": "😌 平静", "surprised": "😲 惊讶", "worried": "😟 担忧",
+    }
+    return emoji_map.get(state.current_emotion, "")
+
+
 async def get_emotion_prompt(user_id: UUID) -> str:
     """Get emotion tone instruction for LLM system prompt."""
     async with async_session() as db:

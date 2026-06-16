@@ -75,6 +75,9 @@ async def startup():
     asyncio.create_task(generate_daily_content())
     # Pre-load OCR models in background
     asyncio.create_task(_warmup_ocr())
+    # Backfill missing memory embeddings + preload BGE-M3
+    from app.services.memory_service import compute_missing_embeddings
+    asyncio.create_task(compute_missing_embeddings())
 
 
 async def _warmup_ocr():
