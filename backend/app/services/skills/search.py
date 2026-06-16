@@ -162,65 +162,167 @@ class SearchSkill(BaseSkill):
             logger.exception("search skill failed")
             return SkillResult(text="暂时无法完成搜索，请稍后再试")
 
-    # ── Source: Finance (CoinGecko free API) ───────────────────────────
+    # ── Source: Finance (Sina + CoinGecko, all free) ────────────────────
+
+    # sina symbol mapping: ticker → sina list code
+    _SINA_REFERER = "https://finance.sina.com.cn"
 
     async def _search_finance(self, query: str) -> list[dict]:
-        """Search financial data via free CoinGecko API (crypto) + SearXNG (stocks).
-        CoinGecko free tier: 10-30 calls/min, no API key required for basic use."""
+        """Search financial data via free APIs.
+        - Sina Finance: A-shares, US stocks, HK stocks, forex — free, no key, stable 10+ years
+        - CoinGecko: cryptocurrency — free, no key, 10-30 calls/min
+        """
         results = []
 
-        # 1. CoinGecko for crypto (free, no key needed)
-        try:
-            crypto_match = re.search(r'(BTC|ETH|SOL|DOGE|XRP|BNB|ADA|MATIC|[A-Z]{2,6})', query.upper())
-            if crypto_match:
-                symbol = crypto_match.group(1).lower()
+        # 1. Try Sina Finance for stocks/forex
+        sina_code = self._resolve_sina_code(query)
+        if sina_code:
+            try:
                 async with httpx.AsyncClient() as client:
                     resp = await client.get(
-                        "https://api.coingecko.com/api/v3/search",
-                        params={"query": symbol},
-                        timeout=10,
+                        f"https://hq.sinajs.cn/list={sina_code}",
+                        headers={"Referer": self._SINA_REFERER},
+                        timeout=8,
                     )
                     if resp.status_code == 200:
-                        data = resp.json()
-                        coins = data.get("coins", [])
-                        if coins:
-                            coin_id = coins[0]["id"]
-                            coin_name = coins[0]["name"]
-                            price_resp = await client.get(
-                                "https://api.coingecko.com/api/v3/simple/price",
-                                params={
-                                    "ids": coin_id,
-                                    "vs_currencies": "usd,cny",
-                                    "include_24hr_change": "true",
-                                },
-                                timeout=10,
-                            )
-                            if price_resp.status_code == 200:
-                                price_data = price_resp.json()
-                                if coin_id in price_data:
-                                    d = price_data[coin_id]
-                                    results.append({
-                                        "title": f"{coin_name} ({symbol.upper()}) 实时价格",
-                                        "content": (
-                                            f"USD: ${d.get('usd', '?')} | "
-                                            f"CNY: ¥{d.get('cny', '?')} | "
-                                            f"24h涨跌: {d.get('usd_24h_change', 0):+.2f}%"
-                                        ),
-                                        "url": f"https://www.coingecko.com/en/coins/{coin_id}",
-                                    })
-        except Exception:
-            logger.exception("coingecko search failed")
+                        text = resp.text
+                        results = self._parse_sina_response(text, sina_code)
+            except Exception:
+                logger.exception("sina finance failed")
 
-        # 2. For stocks/forex, use SearXNG to fetch from web (free)
+        # 2. CoinGecko for crypto
         if not results:
             try:
-                results = await self._search_searxng(f"{query} stock price")
+                crypto_match = re.search(
+                    r'(BTC|ETH|SOL|DOGE|XRP|BNB|ADA|MATIC|[A-Z]{2,6})', query.upper()
+                )
+                if crypto_match:
+                    symbol = crypto_match.group(1).lower()
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.get(
+                            "https://api.coingecko.com/api/v3/search",
+                            params={"query": symbol},
+                            timeout=10,
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            coins = data.get("coins", [])
+                            if coins:
+                                coin_id = coins[0]["id"]
+                                coin_name = coins[0]["name"]
+                                price_resp = await client.get(
+                                    "https://api.coingecko.com/api/v3/simple/price",
+                                    params={
+                                        "ids": coin_id,
+                                        "vs_currencies": "usd,cny",
+                                        "include_24hr_change": "true",
+                                    },
+                                    timeout=10,
+                                )
+                                if price_resp.status_code == 200:
+                                    price_data = price_resp.json()
+                                    if coin_id in price_data:
+                                        d = price_data[coin_id]
+                                        results.append({
+                                            "title": f"{coin_name} ({symbol.upper()}) 实时价格",
+                                            "content": (
+                                                f"USD: ${d.get('usd', '?')} | "
+                                                f"CNY: ¥{d.get('cny', '?')} | "
+                                                f"24h涨跌: {d.get('usd_24h_change', 0):+.2f}%"
+                                            ),
+                                            "url": f"https://www.coingecko.com/en/coins/{coin_id}",
+                                        })
+            except Exception:
+                logger.exception("coingecko search failed")
+
+        # 3. Fallback: SearXNG web search
+        if not results:
+            try:
+                results = await self._search_searxng(f"{query} 股价 行情")
                 for r in results:
                     r["_source"] = "finance"
             except Exception:
                 pass
 
         return results
+
+    def _resolve_sina_code(self, query: str) -> str | None:
+        """Resolve a stock/forex query to Sina Finance list code."""
+        # Stock ticker patterns
+        # A-share: 6-digit number → sh/sh+code or sz+code
+        a_share = re.search(r'\b(\d{6})\b', query)
+        if a_share:
+            code = a_share.group(1)
+            # 60xxxx → sh, 00xxxx/30xxxx → sz, 68xxxx → sh (科创板)
+            if code.startswith(('60', '68')):
+                return f"sh{code}"
+            return f"sz{code}"
+
+        # Named A-share: 贵州茅台, 宁德时代, etc — try search-like query
+        # US stock: AAPL, TSLA, GOOGL, MSFT, etc
+        us_stock = re.search(r'\b([A-Z]{1,5})\b', query)
+        if us_stock:
+            ticker = us_stock.group(1).lower()
+            # Skip common words and crypto
+            if ticker not in ("BTC", "ETH", "A", "I", "AT", "TO", "BE", "IN", "IF"):
+                return f"gb_{ticker}"
+
+        # HK stock: 00700, 09988, etc
+        hk_stock = re.search(r'\b(\d{5})\b', query)
+        if hk_stock:
+            return f"hk{hk_stock.group(1)}"
+
+        # Forex: 美元人民币, USDCNY, etc
+        forex_map = {
+            "美元人民币": "fx_susdcny", "usdcny": "fx_susdcny",
+            "美元日元": "fx_susdjpy", "usdjpy": "fx_susdjpy",
+            "欧元美元": "fx_seurusd", "eurusd": "fx_seurusd",
+            "英镑美元": "fx_sgbpusd", "gbpusd": "fx_sgbpusd",
+        }
+        ql = query.lower().replace(" ", "").replace("/", "").replace("兑", "")
+        for key, code in forex_map.items():
+            if key in ql:
+                return code
+
+        return None
+
+    def _parse_sina_response(self, text: str, code: str) -> list[dict]:
+        """Parse Sina Finance response into structured data."""
+        if not text or "FAILED" in text:
+            return []
+
+        try:
+            # Format: var hq_str_xx="name,open,close,current,high,low,..."
+            parts = text.split('"')[1].split(",") if '"' in text else text.split(",")
+
+            if len(parts) < 4:
+                return []
+
+            name = parts[0]
+            open_price = parts[1]
+            prev_close = float(parts[2]) if parts[2] else 0
+            current = float(parts[3]) if parts[3] else 0
+            high = parts[4] if len(parts) > 4 else ""
+            low = parts[5] if len(parts) > 5 else ""
+
+            change_pct = ((current - prev_close) / prev_close * 100) if prev_close else 0
+            direction = "📈" if change_pct >= 0 else "📉"
+
+            return [{
+                "title": f"{name} 实时行情 {direction}",
+                "content": (
+                    f"最新: {current} | "
+                    f"开盘: {open_price} | "
+                    f"昨收: {prev_close} | "
+                    f"涨跌: {change_pct:+.2f}% | "
+                    f"最高: {high} | "
+                    f"最低: {low}"
+                ),
+                "url": f"https://finance.sina.com.cn/realstock/company/{code}/nc.shtml",
+            }]
+        except Exception:
+            logger.exception("parse sina response failed")
+            return []
 
     # ── Source: Weather ────────────────────────────────────────────────
 
