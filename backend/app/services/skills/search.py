@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import httpx
 from app.config import settings
 from app.services.skills.base import BaseSkill, SkillResult
@@ -24,6 +25,51 @@ SYNTHESIS_PROMPT = """当前时间：{current_time}。请根据以下搜索结�
 
 请综合以上信息给出清晰、准确的回答。如果涉及实时价格、汇率、股价等，务必引用搜索结果中的具体数字并注明来源。"""
 
+# ── Query type patterns ──────────────────────────────────────────────
+
+FINANCE_KEYWORDS = (
+    "股价", "股票", "价格", "行情", "涨了", "跌了",
+    "BTC", "ETH", "比特币", "以太坊", "加密货币",
+    "美元", "汇率", "人民币", "港币", "日元",
+    "黄金", "白银", "原油", "期货",
+    "纳斯达克", "标普", "道琼斯", "恒生", "上证", "A股",
+    "每股收益", "市盈率", "市值",
+)
+WEATHER_KEYWORDS = (
+    "天气", "下雨", "下雪", "多少度", "温度", "湿度",
+    "刮风", "台风", "雾霾", "PM2.5", "紫外线",
+    "明天", "后天", "一周天气",
+)
+NEWS_KEYWORDS = (
+    "新闻", "最新", "热点", "头条", "快讯",
+    "发生了什么", "最近有什么", "今天有什么大事",
+)
+
+
+def _detect_query_type(query: str) -> str:
+    """Detect the type of search query for source routing."""
+    q = query.upper()
+
+    # Finance
+    if any(kw.upper() in q for kw in FINANCE_KEYWORDS):
+        return "finance"
+    if re.search(r'\b[A-Z]{2,5}[- ]?\d+', query):  # stock ticker pattern
+        return "finance"
+    if re.search(r'\$\d+|\d+元|\d+美金', query):
+        return "finance"
+
+    # Weather
+    if any(kw in query for kw in WEATHER_KEYWORDS):
+        return "weather"
+
+    # News
+    if any(kw in query for kw in NEWS_KEYWORDS):
+        return "news"
+
+    return "general"
+
+
+# ── Search Skill ───────────────────────────────────────────────────────
 
 class SearchSkill(BaseSkill):
     name = "search"
@@ -34,70 +80,225 @@ class SearchSkill(BaseSkill):
             query = await self._extract_query(user_input)
             logger.info("search query: %s -> %s", user_input[:60], query)
 
-            # Step 2: Search SearXNG (with DuckDuckGo fallback)
-            searxng_results = await self._search_searxng(query)
+            # Step 2: Determine query type + route to sources
+            qtype = _detect_query_type(query)
+            logger.info("search type: %s for '%s'", qtype, query[:60])
 
-            # Step 3: Synthesize answer from search results via LLM
+            # Step 3: Multi-source search
+            all_results = []
+            tasks = []
+
+            if qtype == "finance":
+                tasks.append(("finance", self._search_finance(query)))
+            elif qtype == "weather":
+                tasks.append(("weather", self._search_weather(query)))
+            elif qtype == "news":
+                tasks.append(("news", self._search_news(query)))
+
+            # Always include general search as fallback
+            tasks.append(("general", self._search_searxng(query)))
+
+            # Run all searches concurrently
+            results_map = {}
+            for label, task in tasks:
+                try:
+                    results_map[label] = await task
+                except Exception:
+                    logger.exception("search source %s failed", label)
+                    results_map[label] = []
+
+            # Merge results: specialized first, then general
+            for label, results in results_map.items():
+                for r in results:
+                    r["_source"] = label
+                all_results.extend(results)
+
+            # Deduplicate by URL
+            seen_urls = set()
+            deduped = []
+            for r in all_results:
+                url = r.get("url", "")
+                if url and url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                deduped.append(r)
+            all_results = deduped[:8]
+
+            # Step 4: Re-rank + synthesize
             llm_answer = ""
-            if searxng_results:
-                llm_answer = await self._synthesize(query, searxng_results)
+            if all_results:
+                llm_answer = await self._synthesize(query, all_results)
 
-            if not searxng_results and not llm_answer:
+            if not all_results and not llm_answer:
                 return SkillResult(text="没有找到相关信息，请尝试换个关键词搜索")
 
             # Build response
             parts = []
-
-            # Synthesized answer first
             if llm_answer:
                 parts.append(llm_answer.strip())
 
-            # Raw search results as reference
-            if searxng_results:
-                parts.append("\n📎 搜索结果:")
-                for i, r in enumerate(searxng_results):
+            if all_results:
+                parts.append("\n📎 参考来源:")
+                for i, r in enumerate(all_results[:5]):
                     title = r.get('title', '')
                     content = r.get('content', '')
                     url = r.get('url', '')
-                    parts.append(f"\n{i + 1}. **{title}**")
+                    source = r.get('_source', '')
+                    source_label = {"finance": "财经", "weather": "天气", "news": "新闻", "general": "搜索"}.get(source, "")
+                    parts.append(f"\n{i + 1}. **{title}** {f'[{source_label}]' if source_label else ''}")
                     if content:
                         parts.append(f"   {content}")
                     if url:
                         parts.append(f"   🔗 {url}")
 
             text = "\n".join(parts)
-
             return SkillResult(text=text, data={
                 "query": query,
-                "results": searxng_results,
+                "results": all_results,
                 "llm_answer": llm_answer,
             })
+
         except Exception:
             logger.exception("search skill failed")
             return SkillResult(text="暂时无法完成搜索，请稍后再试")
 
-    async def _synthesize(self, query: str, results: list[dict]) -> str:
-        """Ask LLM to synthesize an answer from search results."""
+    # ── Source: Yahoo Finance ──────────────────────────────────────────
+
+    async def _search_finance(self, query: str) -> list[dict]:
+        """Search financial data via Yahoo Finance unofficial API."""
+        results = []
         try:
-            from datetime import datetime, timezone, timedelta
-            now = datetime.now(timezone(timedelta(hours=8)))
-
-            # Format search results for LLM consumption
-            results_text = ""
-            for i, r in enumerate(results[:5]):
-                title = r.get('title', '')
-                content = r.get('content', '')
-                results_text += f"\n[{i + 1}] {title}\n{content}\n"
-
-            prompt = SYNTHESIS_PROMPT.format(
-                query=query,
-                current_time=now.strftime("%Y-%m-%d %H:%M"),
-                search_results=results_text,
-            )
-            return await llm_router.chat([{"role": "user", "content": prompt}])
+            async with httpx.AsyncClient() as client:
+                # Try Yahoo Finance search
+                resp = await client.get(
+                    "https://query1.finance.yahoo.com/v1/finance/search",
+                    params={"q": query, "lang": "zh-CN", "region": "CN"},
+                    timeout=10,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    quotes = data.get("quotes", [])[:5]
+                    for q in quotes:
+                        symbol = q.get("symbol", "")
+                        name = q.get("shortname") or q.get("longname", "")
+                        price = q.get("regularMarketPrice", "")
+                        change = q.get("regularMarketChangePercent", "")
+                        if name:
+                            parts = [f"{name} ({symbol})"]
+                            if price:
+                                parts.append(f"价格: {price}")
+                            if change:
+                                parts.append(f"涨跌幅: {change:+.2f}%")
+                            results.append({
+                                "title": f"{name} ({symbol})",
+                                "content": " | ".join(parts),
+                                "url": f"https://finance.yahoo.com/quote/{symbol}",
+                            })
         except Exception:
-            logger.exception("synthesis failed")
-            return ""
+            logger.exception("finance search failed")
+
+        # Fallback: CoinGecko for crypto
+        if not results:
+            try:
+                crypto_match = re.search(r'(BTC|ETH|SOL|DOGE|XRP|BNB|ADA|MATIC|[A-Z]{2,6})', query.upper())
+                if crypto_match:
+                    symbol = crypto_match.group(1).lower()
+                    async with httpx.AsyncClient() as client:
+                        # CoinGecko search API — auto-resolves symbol to coin id
+                        resp = await client.get(
+                            "https://api.coingecko.com/api/v3/search",
+                            params={"query": symbol},
+                            timeout=10,
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            coins = data.get("coins", [])
+                            if coins:
+                                coin_id = coins[0]["id"]
+                                price_resp = await client.get(
+                                    "https://api.coingecko.com/api/v3/simple/price",
+                                    params={"ids": coin_id, "vs_currencies": "usd,cny",
+                                            "include_24hr_change": "true"},
+                                    timeout=10,
+                                )
+                                if price_resp.status_code == 200:
+                                    price_data = price_resp.json()
+                                    if coin_id in price_data:
+                                        d = price_data[coin_id]
+                                        results.append({
+                                            "title": f"{symbol.upper()} 实时价格",
+                                            "content": f"USD: ${d.get('usd', '?')} | CNY: ¥{d.get('cny', '?')} | 24h: {d.get('usd_24h_change', 0):+.2f}%",
+                                            "url": f"https://www.coingecko.com/en/coins/{coin_id}",
+                                        })
+            except Exception:
+                logger.exception("coingecko fallback failed")
+
+        return results
+
+    # ── Source: Weather ────────────────────────────────────────────────
+
+    async def _search_weather(self, query: str) -> list[dict]:
+        """Search weather via wttr.in."""
+        try:
+            # Extract city name
+            city = query
+            for kw in WEATHER_KEYWORDS:
+                city = city.replace(kw, "")
+            city = city.strip().rstrip("的").strip() or "Beijing"
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    f"https://wttr.in/{city}?format=j1",
+                    timeout=10,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    current = (data.get("current_condition") or [{}])[0]
+                    weather_info = data.get("weather", [{}])[0]
+
+                    temp = current.get("temp_C", "?")
+                    desc = (current.get("weatherDesc") or [{"value": ""}])[0].get("value", "")
+                    humidity = current.get("humidity", "?")
+                    wind = current.get("windspeedKmph", "?")
+                    max_temp = weather_info.get("maxtempC", "?")
+                    min_temp = weather_info.get("mintempC", "?")
+
+                    return [{
+                        "title": f"{city} 天气",
+                        "content": f"{desc} | 当前 {temp}°C | 湿度 {humidity}% | 风力 {wind}km/h | 最高 {max_temp}°C 最低 {min_temp}°C",
+                        "url": f"https://wttr.in/{city}",
+                    }]
+        except Exception:
+            logger.exception("weather search failed")
+        return []
+
+    # ── Source: News ────────────────────────────────────────────────────
+
+    async def _search_news(self, query: str) -> list[dict]:
+        """Search news via SearXNG news category."""
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    f"{settings.searxng_url}/search",
+                    params={
+                        "q": query, "format": "json",
+                        "categories": "news",
+                        "engines": settings.searxng_engines,
+                    },
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                results = data.get("results", [])[:5]
+                for r in results:
+                    r["_source"] = "news"
+                return results
+        except Exception:
+            logger.exception("news search failed")
+        return []
+
+    # ── Source: General (SearXNG + DuckDuckGo) ──────────────────────────
 
     async def _search_searxng(self, query: str) -> list[dict]:
         try:
@@ -132,14 +333,39 @@ class SearchSkill(BaseSkill):
                 logger.exception("duckduckgo fallback failed")
                 return []
 
+    # ── LLM Synthesis ──────────────────────────────────────────────────
+
+    async def _synthesize(self, query: str, results: list[dict]) -> str:
+        """Ask LLM to synthesize an answer from search results."""
+        try:
+            from datetime import datetime, timezone, timedelta
+            now = datetime.now(timezone(timedelta(hours=8)))
+
+            results_text = ""
+            for i, r in enumerate(results[:6]):
+                title = r.get('title', '')
+                content = r.get('content', '')
+                source = r.get('_source', '')
+                results_text += f"\n[{i + 1}] [{source}] {title}\n{content}\n"
+
+            prompt = SYNTHESIS_PROMPT.format(
+                query=query,
+                current_time=now.strftime("%Y-%m-%d %H:%M"),
+                search_results=results_text,
+            )
+            return await llm_router.chat([{"role": "user", "content": prompt}])
+        except Exception:
+            logger.exception("synthesis failed")
+            return ""
+
+    # ── Query Extraction ──────────────────────────────────────────────
+
     async def _extract_query(self, user_input: str) -> str:
         try:
-            # Strip context preamble if present (added by chat_orchestrator for skills)
             clean_input = user_input
             if "用户最新输入:" in user_input:
                 clean_input = user_input.split("用户最新输入:")[-1].strip()
             elif user_input.startswith("【对话上下文"):
-                # Fallback: take the last line which is usually the actual query
                 lines = user_input.strip().split("\n")
                 clean_input = lines[-1] if lines else user_input
 
@@ -150,10 +376,8 @@ class SearchSkill(BaseSkill):
             query = data.get("query", "").strip()
             if query:
                 return query
-            # If LLM returned empty, use the cleaned input directly
             return clean_input if clean_input else user_input
         except Exception:
-            # Last resort: strip context markers and use raw text
             if "用户最新输入:" in user_input:
                 return user_input.split("用户最新输入:")[-1].strip()
             return user_input
