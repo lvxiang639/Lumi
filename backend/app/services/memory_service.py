@@ -193,7 +193,10 @@ async def extract_memories(user_id: UUID, conv_id: UUID, dialogue: str) -> None:
 async def _save_memories(
     db: AsyncSession, user_id: UUID, conv_id: UUID, items: list[tuple[str, str]]
 ) -> None:
-    """Insert new memories with precomputed embeddings, updating existing ones."""
+    """Insert new memories with precomputed embeddings, updating existing ones.
+    Embeddings are batch-computed for efficiency (single BGE-M3 call for all new items)."""
+    # First, check what exists and collect new items that need embedding
+    to_embed: list[tuple[str, str, bool]] = []  # (key, value, is_update)
     for key, value in items:
         result = await db.execute(
             select(UserMemory).where(
@@ -205,12 +208,36 @@ async def _save_memories(
         if existing:
             existing.value = value
             existing.source_conv_id = conv_id
-            # Update embedding when value changes
-            emb = await _embed_memory_text(key, value)
-            if emb is not None:
+            to_embed.append((key, value, True))
+        else:
+            to_embed.append((key, value, False))
+
+    # Batch embed all new/changed items
+    embed_map: dict[str, list[float]] = {}
+    if to_embed:
+        from app.services.memory_embedder import embed_batch
+        loop = asyncio.get_running_loop()
+        texts = [f"{k}: {v}" for k, v, _ in to_embed]
+        embeddings = await loop.run_in_executor(None, embed_batch, texts)
+        if embeddings is not None:
+            for (key, _, _), emb in zip(to_embed, embeddings):
+                embed_map[key] = emb.tolist()
+
+    # Apply embeddings
+    for key, value, is_update in to_embed:
+        emb = embed_map.get(key)
+        if is_update:
+            # Embedding already applied to existing record's field above
+            result = await db.execute(
+                select(UserMemory).where(
+                    UserMemory.user_id == user_id,
+                    UserMemory.key == key,
+                )
+            )
+            existing = result.scalar_one_or_none()
+            if existing and emb is not None:
                 existing.embedding = emb
         else:
-            emb = await _embed_memory_text(key, value)
             db.add(UserMemory(
                 user_id=user_id,
                 key=key,
@@ -218,6 +245,7 @@ async def _save_memories(
                 source_conv_id=conv_id,
                 embedding=emb,
             ))
+
     await db.commit()
 
 
@@ -264,6 +292,8 @@ async def _enforce_limit(db: AsyncSession, user_id: UUID) -> None:
     await db.flush()
 
     if compressed and compressed.strip():
+        # Collect new items that need embeddings
+        new_items: list[tuple[str, str, bool]] = []  # (key, value, is_existing)
         for line in compressed.strip().split("\n"):
             line = line.strip()
             if not line or ":" not in line:
@@ -281,12 +311,24 @@ async def _enforce_limit(db: AsyncSession, user_id: UUID) -> None:
                 e = r.scalar_one_or_none()
                 if e:
                     e.value = value
+                    new_items.append((key, value, True))
                 else:
-                    emb = await _embed_memory_text(key, value)
-                    db.add(UserMemory(
-                        user_id=user_id, key=key, value=value,
-                        embedding=emb,
-                    ))
+                    new_items.append((key, value, False))
+
+        # Batch embed new items
+        if new_items:
+            from app.services.memory_embedder import embed_batch
+            loop = asyncio.get_running_loop()
+            new_only = [(k, v) for k, v, exists in new_items if not exists]
+            if new_only:
+                texts = [f"{k}: {v}" for k, v in new_only]
+                embeddings = await loop.run_in_executor(None, embed_batch, texts)
+                if embeddings is not None:
+                    for (key, value, _), emb in zip(new_items, embeddings):
+                        db.add(UserMemory(
+                            user_id=user_id, key=key, value=value,
+                            embedding=emb.tolist(),
+                        ))
 
     await db.commit()
 

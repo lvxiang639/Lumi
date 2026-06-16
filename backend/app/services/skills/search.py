@@ -99,13 +99,16 @@ class SearchSkill(BaseSkill):
             tasks.append(("general", self._search_searxng(query)))
 
             # Run all searches concurrently
+            labels = [t[0] for t in tasks]
+            coros = [t[1] for t in tasks]
+            gathered = await asyncio.gather(*coros, return_exceptions=True)
             results_map = {}
-            for label, task in tasks:
-                try:
-                    results_map[label] = await task
-                except Exception:
+            for label, result in zip(labels, gathered):
+                if isinstance(result, Exception):
                     logger.exception("search source %s failed", label)
                     results_map[label] = []
+                else:
+                    results_map[label] = result or []
 
             # Merge results: specialized first, then general
             for label, results in results_map.items():

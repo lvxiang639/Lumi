@@ -126,7 +126,6 @@ class ChatOrchestrator:
         full_response = ""
         tool_buffer = ""
         tool_executed = False
-        streaming_paused = False
 
         async for delta in llm_router.chat_stream(llm_messages):
             if tool_executed:
@@ -407,25 +406,26 @@ class ChatOrchestrator:
 
         await send_message({"type": "quick_replies", "replies": suggestions[:3]})
 
-    def _schedule_post_tasks(self, user_uuid, text, conv_id, db):
-        """Fire-and-forget post-response tasks."""
-        # Memory extraction
+    def _schedule_post_tasks(self, user_uuid, text, conv_id, _db):
+        """Fire-and-forget post-response tasks. Uses its own DB session."""
         async def _extract():
             try:
                 from app.services.memory_service import schedule_extraction
+                from app.database import async_session
                 from sqlalchemy import select as sa_select
-                _recent_msgs = await db.execute(
-                    sa_select(Message)
-                    .where(Message.conv_id == conv_id)
-                    .order_by(Message.created_at.asc())
-                    .limit(40)
-                )
-                _recent = _recent_msgs.scalars().all()
-                _dialogue_lines = []
-                for _m in _recent:
-                    _role = "用户" if _m.role == MessageRole.user else "AI"
-                    _dialogue_lines.append(f"{_role}: {_m.content or ''}")
-                schedule_extraction(user_uuid, conv_id, "\n".join(_dialogue_lines))
+                async with async_session() as db:
+                    _recent_msgs = await db.execute(
+                        sa_select(Message)
+                        .where(Message.conv_id == conv_id)
+                        .order_by(Message.created_at.asc())
+                        .limit(40)
+                    )
+                    _recent = _recent_msgs.scalars().all()
+                    _dialogue_lines = []
+                    for _m in _recent:
+                        _role = "用户" if _m.role == MessageRole.user else "AI"
+                        _dialogue_lines.append(f"{_role}: {_m.content or ''}")
+                    schedule_extraction(user_uuid, conv_id, "\n".join(_dialogue_lines))
             except Exception:
                 logger.exception("post-task memory extraction failed")
 
