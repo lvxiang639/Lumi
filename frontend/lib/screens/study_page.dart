@@ -403,6 +403,7 @@ class _StudyPageState extends State<StudyPage> {
           ],
         ),
       ),
+      ),
     );
   }
 
