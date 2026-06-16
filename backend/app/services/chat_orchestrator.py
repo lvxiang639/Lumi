@@ -16,7 +16,7 @@ from app.services.skill_registry import skill_registry
 logger = logging.getLogger("orchestrator")
 
 # Tool marker pattern: [TOOL:name:arg1:arg2...]
-TOOL_MARKER = re.compile(r'^\[TOOL:(\w+)(?::([^\]]+))?\]')
+TOOL_MARKER = re.compile(r'\[TOOL:(\w+)(?::([^\]]+))?\]')
 
 # Quick keyword triggers — fast path to skip LLM intent check for obvious skill requests
 SKILL_KEYWORDS = {
@@ -37,6 +37,8 @@ SKILL_KEYWORDS = {
 # System message prefixes that force chat mode (no skill routing)
 _SYSTEM_PREFIXES = ('📋', '✅', '❌', '📝', '📧', '📎', '📄')
 _AGENT_KEYWORDS = ("并", "然后", "顺便", "同时", "再帮我", "也帮我", "还有")
+# Context-free skills: don't need conversation history, just the raw user text
+_CONTEXT_FREE_SKILLS = {"search", "weather", "expense"}
 
 BEIJING_TZ = timezone(timedelta(hours=8))
 
@@ -56,7 +58,8 @@ class ChatOrchestrator:
         # Detect intent: system message → chat, agent keywords → agent, else → inline routing
         if text.strip().startswith(_SYSTEM_PREFIXES):
             intent = "chat"
-        elif any(kw in text for kw in _AGENT_KEYWORDS):
+        elif len(text) >= 20 and sum(1 for kw in _AGENT_KEYWORDS if kw in text) >= 2:
+            # Agent mode: only when text is long enough AND has ≥2 agent keywords
             intent = "agent"
         else:
             intent = self._quick_intent(text)
@@ -108,86 +111,89 @@ class ChatOrchestrator:
 
     # ── Chat with inline tool markers ──────────────────────────────────
 
+    # Max chars to buffer looking for tool markers before giving up
+    _TOOL_BUFFER_MAX = 250
+
     async def _chat_with_tools(self, user_id, text, conv, db, send_message, user_uuid):
         """Main chat flow: build layered system prompt, stream, detect tool markers."""
-        # Build context
         history = await self._load_history(conv.id, db, limit=10)
         system_prompt = await self._build_system_prompt(user_uuid, text, conv.id)
 
-        # Build messages
         llm_messages = [{"role": "system", "content": system_prompt}]
         llm_messages += [{"role": m.role.value, "content": m.content} for m in history]
         llm_messages.append({"role": "user", "content": text})
 
-        # Stream with tool marker detection
         full_response = ""
         tool_buffer = ""
         tool_executed = False
+        streaming_paused = False
 
         async for delta in llm_router.chat_stream(llm_messages):
             if tool_executed:
-                # Already executed tool, just pass through
                 full_response += delta
                 await send_message({"type": "llm_stream", "delta": delta})
                 continue
 
             tool_buffer += delta
-            # Check if we've accumulated enough to detect a marker
-            if "\n" in tool_buffer or len(tool_buffer) > 80:
-                # Check for tool marker at the start
-                marker_match = TOOL_MARKER.match(tool_buffer.strip())
-                if marker_match:
-                    tool_executed = True
-                    tool_name = marker_match.group(1)
-                    tool_arg = (marker_match.group(2) or "").strip()
 
-                    # Execute skill
-                    if tool_name == "search" and tool_arg:
-                        skill = skill_registry.get("search")
-                        if skill:
-                            result = await skill.execute(user_id, f"搜索 {tool_arg}", db)
-                            tool_result = result.text[:600]
-                            await send_message({"type": "skill_call", "skill": "search", "status": "done", "data": result.data})
-                        else:
-                            tool_result = "搜索功能暂时不可用"
-                    elif tool_name == "weather":
-                        skill = skill_registry.get("weather")
-                        if skill:
-                            result = await skill.execute(user_id, tool_arg or text, db)
-                            tool_result = result.text[:400]
-                        else:
-                            tool_result = ""
-                    elif tool_name == "calendar" and tool_arg:
-                        skill = skill_registry.get("calendar")
-                        if skill:
-                            result = await skill.execute(user_id, f"添加日程: {tool_arg}", db)
-                            tool_result = result.text[:300]
-                        else:
-                            tool_result = ""
-                    else:
-                        tool_result = ""
+            # Search for tool marker ANYWHERE in buffer (not just at start)
+            match = TOOL_MARKER.search(tool_buffer)
+            if match:
+                # Found marker — extract and execute
+                tool_executed = True
+                tool_name = match.group(1)
+                tool_arg = (match.group(2) or "").strip()
 
-                    # Send marker as hidden, then inject tool result
-                    if tool_result:
-                        await send_message({"type": "llm_stream", "delta": f"\n\n📎 {tool_result}\n\n"})
+                # Execute skill with clean input (no context pollution)
+                tool_result = await self._execute_tool(tool_name, tool_arg, user_id, text, db)
 
-                    # Continue streaming after marker
-                    remainder = tool_buffer[marker_match.end():].lstrip()
-                    if remainder:
-                        full_response += remainder
-                        await send_message({"type": "llm_stream", "delta": remainder})
-                else:
-                    # No marker found, stream normally
-                    tool_executed = True  # stop buffering
-                    full_response += tool_buffer
-                    await send_message({"type": "llm_stream", "delta": tool_buffer})
-                    tool_buffer = ""
+                if tool_result:
+                    await send_message({"type": "llm_stream", "delta": f"\n\n📎 {tool_result}\n\n"})
 
-        # If streaming ended and we never left buffering mode
+                # Strip marker from buffer, stream the rest
+                before = tool_buffer[:match.start()].strip()
+                after = tool_buffer[match.end():].lstrip()
+
+                if before:
+                    full_response += before + "\n"
+                    await send_message({"type": "llm_stream", "delta": before + "\n"})
+                if after:
+                    full_response += after
+                    await send_message({"type": "llm_stream", "delta": after})
+                continue
+
+            # Buffer exceeded max without finding marker → stream through
+            if len(tool_buffer) > self._TOOL_BUFFER_MAX:
+                tool_executed = True
+                full_response += tool_buffer
+                await send_message({"type": "llm_stream", "delta": tool_buffer})
+                tool_buffer = ""
+
+        # Drain any remaining buffer
         if not tool_executed and tool_buffer:
             full_response += tool_buffer
 
         return full_response
+
+    async def _execute_tool(self, tool_name: str, tool_arg: str, user_id: str, user_text: str, db) -> str:
+        """Execute a tool requested via marker protocol. Returns result text."""
+        if tool_name == "search" and tool_arg:
+            skill = skill_registry.get("search")
+            if skill:
+                # Pass clean search query, not full context
+                result = await skill.execute(user_id, tool_arg, db)
+                return (result.text or "")[:600]
+        elif tool_name == "weather":
+            skill = skill_registry.get("weather")
+            if skill:
+                result = await skill.execute(user_id, tool_arg or user_text, db)
+                return (result.text or "")[:400]
+        elif tool_name == "calendar" and tool_arg:
+            skill = skill_registry.get("calendar")
+            if skill:
+                result = await skill.execute(user_id, tool_arg, db)
+                return (result.text or "")[:300]
+        return ""
 
     # ── Layered System Prompt ──────────────────────────────────────────
 
@@ -266,8 +272,16 @@ class ChatOrchestrator:
 
     async def _execute_skill(self, intent, user_id, text, conv, db, send_message) -> str:
         skill = skill_registry.get(intent)
-        history = await self._load_history(conv.id, db, limit=20)
 
+        # Context-free skills: pass clean text, no history pollution
+        if intent in _CONTEXT_FREE_SKILLS:
+            result = await skill.execute(user_id, text, db)
+            await send_message({"type": "skill_call", "skill": intent, "status": "done", "data": result.data})
+            await send_message({"type": "llm_stream", "delta": result.text})
+            return result.text
+
+        # Contextual skills: pass full conversation history for better understanding
+        history = await self._load_history(conv.id, db, limit=20)
         if history:
             context_lines = [
                 "【对话上下文——请结合此前的对话内容理解用户的意图】",
@@ -341,7 +355,9 @@ class ChatOrchestrator:
                 skill = skill_registry.get(action)
                 if skill:
                     try:
-                        result = await skill.execute(user_id, desc, db)
+                        # For context-free skills, use original user text as fallback
+                        skill_input = text if action in _CONTEXT_FREE_SKILLS else desc
+                        result = await skill.execute(user_id, skill_input, db)
                         results.append(f"[{action}] {desc}: {result.text[:200]}")
                         await send_message({"type": "llm_stream", "delta": f"✅ {result.text[:150]}\n"})
                     except Exception:
