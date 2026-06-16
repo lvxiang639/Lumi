@@ -162,77 +162,63 @@ class SearchSkill(BaseSkill):
             logger.exception("search skill failed")
             return SkillResult(text="暂时无法完成搜索，请稍后再试")
 
-    # ── Source: Yahoo Finance ──────────────────────────────────────────
+    # ── Source: Finance (CoinGecko free API) ───────────────────────────
 
     async def _search_finance(self, query: str) -> list[dict]:
-        """Search financial data via Yahoo Finance unofficial API."""
+        """Search financial data via free CoinGecko API (crypto) + SearXNG (stocks).
+        CoinGecko free tier: 10-30 calls/min, no API key required for basic use."""
         results = []
-        try:
-            async with httpx.AsyncClient() as client:
-                # Try Yahoo Finance search
-                resp = await client.get(
-                    "https://query1.finance.yahoo.com/v1/finance/search",
-                    params={"q": query, "lang": "zh-CN", "region": "CN"},
-                    timeout=10,
-                    headers={"User-Agent": "Mozilla/5.0"},
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    quotes = data.get("quotes", [])[:5]
-                    for q in quotes:
-                        symbol = q.get("symbol", "")
-                        name = q.get("shortname") or q.get("longname", "")
-                        price = q.get("regularMarketPrice", "")
-                        change = q.get("regularMarketChangePercent", "")
-                        if name:
-                            parts = [f"{name} ({symbol})"]
-                            if price:
-                                parts.append(f"价格: {price}")
-                            if change:
-                                parts.append(f"涨跌幅: {change:+.2f}%")
-                            results.append({
-                                "title": f"{name} ({symbol})",
-                                "content": " | ".join(parts),
-                                "url": f"https://finance.yahoo.com/quote/{symbol}",
-                            })
-        except Exception:
-            logger.exception("finance search failed")
 
-        # Fallback: CoinGecko for crypto
+        # 1. CoinGecko for crypto (free, no key needed)
+        try:
+            crypto_match = re.search(r'(BTC|ETH|SOL|DOGE|XRP|BNB|ADA|MATIC|[A-Z]{2,6})', query.upper())
+            if crypto_match:
+                symbol = crypto_match.group(1).lower()
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(
+                        "https://api.coingecko.com/api/v3/search",
+                        params={"query": symbol},
+                        timeout=10,
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        coins = data.get("coins", [])
+                        if coins:
+                            coin_id = coins[0]["id"]
+                            coin_name = coins[0]["name"]
+                            price_resp = await client.get(
+                                "https://api.coingecko.com/api/v3/simple/price",
+                                params={
+                                    "ids": coin_id,
+                                    "vs_currencies": "usd,cny",
+                                    "include_24hr_change": "true",
+                                },
+                                timeout=10,
+                            )
+                            if price_resp.status_code == 200:
+                                price_data = price_resp.json()
+                                if coin_id in price_data:
+                                    d = price_data[coin_id]
+                                    results.append({
+                                        "title": f"{coin_name} ({symbol.upper()}) 实时价格",
+                                        "content": (
+                                            f"USD: ${d.get('usd', '?')} | "
+                                            f"CNY: ¥{d.get('cny', '?')} | "
+                                            f"24h涨跌: {d.get('usd_24h_change', 0):+.2f}%"
+                                        ),
+                                        "url": f"https://www.coingecko.com/en/coins/{coin_id}",
+                                    })
+        except Exception:
+            logger.exception("coingecko search failed")
+
+        # 2. For stocks/forex, use SearXNG to fetch from web (free)
         if not results:
             try:
-                crypto_match = re.search(r'(BTC|ETH|SOL|DOGE|XRP|BNB|ADA|MATIC|[A-Z]{2,6})', query.upper())
-                if crypto_match:
-                    symbol = crypto_match.group(1).lower()
-                    async with httpx.AsyncClient() as client:
-                        # CoinGecko search API — auto-resolves symbol to coin id
-                        resp = await client.get(
-                            "https://api.coingecko.com/api/v3/search",
-                            params={"query": symbol},
-                            timeout=10,
-                        )
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            coins = data.get("coins", [])
-                            if coins:
-                                coin_id = coins[0]["id"]
-                                price_resp = await client.get(
-                                    "https://api.coingecko.com/api/v3/simple/price",
-                                    params={"ids": coin_id, "vs_currencies": "usd,cny",
-                                            "include_24hr_change": "true"},
-                                    timeout=10,
-                                )
-                                if price_resp.status_code == 200:
-                                    price_data = price_resp.json()
-                                    if coin_id in price_data:
-                                        d = price_data[coin_id]
-                                        results.append({
-                                            "title": f"{symbol.upper()} 实时价格",
-                                            "content": f"USD: ${d.get('usd', '?')} | CNY: ¥{d.get('cny', '?')} | 24h: {d.get('usd_24h_change', 0):+.2f}%",
-                                            "url": f"https://www.coingecko.com/en/coins/{coin_id}",
-                                        })
+                results = await self._search_searxng(f"{query} stock price")
+                for r in results:
+                    r["_source"] = "finance"
             except Exception:
-                logger.exception("coingecko fallback failed")
+                pass
 
         return results
 
