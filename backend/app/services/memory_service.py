@@ -63,9 +63,15 @@ async def _embed_memory_text(key: str, value: str) -> list[float] | None:
 
 async def compute_missing_embeddings() -> int:
     """Backfill embeddings for memories that don't have them yet.
+    Also preloads BGE-M3 model so first chat is fast.
     Should be called once at startup."""
-    from app.services.memory_embedder import embed_batch
+    from app.services.memory_embedder import embed_batch, _load_model
     import numpy as np
+
+    # Preload model in background thread — ensures first chat doesn't wait
+    loop = asyncio.get_running_loop()
+    loop.run_in_executor(None, _load_model)
+    logger.info("BGE-M3 preload scheduled")
 
     async with async_session() as db:
         result = await db.execute(
@@ -77,7 +83,6 @@ async def compute_missing_embeddings() -> int:
         return 0
 
     texts = [f"{m.key}: {m.value}" for m in memories]
-    loop = asyncio.get_running_loop()
     embeddings = await loop.run_in_executor(None, embed_batch, texts)
 
     if embeddings is None:
