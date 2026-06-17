@@ -38,7 +38,7 @@ SKILL_KEYWORDS = {
 _SYSTEM_PREFIXES = ('📋', '✅', '❌', '📝', '📧', '📎', '📄')
 _AGENT_KEYWORDS = ("并", "然后", "顺便", "同时", "再帮我", "也帮我", "还有")
 # Context-free skills: don't need conversation history, just the raw user text
-_CONTEXT_FREE_SKILLS = {"search", "weather", "expense"}
+_CONTEXT_FREE_SKILLS = {"weather", "expense"}
 
 BEIJING_TZ = timezone(timedelta(hours=8))
 
@@ -142,50 +142,49 @@ class ChatOrchestrator:
         tool_buffer = ""
         tool_executed = False
 
-        async for delta in llm_router.chat_stream(llm_messages):
-            if tool_executed:
-                full_response += delta
-                await send_message({"type": "llm_stream", "delta": delta})
-                continue
+        try:
+            async for delta in llm_router.chat_stream(llm_messages):
+                if tool_executed:
+                    full_response += delta
+                    await send_message({"type": "llm_stream", "delta": delta})
+                    continue
 
-            tool_buffer += delta
+                tool_buffer += delta
 
-            # Search for tool marker ANYWHERE in buffer (not just at start)
-            match = TOOL_MARKER.search(tool_buffer)
-            if match:
-                # Found marker — extract and execute
-                tool_executed = True
-                tool_name = match.group(1)
-                tool_arg = (match.group(2) or "").strip()
+                # Search for tool marker ANYWHERE in buffer
+                match = TOOL_MARKER.search(tool_buffer)
+                if match:
+                    tool_executed = True
+                    tool_name = match.group(1)
+                    tool_arg = (match.group(2) or "").strip()
+                    tool_result = await self._execute_tool(tool_name, tool_arg, user_id, text, db)
 
-                # Execute skill with clean input (no context pollution)
-                tool_result = await self._execute_tool(tool_name, tool_arg, user_id, text, db)
+                    if tool_result:
+                        await send_message({"type": "llm_stream", "delta": f"\n\n📎 {tool_result}\n\n"})
 
-                if tool_result:
-                    await send_message({"type": "llm_stream", "delta": f"\n\n📎 {tool_result}\n\n"})
+                    before = tool_buffer[:match.start()].strip()
+                    after = tool_buffer[match.end():].lstrip()
+                    if before:
+                        full_response += before + "\n"
+                        await send_message({"type": "llm_stream", "delta": before + "\n"})
+                    if after:
+                        full_response += after
+                        await send_message({"type": "llm_stream", "delta": after})
+                    continue
 
-                # Strip marker from buffer, stream the rest
-                before = tool_buffer[:match.start()].strip()
-                after = tool_buffer[match.end():].lstrip()
+                if len(tool_buffer) > self._TOOL_BUFFER_MAX:
+                    tool_executed = True
+                    full_response += tool_buffer
+                    await send_message({"type": "llm_stream", "delta": tool_buffer})
+                    tool_buffer = ""
 
-                if before:
-                    full_response += before + "\n"
-                    await send_message({"type": "llm_stream", "delta": before + "\n"})
-                if after:
-                    full_response += after
-                    await send_message({"type": "llm_stream", "delta": after})
-                continue
-
-            # Buffer exceeded max without finding marker → stream through
-            if len(tool_buffer) > self._TOOL_BUFFER_MAX:
-                tool_executed = True
+            if not tool_executed and tool_buffer:
                 full_response += tool_buffer
-                await send_message({"type": "llm_stream", "delta": tool_buffer})
-                tool_buffer = ""
 
-        # Drain any remaining buffer
-        if not tool_executed and tool_buffer:
-            full_response += tool_buffer
+        except Exception:
+            logger.exception("chat stream failed")
+            if not full_response:
+                full_response = "抱歉，我暂时无法回复，请稍后再试 😿"
 
         return full_response
 
