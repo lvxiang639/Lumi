@@ -57,10 +57,16 @@ class ChatProvider extends ChangeNotifier {
     try {
       final data = await api.get('/api/conversations/$convId/messages');
       final items = data['items'] as List<dynamic>;
-      _messages.clear();
-      _messages.addAll(
-        items.map((j) => Message.fromJson(j as Map<String, dynamic>)).toList(),
-      );
+      final historyMessages = items
+          .map((j) => Message.fromJson(j as Map<String, dynamic>))
+          .toList();
+      // Merge: keep any pending local messages that aren't in history yet
+      final existingIds = historyMessages.map((m) => m.id).toSet();
+      final pending = _messages.where((m) => !existingIds.contains(m.id)).toList();
+      _messages
+        ..clear()
+        ..addAll(historyMessages)
+        ..addAll(pending);
       _historyLoaded = true;
       notifyListeners();
     } catch (e) {

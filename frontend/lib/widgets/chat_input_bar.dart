@@ -20,14 +20,20 @@ class ChatInputBar extends StatefulWidget {
   State<ChatInputBar> createState() => _ChatInputBarState();
 }
 
-class _ChatInputBarState extends State<ChatInputBar> {
+class _ChatInputBarState extends State<ChatInputBar>
+    with SingleTickerProviderStateMixin {
   bool _hasText = false;
+  late AnimationController _pulseCtrl;
 
   @override
   void initState() {
     super.initState();
     _hasText = widget.ctrl.text.isNotEmpty;
     widget.ctrl.addListener(_onTextChanged);
+    _pulseCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 200),
+    );
+    if (_hasText) _pulseCtrl.forward();
   }
 
   @override
@@ -43,13 +49,19 @@ class _ChatInputBarState extends State<ChatInputBar> {
   @override
   void dispose() {
     widget.ctrl.removeListener(_onTextChanged);
+    _pulseCtrl.dispose();
     super.dispose();
   }
 
   void _onTextChanged() {
-    final hasText = widget.ctrl.text.isNotEmpty;
+    final hasText = widget.ctrl.text.trim().isNotEmpty;
     if (hasText != _hasText) {
       setState(() => _hasText = hasText);
+      if (hasText) {
+        _pulseCtrl.forward();
+      } else {
+        _pulseCtrl.reverse();
+      }
     }
   }
 
@@ -59,59 +71,102 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final listening = widget.listening;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+      padding: EdgeInsets.fromLTRB(10, 8, 10, 8 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
         color: AppColors.card(b),
-        border: Border(top: BorderSide(color: AppColors.border(b))),
+        border: Border(top: BorderSide(color: AppColors.border(b).withValues(alpha: 0.3))),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, -2)),
+        ],
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        // Voice
-        GestureDetector(
-          onTap: widget.onVoice,
-          child: Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-              color: listening ? AppColors.danger.withValues(alpha: 0.15) : AppColors.accent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Icon(listening ? Icons.mic : Icons.mic_none, color: listening ? AppColors.danger : AppColors.accent, size: 22),
+        // Voice button
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 40, height: 40,
+          decoration: BoxDecoration(
+            color: listening
+                ? AppColors.danger.withValues(alpha: 0.12)
+                : AppColors.accent.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: IconButton(
+            icon: Icon(listening ? Icons.mic : Icons.mic_none,
+                color: listening ? AppColors.danger : AppColors.accent, size: 20),
+            onPressed: widget.onVoice,
+            padding: EdgeInsets.zero,
+            splashRadius: 18,
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 8),
         // Text field
-        Expanded(child: Container(
-          constraints: const BoxConstraints(minHeight: 44, maxHeight: 100),
-          decoration: BoxDecoration(
-            color: b == Brightness.light ? Colors.white : AppColors.darkCard,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.border(b)),
-          ),
-          child: TextField(
-            controller: widget.ctrl, autofocus: widget.showField,
-            minLines: 1, maxLines: 4,
-            textInputAction: TextInputAction.send,
-            onSubmitted: (_) => widget.onSend(),
-            style: TextStyle(color: AppColors.text(b), fontSize: 15),
-            decoration: InputDecoration(
-              hintText: widget.showField ? '输入消息...' : '语音输入',
-              hintStyle: TextStyle(color: AppColors.textSecondary(b), fontSize: 15),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            ),
-          ),
-        )),
-        const SizedBox(width: 6),
-        // Send / Attach
-        GestureDetector(
-          onTap: _hasText ? widget.onSend : widget.onFile,
+        Expanded(
           child: Container(
-            width: 44, height: 44,
             decoration: BoxDecoration(
-              color: _hasText ? AppColors.accent : AppColors.accent.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(22),
+              color: b == Brightness.light
+                  ? const Color(0xFFF1F3F5)
+                  : const Color(0xFF1C212B),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppColors.border(b).withValues(alpha: 0.5),
+              ),
             ),
-            child: Icon(_hasText ? Icons.send_rounded : Icons.add, color: _hasText ? Colors.white : AppColors.accent, size: 20),
+            child: TextField(
+              controller: widget.ctrl,
+              minLines: 1, maxLines: 4,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => widget.onSend(),
+              style: TextStyle(color: AppColors.text(b), fontSize: 15, height: 1.3),
+              decoration: InputDecoration(
+                hintText: '输入消息...',
+                hintStyle: TextStyle(
+                  color: AppColors.textSecondary(b).withValues(alpha: 0.4),
+                  fontSize: 15,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+            ),
           ),
+        ),
+        const SizedBox(width: 8),
+        // Send / Add button (animated)
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
+          child: _hasText
+              ? Container(
+                  key: const ValueKey('send'),
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(color: AppColors.accent.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2)),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.send_rounded, size: 18),
+                    color: Colors.white,
+                    onPressed: widget.onSend,
+                    padding: EdgeInsets.zero,
+                    splashRadius: 16,
+                  ),
+                )
+              : Container(
+                  key: const ValueKey('add'),
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: IconButton(
+                    icon: Icon(Icons.add_rounded, color: AppColors.accent, size: 22),
+                    onPressed: widget.onFile,
+                    padding: EdgeInsets.zero,
+                    splashRadius: 16,
+                  ),
+                ),
         ),
       ]),
     );

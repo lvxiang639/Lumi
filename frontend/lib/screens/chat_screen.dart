@@ -38,19 +38,45 @@ class _ChatScreenState extends State<ChatScreen> {
   final _stt = stt.SpeechToText();
   bool _listening = false;
   bool _didInitialScroll = false;
+  int _prevMsgCount = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ChatProvider>().startConversation(
-            conversationId: widget.conversationId,
-          );
+      final chat = context.read<ChatProvider>();
+      chat.addListener(_onChatChanged);
+      chat.startConversation(conversationId: widget.conversationId);
+    });
+  }
+
+  void _onChatChanged() {
+    final chat = context.read<ChatProvider>();
+    final count = chat.messages.length;
+    final streaming = chat.streamingText;
+
+    // Only scroll when: initial load OR new messages arrive OR streaming
+    if (_didInitialScroll && (count != _prevMsgCount || streaming.isNotEmpty)) {
+      _scrollToBottom();
+    }
+    _prevMsgCount = count;
+  }
+
+  void _scrollToBottom() {
+    if (!_scrollCtrl.hasClients) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients && _scrollCtrl.position.hasContentDimensions) {
+        if (!_didInitialScroll || _scrollCtrl.position.maxScrollExtent - _scrollCtrl.position.pixels < 200) {
+          _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+          _didInitialScroll = true;
+        }
+      }
     });
   }
 
   @override
   void dispose() {
+    context.read<ChatProvider>().removeListener(_onChatChanged);
     _textCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -362,6 +388,7 @@ class _ChatScreenState extends State<ChatScreen> {
         type: FileType.custom, allowedExtensions: ['docx', 'pdf']);
     if (r == null || r.files.single.path == null) return;
     final p = r.files.single.path!, n = r.files.single.name;
+    if (!mounted) return;
     final ext = n.split('.').last.toLowerCase(),
         target = ext == 'pdf' ? 'docx' : 'pdf';
     final chat = context.read<ChatProvider>();
@@ -395,19 +422,6 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (ctx, chat, _) {
         final msgs = chat.messages;
         final streaming = chat.streamingText;
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollCtrl.hasClients && _scrollCtrl.position.hasContentDimensions) {
-            final pos = _scrollCtrl.position;
-            // Auto-scroll to bottom on initial history load
-            if (!_didInitialScroll && chat.historyLoaded && pos.maxScrollExtent > 0) {
-              _scrollCtrl.jumpTo(pos.maxScrollExtent);
-              _didInitialScroll = true;
-            } else if (pos.maxScrollExtent - pos.pixels < 200) {
-              _scrollCtrl.jumpTo(pos.maxScrollExtent);
-            }
-          }
-        });
 
         return Scaffold(
           backgroundColor: AppColors.bg(brightness),

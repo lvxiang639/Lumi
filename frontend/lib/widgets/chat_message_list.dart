@@ -57,7 +57,9 @@ class ChatMessageList extends StatelessWidget {
 
   Widget _bubble(BuildContext ctx, dynamic m) {
     final isUser = m.role == 'user';
-    final content = (m.content ?? '').toString();
+    final raw = (m.content ?? '').toString();
+    // Sanitize: replace ~~ with ～ to prevent accidental strikethrough
+    final content = raw.replaceAll('~~', '～');
     final createdAt = m.createdAt as DateTime?;
 
     return Padding(
