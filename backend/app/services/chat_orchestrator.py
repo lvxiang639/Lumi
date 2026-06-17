@@ -21,10 +21,10 @@ TOOL_MARKER = re.compile(r'\[TOOL:(\w+)(?::([^\]]+))?\]')
 # Quick keyword triggers — fast path to skip LLM intent check for obvious skill requests
 SKILL_KEYWORDS = {
     "search": (
-        "搜索", "查一下", "帮我搜", "帮我查", "搜一下", "百度", "谷歌", "查一查", "搜搜",
-        "多少钱", "股价", "行情", "涨了", "跌了", "价格", "最新",
-        "BTC", "ETH", "比特币", "股票", "外汇", "汇率", "黄金",
-        "新闻", "热点", "头条", "发生了什么",
+        "搜索", "搜一下", "百度", "谷歌",  # user explicitly asking to search
+        "BTC", "ETH", "比特币",           # crypto symbols
+        "股价", "股票",                    # stocks
+        "汇率", "外汇",                    # forex
     ),
     "weather": ("天气", "下雨", "下雪", "多少度", "冷吗", "热吗", "穿什么"),
     "calendar": ("提醒我", "定个闹钟", "日程", "别忘了", "记得"),
