@@ -10,11 +10,6 @@ from sqlalchemy import select, func
 
 logger = logging.getLogger(__name__)
 
-# Lazy import for llm_router to avoid circular deps
-def _get_llm():
-    from app.services.llm_service import llm_router
-    return llm_router
-
 SOLVE_PROMPT = """你是一位耐心的辅导老师。学生的题目如下，请先分步讲解思路，最后给出答案。
 
 题目: {question}
@@ -200,7 +195,6 @@ class StudyService:
             if weak_points:
                 top_tags = "、".join(w["tag"] for w in weak_points[:3])
                 try:
-                    llm = llm_router or _get_llm()
                     prompt = ANALYSIS_SUGGESTION_PROMPT.format(
                         child_name=child.name or "学生",
                         total=total,
@@ -283,7 +277,7 @@ class StudyService:
             return {"error": "Not found"}
 
         # Full analysis
-        analysis = await StudyService.analyze_weak_points(user_id, db, child_uuid=child_id)
+        analysis = await StudyService.analyze_weak_points(user_id, db, child_uuid=child_id, llm_router=llm_router)
         child_data = analysis["children"][0] if analysis["children"] else {}
 
         # Recent wrong answers
