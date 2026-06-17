@@ -107,8 +107,9 @@ async def compute_missing_embeddings() -> int:
 # ── Relevant Memory Query (semantic search) ────────────────────────────
 
 async def get_relevant_memories(user_id: UUID, user_text: str, top_k: int = 3) -> list[str]:
-    """Get top-k semantically relevant memories using precomputed embeddings."""
-    from app.services.memory_embedder import embed_single, search
+    """Get top-k semantically relevant memories using precomputed embeddings.
+    Falls back to keyword matching if model isn't loaded yet."""
+    from app.services.memory_embedder import embed_single, search, is_ready
 
     async with async_session() as db:
         result = await db.execute(
@@ -125,20 +126,19 @@ async def get_relevant_memories(user_id: UUID, user_text: str, top_k: int = 3) -
     if not memories:
         return []
 
-    # Embed query
-    loop = asyncio.get_running_loop()
-    query_vec = await loop.run_in_executor(None, embed_single, user_text)
-    if query_vec is None:
-        return []
+    # Try semantic search if model is ready
+    if is_ready():
+        loop = asyncio.get_running_loop()
+        query_vec = await loop.run_in_executor(None, embed_single, user_text)
+        if query_vec is not None:
+            items = [{"id": m.id, "text": f"{m.key}: {m.value}", "embedding": m.embedding} for m in memories]
+            results = search(query_vec, items, top_k=top_k)
+            if results:
+                return [r["text"] for r in results]
+    else:
+        logger.debug("BGE-M3 not ready, using keyword fallback")
 
-    # Search
-    items = [{"id": m.id, "text": f"{m.key}: {m.value}", "embedding": m.embedding} for m in memories]
-    results = search(query_vec, items, top_k=top_k)
-
-    if results:
-        return [r["text"] for r in results]
-
-    # Fallback: keyword match for memories without embeddings
+    # Fallback: keyword match
     query_words = set(user_text)
     scored = []
     result2 = await db.execute(

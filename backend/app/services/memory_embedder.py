@@ -9,6 +9,11 @@ _model = None
 _embedding_dim = 1024
 
 
+def is_ready() -> bool:
+    """Check if model is loaded without triggering a load."""
+    return _model is not None
+
+
 def _load_model():
     """Load BGE-M3 sentence-transformer model. Called once on first use."""
     global _model
