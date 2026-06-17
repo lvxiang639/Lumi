@@ -50,8 +50,8 @@ class LLMRouter:
                 content = choices[0].message.content or ""
                 # Log request + response summary
                 last_msg = messages[-1]["content"] if messages else ""
-                logger.info("LLM req(%s): %s", model, last_msg[:80].replace("\n", " "))
-                logger.info("LLM res(%s): %s", model, content[:200].replace("\n", " "))
+                logger.debug("LLM req(%s): %s", model, last_msg[:80].replace("\n", " "))
+                logger.debug("LLM res(%s): %s", model, content[:200].replace("\n", " "))
                 return content
             except Exception:
                 logger.exception("LLM chat failed, model=%s", model)

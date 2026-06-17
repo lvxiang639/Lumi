@@ -433,7 +433,105 @@ async def get_memory_summary(user_id: UUID) -> str:
     return "\n".join(lines)
 
 
+UNIFIED_EXTRACT_PROMPT = """分析以下对话，同时完成两个任务。返回JSON格式。
+
+任务1 - 提取用户关键信息（只提取明确表述的事实）:
+可提取类型: 姓名/年龄/职业/城市/兴趣爱好/家庭成员/宠物/习惯/偏好/重要经历
+格式: "facts": [{"key": "爱好", "value": "编程"}]
+
+任务2 - 对话摘要（50字以内，概括用户和AI聊了什么）:
+格式: "summary": "..."
+
+如果对话很短（<3轮）或没有新信息，对应字段返回空。
+如果已有之前的摘要，新摘要应合并旧内容。
+
+之前的摘要: {previous_summary}
+
+对话内容:
+{dialogue}
+
+JSON:"""
+
+
 def schedule_extraction(user_id: UUID, conv_id: UUID, dialogue: str) -> None:
-    """Fire-and-forget memory extraction after conversation ends."""
-    asyncio.create_task(extract_memories(user_id, conv_id, dialogue))
-    asyncio.create_task(extract_conv_summary(user_id, conv_id, dialogue))
+    """Fire-and-forget: extract memories + conversation summary in one LLM call.
+    Skips trivial conversations (< 3 messages or < 50 chars of dialogue)."""
+    lines = [l for l in dialogue.strip().split("\n") if l.strip()]
+    if len(lines) < 3 or len(dialogue) < 50:
+        return
+
+    async def _run():
+        try:
+            await _unified_extract(user_id, conv_id, dialogue)
+        except Exception:
+            logger.exception("unified extraction failed")
+
+    asyncio.create_task(_run())
+
+
+async def _unified_extract(user_id: UUID, conv_id: UUID, dialogue: str) -> None:
+    """Single LLM call: extract user facts + conversation summary."""
+    # Load previous summary for cumulative merge
+    previous_summary = ""
+    async with async_session() as db:
+        from app.models import ConvMemory
+        result = await db.execute(
+            select(ConvMemory.summary_text)
+            .where(ConvMemory.conv_id == conv_id)
+            .order_by(ConvMemory.updated_at.desc())
+            .limit(1)
+        )
+        row = result.scalar_one_or_none()
+        if row:
+            previous_summary = row
+
+    prompt = UNIFIED_EXTRACT_PROMPT.format(
+        dialogue=dialogue,
+        previous_summary=previous_summary or "(无)",
+    )
+    raw = await llm_router.chat([{"role": "user", "content": prompt}])
+    if not raw or not raw.strip():
+        return
+
+    # Parse JSON
+    try:
+        import json
+        # Strip markdown wrappers
+        clean = raw.strip()
+        if clean.startswith("```"):
+            clean = clean.split("\n", 1)[-1] if "\n" in clean else clean[3:]
+            if clean.endswith("```"):
+                clean = clean[:-3]
+            clean = clean.strip()
+        data = json.loads(clean)
+    except Exception:
+        return
+
+    # Save facts
+    facts = data.get("facts") or []
+    if isinstance(facts, dict):
+        facts = [{"key": k, "value": v} for k, v in facts.items()]
+    if facts:
+        items = [(f["key"], str(f["value"])) for f in facts if f.get("key") and f.get("value")]
+        if items:
+            async with async_session() as db:
+                await _save_memories(db, user_id, conv_id, items)
+
+    # Save summary
+    summary = (data.get("summary") or "").strip()[:200]
+    if summary:
+        async with async_session() as db:
+            from app.models import ConvMemory
+            result = await db.execute(
+                select(ConvMemory).where(ConvMemory.conv_id == conv_id)
+            )
+            existing = result.scalar_one_or_none()
+            if existing:
+                existing.summary_text = summary
+            else:
+                db.add(ConvMemory(
+                    user_id=user_id,
+                    conv_id=conv_id,
+                    summary_text=summary,
+                ))
+            await db.commit()
