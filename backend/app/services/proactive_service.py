@@ -77,6 +77,42 @@ CONTENT_CARD_PROMPT = """生成一张每日内容卡片，包含以下五项（�
 
 内容卡片:"""
 
+# ── Timezone estimation ──────────────────────────────────────────────
+
+# Major city → UTC offset map (simplified, covers common user locations)
+_CITY_TZ_OFFSETS = {
+    "北京": 8, "上海": 8, "广州": 8, "深圳": 8, "杭州": 8,
+    "东京": 9, "首尔": 9, "新加坡": 8, "吉隆坡": 8, "曼谷": 7,
+    "迪拜": 4, "阿布扎比": 4, "多哈": 3, "利雅得": 3,
+    "莫斯科": 3, "伊斯坦布尔": 3,
+    "伦敦": 0, "巴黎": 1, "柏林": 1, "罗马": 1, "马德里": 1,
+    "纽约": -5, "洛杉矶": -8, "芝加哥": -6, "多伦多": -5,
+    "悉尼": 10, "墨尔本": 10, "奥克兰": 12,
+    "孟买": 5.5, "新德里": 5.5,
+}
+
+
+def _estimate_local_hour(city: str, beijing_now: datetime) -> int:
+    """Estimate the local hour for a city given Beijing time.
+    Returns approximate local hour (0-23)."""
+    # Beijing is UTC+8
+    beijing_utc = beijing_now.astimezone(timezone.utc)
+
+    # Try exact match, then prefix match
+    offset = None
+    for name, tz in _CITY_TZ_OFFSETS.items():
+        if name in city:
+            offset = tz
+            break
+
+    if offset is None:
+        # Default: assume UTC+8 (Beijing) — same as server
+        return beijing_now.hour
+
+    local = beijing_utc + timedelta(hours=offset)
+    return local.hour
+
+
 # ── Proactive service ──
 
 
@@ -815,22 +851,30 @@ async def push_daily_content():
 
 
 async def push_morning_briefing():
-    """Push morning briefing to discover page at 8 AM Beijing time.
+    """Push morning briefing to discover page. Only sends to users whose
+    local time is between 6am-10am (actual morning for them).
 
-    Sends weather + calendar + expense summary as a proactive push.
     One per user per day (enforced by last_briefing_date on User model).
     """
     now = datetime.now(BEIJING_TZ)
-    # Fire at any poll after 8:00 AM (once/day enforced by last_briefing_date)
-    if now.hour < 8:
+    # Fire at any poll after 6:00 AM Beijing time (covers all Asian timezones)
+    if now.hour < 6:
         return
 
     from app.services.briefing_service import generate_briefing
+    from app.services.location_service import get_city
 
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     for uid_str in online_users():
         try:
             uid = UUID(uid_str)
+            # Skip if user's local time is outside morning window (6-10am)
+            city = await get_city(user_id=str(uid))
+            local_hour = _estimate_local_hour(city, now)
+            if local_hour < 6 or local_hour >= 10:
+                logger.debug("briefing skip: local_hour=%d for city=%s user=%s", local_hour, city, uid_str[:8])
+                continue
+
             # Check if briefing already sent today
             user_ok = False
             async with async_session() as db:
