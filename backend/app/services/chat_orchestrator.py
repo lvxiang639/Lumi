@@ -55,14 +55,16 @@ class ChatOrchestrator:
         conv = await self._get_or_create_conv(user_id, conversation_id, db, text)
         user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
 
-        # Detect intent: system message → chat, agent keywords → agent, else → inline routing
+        # Detect intent: fast keyword pre-filter → LLM fallback for ambiguous cases
         if text.strip().startswith(_SYSTEM_PREFIXES):
             intent = "chat"
         elif len(text) >= 20 and sum(1 for kw in _AGENT_KEYWORDS if kw in text) >= 2:
-            # Agent mode: only when text is long enough AND has ≥2 agent keywords
             intent = "agent"
         else:
             intent = self._quick_intent(text)
+            # Keyword returned "chat" → use LLM to verify (catches 记帐→expense, etc.)
+            if intent == "chat" and len(text) >= 4:
+                intent = await self._classify_with_llm(text)
 
         logger.info("user=%s conv=%s intent=%s text=%s", user_id[:8], str(conv.id)[:8], intent, text[:60])
 
@@ -107,6 +109,19 @@ class ChatOrchestrator:
         for skill, keywords in SKILL_KEYWORDS.items():
             if any(kw in tl or kw in text for kw in keywords):
                 return skill
+        return "chat"
+
+    async def _classify_with_llm(self, text: str) -> str:
+        """LLM-based intent classification for ambiguous cases.
+        Only called when keyword pre-filter returns 'chat'."""
+        try:
+            intent = await llm_router.classify_intent(text)
+            # Only trust LLM for non-chat intents; keep "chat" as-is
+            if intent and intent != "chat":
+                logger.info("LLM reclassified intent: chat → %s", intent)
+                return intent
+        except Exception:
+            pass
         return "chat"
 
     # ── Chat with inline tool markers ──────────────────────────────────
