@@ -12,6 +12,7 @@ Runs every 30 minutes (configurable) and checks:
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from sqlalchemy import select, func, desc
 

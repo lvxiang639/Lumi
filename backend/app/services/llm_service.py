@@ -94,14 +94,25 @@ class LLMRouter:
     async def classify_intent(self, text: str) -> str:
         """Returns: chat, search, weather, calendar, expense, convert"""
         prompt = f"""分析用户意图，只返回一个标签:
-- chat: 普通闲聊
-- search: 需要搜索信息
+
+- chat: 普通闲聊、知识问答、感情交流、推荐建议、解释说明
+  注意：大部分日常对话都是 chat！只有明确需要实时数据才用其他标签。
+  例如"推荐几个招牌菜""介绍一下淮扬菜""量子力学是什么"→ chat
+
+- search: 搜索互联网获取实时/最新信息
+  只在以下情况返回 search：
+  - 查询实时价格/股价/汇率（如"BTC多少钱""茅台股价"）
+  - 查询最新新闻/热点/事件（如"今天有什么新闻"）
+  - 查询需要最新数据的特定事实（如"今天XX发生了什么"）
+  - 用户明确要求搜索（如"帮我搜一下XX"）
+  知识类问题（菜系介绍、历史事件、科学知识）→ 归 chat，不要归 search
+
 - weather: 查询天气
 - calendar: 日历提醒相关
-- expense: 记账相关
-- convert: 文件格式转换（如Word转PDF、PDF转Word）
-- briefing: 查看今日简报、早晨问候（如"早上好""今日简报""今天有什么"）
-- email: 发送邮件、对话摘要发送到邮箱
+- expense: 记账相关（如"记帐82元""花了100块"）
+- convert: 文件格式转换
+- briefing: 今日简报
+- email: 发送邮件
 
 用户输入: {text}
 标签:"""
