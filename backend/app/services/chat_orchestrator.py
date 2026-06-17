@@ -212,10 +212,22 @@ class ChatOrchestrator:
     # ── Layered System Prompt ──────────────────────────────────────────
 
     async def _build_system_prompt(self, user_id: UUID, user_text: str, conv_id: UUID) -> str:
-        """Build a structured, layered system prompt."""
+        """Build a structured, layered system prompt. IO operations run in parallel."""
+
+        # Run all IO-bound lookups concurrently
+        from app.services.memory_service import get_conv_memory_summary, get_relevant_memories
+        from app.services.emotion_service import get_emotion_state
+
+        persona_t, conv_t, mem_t, emo_t = await asyncio.gather(
+            self._load_persona(user_id),
+            get_conv_memory_summary(conv_id),
+            get_relevant_memories(user_id, user_text, top_k=3),
+            get_emotion_state(user_id),
+            return_exceptions=True,
+        )
 
         # ── Layer 1: Role ──
-        persona = await self._load_persona(user_id) or "你是一个贴心的AI助手，名叫灵犀。"
+        persona = (persona_t if not isinstance(persona_t, Exception) else None) or "你是一个贴心的AI助手，名叫灵犀。"
 
         # ── Layer 2: Time ──
         now = datetime.now(BEIJING_TZ)
@@ -224,35 +236,20 @@ class ChatOrchestrator:
 
         # ── Layer 3: Conversation context ──
         conv_ctx = ""
-        try:
-            from app.services.memory_service import get_conv_memory_summary
-            conv_summary = await get_conv_memory_summary(conv_id)
-            if conv_summary:
-                conv_ctx = f"\n你们正在聊: {conv_summary}"
-        except Exception:
-            pass
+        if not isinstance(conv_t, Exception) and conv_t:
+            conv_ctx = f"\n你们正在聊: {conv_t}"
 
         # ── Layer 4: Relevant memories ──
         memory_section = ""
-        try:
-            from app.services.memory_service import get_relevant_memories
-            memories = await get_relevant_memories(user_id, user_text, top_k=3)
-            if memories:
-                memory_section = "\n关于用户（自然融入对话，不要刻意复述）:\n" + "\n".join(
-                    f"- {m}" for m in memories
-                )
-        except Exception:
-            pass
+        if not isinstance(mem_t, Exception) and mem_t:
+            memory_section = "\n关于用户（自然融入对话，不要刻意复述）:\n" + "\n".join(
+                f"- {m}" for m in mem_t
+            )
 
         # ── Layer 5: Emotion ──
         emotion_section = ""
-        try:
-            from app.services.emotion_service import get_emotion_state
-            emo = await get_emotion_state(user_id)
-            if emo:
-                emotion_section = f"\n用户最近情绪: {emo}"
-        except Exception:
-            pass
+        if not isinstance(emo_t, Exception) and emo_t:
+            emotion_section = f"\n用户最近情绪: {emo_t}"
 
         # ── Layer 6: Behavior guide ──
         behavior = """
