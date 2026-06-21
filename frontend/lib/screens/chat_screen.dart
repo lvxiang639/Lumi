@@ -224,57 +224,65 @@ class _ChatScreenState extends State<ChatScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        final brightness = Theme.of(context).brightness;
+        final brightness = Theme.of(ctx).brightness;
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                child: Container(width: 36, height: 4,
                   decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
-                const Text('分享对话', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: brightness == Brightness.light ? Colors.white : const Color(0xFF1C2129),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      const Text('🐱', style: TextStyle(fontSize: 24)),
-                      const SizedBox(width: 8),
-                      const Text('灵犀 AI 伴侣', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                    ]),
-                    const SizedBox(height: 12),
-                    const Divider(),
-                    ...recent.map((m) => Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        '${m.role == 'user' ? "🧑" : "🐱"} ${m.content}',
-                        style: const TextStyle(fontSize: 13, height: 1.5),
-                        maxLines: 3, overflow: TextOverflow.ellipsis,
-                      ),
-                    )),
-                  ]),
-                ),
-                const SizedBox(height: 20),
-                Row(children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: buf.toString()));
-                        Navigator.pop(ctx);
-                        _snack('已复制分享内容');
-                      },
-                      icon: const Icon(Icons.copy),
-                      label: const Text('复制文字'),
+              ),
+              const SizedBox(height: 12),
+              const Text('分享对话', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: brightness == Brightness.light ? Colors.white : const Color(0xFF1C2129),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                      const Row(children: [
+                        Text('🐱', style: TextStyle(fontSize: 24)),
+                        SizedBox(width: 8),
+                        Text('灵犀 AI 伴侣', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      ]),
+                      const SizedBox(height: 12),
+                      const Divider(),
+                      ...recent.map((m) => Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          '${m.role == 'user' ? "🧑" : "🐱"} ${m.content}',
+                          style: const TextStyle(fontSize: 13, height: 1.5),
+                          maxLines: 3, overflow: TextOverflow.ellipsis,
+                        ),
+                      )),
+                    ]),
                   ),
-                ]),
-              ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: buf.toString()));
+                      Navigator.pop(ctx);
+                      _snack('已复制分享内容');
+                    },
+                    icon: const Icon(Icons.copy),
+                    label: const Text('复制文字'),
+                  ),
+                ),
+              ),
+            ],
             ),
           ),
         );
