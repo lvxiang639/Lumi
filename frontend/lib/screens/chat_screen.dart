@@ -50,28 +50,32 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _scrollToBottom({bool force = false}) {
+    if (!_scrollCtrl.hasClients) return;
+    // Schedule after frame to let ListView finish layout
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollCtrl.hasClients || !_scrollCtrl.position.hasContentDimensions) return;
+      final distToBottom = _scrollCtrl.position.maxScrollExtent - _scrollCtrl.position.pixels;
+      if (force || !_didInitialScroll || distToBottom < 200) {
+        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+      }
+      if (!_didInitialScroll) _didInitialScroll = true;
+    });
+  }
+
   void _onChatChanged() {
+    if (!mounted) return;
     final chat = context.read<ChatProvider>();
     final count = chat.messages.length;
-    final streaming = chat.streamingText;
 
-    // Only scroll when: initial load OR new messages arrive OR streaming
-    if (_didInitialScroll && (count != _prevMsgCount || streaming.isNotEmpty)) {
+    if (!_didInitialScroll && chat.historyLoaded && count > 0) {
+      // Initial load complete → force scroll to bottom
+      _scrollToBottom(force: true);
+    } else if (_didInitialScroll && count > _prevMsgCount) {
+      // New message arrived → auto-scroll if near bottom
       _scrollToBottom();
     }
     _prevMsgCount = count;
-  }
-
-  void _scrollToBottom() {
-    if (!_scrollCtrl.hasClients) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients && _scrollCtrl.position.hasContentDimensions) {
-        if (!_didInitialScroll || _scrollCtrl.position.maxScrollExtent - _scrollCtrl.position.pixels < 200) {
-          _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
-          _didInitialScroll = true;
-        }
-      }
-    });
   }
 
   @override
