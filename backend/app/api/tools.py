@@ -147,6 +147,50 @@ async def download_file(
     )
 
 
+@router.get("/files/{file_id}/preview")
+async def preview_file(
+    file_id: UUID,
+    token: str = Query(""),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Preview a file inline (Word → HTML, PDF → raw)."""
+    result = await db.execute(
+        select(ConvertedFile).where(
+            ConvertedFile.id == file_id,
+            ConvertedFile.user_id == current_user.id,
+        )
+    )
+    record = result.scalar_one_or_none()
+    if not record:
+        raise HTTPException(404, "File not found")
+
+    content = await get_file(record.object_name)
+    if not content:
+        raise HTTPException(500, "文件读取失败")
+
+    # For .docx → convert to HTML
+    if record.target_name and record.target_name.lower().endswith(".docx"):
+        try:
+            import mammoth
+            html = mammoth.convert_to_html(content)
+            return Response(content=html.value, media_type="text/html; charset=utf-8")
+        except ImportError:
+            # Fallback: return as text
+            return Response(
+                content=content,
+                media_type=record.content_type,
+                headers={"Content-Disposition": "inline"},
+            )
+
+    # For .pdf → return inline
+    return Response(
+        content=content,
+        media_type=record.content_type,
+        headers={"Content-Disposition": "inline"},
+    )
+
+
 @router.post("/ocr")
 async def ocr_image(
     file: UploadFile = File(...),

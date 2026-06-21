@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../config.dart';
 import '../services/file_service.dart';
@@ -90,6 +91,26 @@ class _FilePageState extends State<FilePage> {
         ),
       );
     }
+  }
+
+  Future<void> _preview(String fileId, String fileName) async {
+    final token = (await SharedPreferences.getInstance()).getString('access_token') ?? '';
+    final url = '${AppConfig.apiBaseUrl}/api/tools/files/$fileId/preview?token=$token';
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            title: Text(fileName, style: const TextStyle(fontSize: 15)),
+          ),
+          body: WebViewWidget(
+            controller: WebViewController()
+              ..setJavaScriptMode(JavaScriptMode.unrestricted)
+              ..loadRequest(Uri.parse(url)),
+          ),
+        ),
+      ),
+    );
   }
 
   String _formatSize(dynamic size) {
@@ -214,9 +235,22 @@ class _FilePageState extends State<FilePage> {
                                                   fontSize: 10)),
                                         ]),
                                   ),
-                                  Icon(Icons.download_outlined,
-                                      size: 18,
-                                      color: AppColors.accent),
+                                  Row(mainAxisSize: MainAxisSize.min, children: [
+                                    GestureDetector(
+                                      onTap: () => _preview(fileId, targetName),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        child: Icon(Icons.visibility_outlined, size: 18, color: AppColors.accent),
+                                      ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () => _download(fileId, targetName),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        child: Icon(Icons.download_outlined, size: 18, color: AppColors.accent),
+                                      ),
+                                    ),
+                                  ]),
                                 ]),
                               ),
                             );
