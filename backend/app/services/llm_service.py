@@ -24,7 +24,7 @@ class LLMRouter:
 
     async def chat(
         self, messages: list[dict], force_model: str | None = None,
-        max_tokens: int = 512,
+        max_tokens: int = 512, temperature: float = 0.6,
     ) -> str:
         if force_model == "qwen":
             client = self.qwen
@@ -38,7 +38,7 @@ class LLMRouter:
                     model=model,
                     messages=messages,
                     stream=False,
-                    temperature=0.6,
+                    temperature=temperature,
                     top_p=0.9,
                     max_tokens=max_tokens,
                     frequency_penalty=0.3,

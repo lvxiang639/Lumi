@@ -756,10 +756,16 @@ async def generate_daily_content() -> dict | None:
     except Exception:
         logger.exception("failed to load daily content configs")
 
+    date_str = now.strftime("%Y年%m月%d日")
     result = {}
     for cfg in configs:
         try:
-            content = await llm_router.chat([{"role": "user", "content": cfg.prompt}])
+            # Inject date so LLM knows to generate fresh content for today
+            dated_prompt = f"今天是{date_str}。{cfg.prompt}"
+            content = await llm_router.chat(
+                [{"role": "user", "content": dated_prompt}],
+                max_tokens=512, temperature=0.9,  # higher temp for creative variety
+            )
             cleaned = _clean_llm_content(content or "")
             result[cfg.content_type] = {
                 "display_name": cfg.display_name,
