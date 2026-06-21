@@ -677,9 +677,11 @@ proactive_service = ProactiveService()
 GREETING_PROMPT = """你是一只关心主人的小猫灵犀。根据以下用户信息和当前时间，想一个简短温暖的欢迎语（不超过35字）。
 要自然、可爱，不要刻意复述记忆。如果没有特别的信息就返回空。
 
-注意: 不要提及已经过期的日历事件（如过去的家长会、接机、会议等）。只关注当前和未来的事。
+重要:
+- 当前日期是 {now}。如果记忆中有日期提醒，请对比今天日期判断是否已过期。
+- 不要提及已经过期的日历事件或节日（如已过去的家长会、端午节等）。
+- 只关注今天和未来的事。
 
-当前时间: {now}
 用户信息:
 {memories}
 
@@ -1270,7 +1272,7 @@ async def send_connect_greeting(user_id: str) -> str | None:
         memories = r.scalars().all()
         if len(memories) >= 2:
             mem_text = "\n".join(f"- {m.key}: {m.value}" for m in memories)
-            prompt = GREETING_PROMPT.format(now=now.strftime("%H:%M"), memories=mem_text)
+            prompt = GREETING_PROMPT.format(now=now.strftime("%Y年%m月%d日 %H:%M"), memories=mem_text)
             try:
                 mem = await llm_router.chat([{"role": "user", "content": prompt}])
                 mem = (mem or "").strip()

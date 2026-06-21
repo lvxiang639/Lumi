@@ -308,7 +308,6 @@ class SearchSkill(BaseSkill):
                 "美团": "hk03690", "京东": "hk09618", "百度": "hk09888",
                 "小米": "hk01810", "苹果": "gb_aapl", "特斯拉": "gb_tsla",
                 "谷歌": "gb_goog", "微软": "gb_msft", "英伟达": "gb_nvda",
-                "茅台": "sh600519",
             }
             for name, code in common_stocks.items():
                 if name in query:

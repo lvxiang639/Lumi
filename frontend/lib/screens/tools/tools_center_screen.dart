@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../calendar_page.dart';
 import '../expense_page.dart';
 import '../notes_page.dart';
-import '../mood_page.dart';
 import '../email_page.dart';
 import '../file_page.dart';
 import '../summary_page.dart';
@@ -20,7 +19,6 @@ class ToolsCenterScreen extends StatelessWidget {
     _Tool('日历', Icons.calendar_month, Color(0xFFF59E0B)),
     _Tool('记账', Icons.account_balance_wallet, Color(0xFF10B981)),
     _Tool('笔记', Icons.note_alt, Color(0xFF3B82F6)),
-    _Tool('心情', Icons.mood, Color(0xFFEC4899)),
     _Tool('邮件', Icons.email, Color(0xFF8B5CF6)),
     _Tool('文档', Icons.description_outlined, Color(0xFF14B8A6)),
     _Tool('摘要', Icons.summarize, Color(0xFFF97316)),
@@ -41,9 +39,6 @@ class ToolsCenterScreen extends StatelessWidget {
         break;
       case '笔记':
         page = const NotesPage();
-        break;
-      case '心情':
-        page = const MoodPage();
         break;
       case '邮件':
         page = const EmailPage();
