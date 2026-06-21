@@ -1271,7 +1271,27 @@ async def send_connect_greeting(user_id: str) -> str | None:
         )
         memories = r.scalars().all()
         if len(memories) >= 2:
-            mem_text = "\n".join(f"- {m.key}: {m.value}" for m in memories)
+            # Filter out memories with obviously past dates
+            import re
+            today = now.date()
+            filtered_memories = []
+            for m in memories:
+                # Check if memory value contains a date in MM-DD or MM月DD日 format
+                date_match = re.search(r'(\d{1,2})月(\d{1,2})日|(\d{4})-(\d{2})-(\d{2})', m.value or '')
+                if date_match:
+                    try:
+                        if date_match.group(1):  # MM月DD日
+                            mem_month = int(date_match.group(1))
+                            mem_day = int(date_match.group(2))
+                            mem_date = datetime(today.year, mem_month, mem_day).date()
+                        else:  # YYYY-MM-DD
+                            mem_date = datetime(int(date_match.group(3)), int(date_match.group(4)), int(date_match.group(5))).date()
+                        if mem_date < today:
+                            continue  # skip past events
+                    except ValueError:
+                        pass
+                filtered_memories.append(m)
+            mem_text = "\n".join(f"- {m.key}: {m.value}" for m in filtered_memories)
             prompt = GREETING_PROMPT.format(now=now.strftime("%Y年%m月%d日 %H:%M"), memories=mem_text)
             try:
                 mem = await llm_router.chat([{"role": "user", "content": prompt}])
