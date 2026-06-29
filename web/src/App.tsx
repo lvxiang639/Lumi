@@ -12,10 +12,6 @@ import ChatFAB from './components/ChatFAB'
 function AppRoutes() {
   const { user } = useAuth()
 
-  if (user === undefined) {
-    return <div style={{padding: 40, fontFamily: 'sans-serif'}}>Loading...</div>
-  }
-
   if (!user) {
     return (
       <Routes>
@@ -36,6 +32,7 @@ function AppRoutes() {
           <Route path="wrong-book" element={<WrongBook />} />
           <Route path="growth" element={<Growth />} />
         </Route>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <ChatFAB />
     </>

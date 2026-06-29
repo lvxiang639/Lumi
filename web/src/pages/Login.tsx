@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
@@ -6,6 +7,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { login } = useAuth()
+  const nav = useNavigate()
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -14,6 +16,7 @@ export default function Login() {
     setError('')
     try {
       await login(phone.trim())
+      nav('/dashboard', { replace: true })
     } catch (err: any) {
       setError(err.message || '登录失败')
     } finally {
