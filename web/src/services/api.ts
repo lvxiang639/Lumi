@@ -13,6 +13,11 @@ async function request<T = any>(path: string, options: RequestInit = {}): Promis
       ...options.headers,
     },
   })
+  if (res.status === 401) {
+    localStorage.removeItem('token')
+    window.location.href = '/login'
+    throw new Error('登录已过期')
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || `HTTP ${res.status}`)
