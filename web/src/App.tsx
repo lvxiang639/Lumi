@@ -12,6 +12,10 @@ import ChatFAB from './components/ChatFAB'
 function AppRoutes() {
   const { user } = useAuth()
 
+  if (user === undefined) {
+    return <div style={{padding: 40, fontFamily: 'sans-serif'}}>Loading...</div>
+  }
+
   if (!user) {
     return (
       <Routes>
