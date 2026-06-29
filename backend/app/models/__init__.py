@@ -32,6 +32,7 @@ from app.models.reminder_schedule import ReminderSchedule
 from app.models.knowledge_base import KnowledgeBase, KnowledgeChunk
 
 from app.models.study_record import StudyRecord, PracticePush, StudyChild
+from app.models.knowledge_point import KnowledgePoint
 from app.models.homophone_exercise import HomophoneExercise
 from app.models.user_agent import UserAgent, AgentStep
 from app.models.daily_content_config import DailyContentConfig
