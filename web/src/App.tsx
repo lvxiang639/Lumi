@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './hooks/useAuth'
 import MainLayout from './layouts/MainLayout'
+import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Textbooks from './pages/Textbooks'
 import Practice from './pages/Practice'
@@ -7,7 +9,18 @@ import WrongBook from './pages/WrongBook'
 import Growth from './pages/Growth'
 import ChatFAB from './components/ChatFAB'
 
-export default function App() {
+function AppRoutes() {
+  const { user } = useAuth()
+
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    )
+  }
+
   return (
     <>
       <Routes>
@@ -22,5 +35,13 @@ export default function App() {
       </Routes>
       <ChatFAB />
     </>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   )
 }

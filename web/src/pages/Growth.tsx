@@ -1,4 +1,34 @@
+import { useState, useEffect } from 'react'
+import { api } from '../services/api'
+
+interface Child { id: string; name: string; grade: string }
+interface ChildAnalysis {
+  child_name: string; total: number; mastered: number; mastery_rate: number
+  by_subject: Record<string, number>; weak_points: { tag: string; count: number }[]
+  ai_suggestion: string; grade: string
+}
+
 export default function Growth() {
+  const [children, setChildren] = useState<Child[]>([])
+  const [childId, setChildId] = useState('')
+  const [analysis, setAnalysis] = useState<any>(null)
+
+  useEffect(() => {
+    api.getChildren().then(d => {
+      setChildren(d.items)
+      if (d.items.length > 0) setChildId(d.items[0].id)
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!childId) return
+    api.getAnalysis(childId).then(setAnalysis).catch(() => {})
+  }, [childId])
+
+  const childData: ChildAnalysis | null = analysis?.children?.[0] || null
+  const weakPoints = childData?.weak_points || []
+  const bySubject = childData?.by_subject || {}
+
   return (
     <div className="space-y-12">
       <div>
@@ -6,63 +36,67 @@ export default function Growth() {
         <p className="text-[#8e8e8e] text-base mt-2">追踪每一步学习成长</p>
       </div>
 
-      {/* Knowledge Map */}
+      {children.length > 1 && (
+        <select value={childId} onChange={e => setChildId(e.target.value)} className="bg-white border border-[#f0efed] rounded-xl px-5 py-2.5 text-sm text-[#2c2c2c] outline-none">
+          {children.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      )}
+
+      {/* Subject breakdown */}
+      {Object.keys(bySubject).length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-medium text-[#2c2c2c]">科目分布</h2>
+          <div className="grid grid-cols-3 gap-4">
+            {Object.entries(bySubject).map(([subj, count]) => (
+              <div key={subj} className="bg-white rounded-2xl border border-[#f0efed] p-6 text-center">
+                <div className="text-2xl mb-2">{subj === '数学' ? '📐' : subj === '语文' ? '📖' : '🔤'}</div>
+                <div className="text-2xl font-semibold text-[#2c2c2c]">{count as number}</div>
+                <div className="text-sm text-[#8e8e8e] mt-1">{subj} · 本周题量</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Weak points */}
+      {weakPoints.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-medium text-[#2c2c2c]">薄弱知识点</h2>
+          <div className="bg-white rounded-2xl border border-[#f0efed] p-8 space-y-5">
+            {weakPoints.map(w => {
+              const maxCount = weakPoints[0]?.count || 1
+              const pct = maxCount > 0 ? (w.count / maxCount) * 100 : 0
+              return (
+                <div key={w.tag} className="flex items-center gap-4">
+                  <div className="w-24 text-sm text-[#2c2c2c] truncate">{w.tag}</div>
+                  <div className="flex-1 h-2 bg-[#f5f4f2] rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-[#e8c0b0]" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="w-12 text-xs text-right text-[#8e8e8e]">{w.count}次</div>
+                </div>
+              )
+            })}
+          </div>
+          {childData?.ai_suggestion && (
+            <div className="bg-[#fafaf9] rounded-2xl border border-[#f0efed] p-6 text-sm text-[#5b6abf]">
+              💡 {childData.ai_suggestion}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Knowledge map */}
       <div className="space-y-4">
         <h2 className="text-lg font-medium text-[#2c2c2c]">知识图谱</h2>
-        <div className="bg-white rounded-2xl border border-[#f0efed] p-8 space-y-5">
-          {[
-            { name: '万以内加减法', pct: 95 },
-            { name: '多位数乘法', pct: 67 },
-            { name: '分数初步', pct: 30 },
-            { name: '周长与面积', pct: 0 },
-            { name: '时间与日历', pct: 85 },
-            { name: '重量单位', pct: 72 },
-          ].map((kp) => (
-            <div key={kp.name} className="flex items-center gap-4">
-              <div className="w-32 text-sm text-[#2c2c2c]">{kp.name}</div>
-              <div className="flex-1 h-2 bg-[#f5f4f2] rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${kp.pct || 100}%`,
-                    background: kp.pct >= 70 ? '#b8c5b0' : kp.pct >= 30 ? '#e8d5b0' : kp.pct > 0 ? '#e8c0b0' : '#e8e6e3',
-                  }}
-                />
-              </div>
-              <div className="w-12 text-xs text-right text-[#8e8e8e]">
-                {kp.pct > 0 ? `${kp.pct}%` : '未学'}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Exam Records */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium text-[#2c2c2c]">考试记录</h2>
-          <button className="text-sm text-[#5b6abf] hover:underline">+ 录入成绩</button>
-        </div>
-        <div className="bg-white rounded-2xl border border-[#f0efed] divide-y divide-[#f0efed]">
-          {[
-            { date: '6月25日', subject: '数学', score: 92, total: 100 },
-            { date: '6月20日', subject: '语文', score: 88, total: 100 },
-            { date: '6月15日', subject: '英语', score: 95, total: 100 },
-          ].map((exam, i) => (
-            <div key={i} className="flex items-center justify-between px-8 py-5">
-              <div className="flex items-center gap-4">
-                <span className="text-xl">{exam.subject === '数学' ? '📐' : exam.subject === '语文' ? '📖' : '🔤'}</span>
-                <div>
-                  <div className="font-medium text-[#2c2c2c]">{exam.subject}</div>
-                  <div className="text-sm text-[#8e8e8e]">{exam.date}</div>
-                </div>
-              </div>
-              <div>
-                <span className="text-2xl font-semibold text-[#5b6abf]">{exam.score}</span>
-                <span className="text-sm text-[#8e8e8e]"> / {exam.total}</span>
-              </div>
-            </div>
-          ))}
+        <div className="bg-white rounded-2xl border border-[#f0efed] p-8">
+          <div className="flex gap-6 mb-6">
+            {(['数学', '语文', '英语'] as const).map(subj => (
+              <button key={subj} className="text-sm text-[#5b6abf] hover:underline">{subj}</button>
+            ))}
+          </div>
+          <div className="text-sm text-[#8e8e8e] text-center py-8">
+            知识点数据加载中...（需后端 API 支持）
+          </div>
         </div>
       </div>
     </div>

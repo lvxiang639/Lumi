@@ -296,3 +296,33 @@ async def generate_practice(
         except ValueError:
             pass
     return await StudyService.generate_practice(current_user.id, db, llm_router, child_uuid=child_uuid)
+
+
+# ── Knowledge Points ──
+
+@router.get("/knowledge-points")
+async def list_knowledge_points(
+    subject: str = Query(""),
+    grade: int = Query(0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List knowledge points tree. Optional subject/grade filter."""
+    from app.models.knowledge_point import KnowledgePoint
+    q = select(KnowledgePoint).order_by(KnowledgePoint.sort_order, KnowledgePoint.grade)
+    if subject:
+        q = q.where(KnowledgePoint.subject == subject)
+    if grade > 0:
+        q = q.where(KnowledgePoint.grade.in_([0, grade]))
+    r = await db.execute(q)
+    rows = r.scalars().all()
+    return {
+        "items": [
+            {
+                "id": str(rw.id), "parent_id": str(rw.parent_id) if rw.parent_id else None,
+                "name": rw.name, "grade": rw.grade, "subject": rw.subject,
+                "level": rw.level, "keywords": rw.keywords,
+            }
+            for rw in rows
+        ]
+    }
