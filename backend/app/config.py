@@ -39,6 +39,6 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from_email: str = ""
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "protected_namespaces": ()}
 
 settings = Settings()
