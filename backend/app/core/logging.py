@@ -1,5 +1,6 @@
 import logging
 import sys
+import warnings
 from pathlib import Path
 
 LOG_FORMAT = (
@@ -17,13 +18,21 @@ def setup_logging(level: int = logging.DEBUG) -> None:
     root.handlers = [handler]
 
     # Quiet noisy third-party loggers
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("dashscope").setLevel(logging.WARNING)
-    logging.getLogger("openai").setLevel(logging.WARNING)
-    logging.getLogger("openai._base_client").setLevel(logging.WARNING)
+    for name in ("httpx", "httpcore", "sqlalchemy.engine", "uvicorn.access",
+                 "dashscope", "openai", "openai._base_client", "faiss",
+                 "faiss.loader", "sentence_transformers", "huggingface_hub",
+                 "passlib", "passlib.handlers", "paddle", "paddlex"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+    # Suppress harmless third-party warnings
+    warnings.filterwarnings("ignore", message=".*protected namespace.*")
+    warnings.filterwarnings("ignore", message=".*urllib3.*")
+    warnings.filterwarnings("ignore", message=".*chardet.*")
+    warnings.filterwarnings("ignore", message=".*ccache.*")
+    warnings.filterwarnings("ignore", message=".*crypt.*deprecated.*")
+    warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
+    warnings.filterwarnings("ignore", category=DeprecationWarning, module="passlib")
+    warnings.filterwarnings("ignore", category=DeprecationWarning, module="jose")
 
 
 def get_logger(name: str) -> logging.Logger:
