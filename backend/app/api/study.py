@@ -298,6 +298,41 @@ async def generate_practice(
     return await StudyService.generate_practice(current_user.id, db, llm_router, child_uuid=child_uuid)
 
 
+# ── Generate Questions ──
+
+@router.post("/generate-questions")
+async def generate_questions(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Generate practice questions via LLM. Accepts subject, topic, grade, count."""
+    subject = body.get("subject", "数学")
+    topic = body.get("topic", "")
+    grade = body.get("grade", 3)
+    count = body.get("count", 5)
+
+    topic_hint = f"知识点: {topic}" if topic else ""
+    grade_hint = f"{grade}年级" if grade else "小学"
+
+    prompt = f"""请生成{count}道{grade_hint}{subject}练习题。{topic_hint}
+每道题格式:
+题号. 题目内容
+答案: 正确答案
+
+要求:
+- 题目难度适合{grade_hint}学生
+- 如果指定了知识点，聚焦该知识点
+- 题目表述清晰，像课本上的题
+- 答案准确
+
+练习题:"""
+
+    raw = await llm_router.chat([{"role": "user", "content": prompt}], max_tokens=1024, temperature=0.8)
+    questions = [q.strip() for q in (raw or "").strip().split("\n\n") if q.strip()]
+
+    return {"questions": questions[:count], "subject": subject, "topic": topic, "grade": grade}
+
+
 # ── Knowledge Points ──
 
 @router.get("/knowledge-points")

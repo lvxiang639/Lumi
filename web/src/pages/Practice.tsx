@@ -25,12 +25,11 @@ export default function Practice() {
   async function handleGenerate() {
     setLoading(true)
     try {
-      const desc = topic || `${subject} 练习题`
-      const form = new FormData()
-      form.append('question', desc)
-      form.append('subject', subject)
-      if (childId) form.append('child_id', childId)
-      const resp = await api.generatePractice(childId)
+      const resp = await api.generateQuestions({
+        subject,
+        topic: topic || undefined,
+        count: 5,
+      })
       if (resp.questions?.length) {
         setQuestions(resp.questions)
         setMode('quiz')

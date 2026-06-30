@@ -67,6 +67,11 @@ export const api = {
   },
 
   // Practice
+  generateQuestions: (params: { subject?: string; topic?: string; grade?: number; count?: number }) =>
+    request<{ questions: string[] }>('/api/study/generate-questions', {
+      method: 'POST', body: JSON.stringify(params),
+    }),
+
   generatePractice: (child_id?: string) => {
     const form = new FormData()
     if (child_id) form.append('child_id', child_id)
@@ -82,4 +87,8 @@ export const api = {
     const qs = subject ? `?subject=${subject}` : ''
     return request(`/api/study/knowledge-points${qs}`)
   },
+
+  // Textbooks
+  getTextbooks: () => request<{ items: any[] }>('/api/textbooks'),
+  getTextbook: (id: string) => request<any>(`/api/textbooks/${id}`),
 }

@@ -14,6 +14,7 @@ from app.api.tools import router as tools_router
 from app.api.knowledge import router as knowledge_router
 from app.api.study import router as study_router
 from app.api.homophone import router as homophone_router
+from app.api.textbooks import router as textbooks_router
 
 app = FastAPI(title="灵犀教育 API", version="2.0.0")
 
@@ -40,6 +41,7 @@ app.include_router(tools_router)
 app.include_router(knowledge_router)
 app.include_router(study_router)
 app.include_router(homophone_router)
+app.include_router(textbooks_router)
 
 
 @app.on_event("startup")
