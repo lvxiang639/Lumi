@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
 
 interface Child { id: string; name: string; grade: string }
@@ -6,11 +7,12 @@ interface Child { id: string; name: string; grade: string }
 type Mode = 'menu' | 'generate' | 'quiz' | 'result'
 
 export default function Practice() {
+  const [searchParams] = useSearchParams()
   const [mode, setMode] = useState<Mode>('menu')
   const [children, setChildren] = useState<Child[]>([])
   const [childId, setChildId] = useState('')
-  const [subject, setSubject] = useState('数学')
-  const [topic, setTopic] = useState('')
+  const [subject, setSubject] = useState(searchParams.get('subject') || '数学')
+  const [topic, setTopic] = useState(searchParams.get('topic') || '')
   const [loading, setLoading] = useState(false)
   const [questions, setQuestions] = useState<string[]>([])
   const [feedback, setFeedback] = useState('')

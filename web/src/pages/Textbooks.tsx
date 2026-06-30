@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 
 interface Textbook {
@@ -10,6 +11,7 @@ export default function Textbooks() {
   const [books, setBooks] = useState<Textbook[]>([])
   const [selected, setSelected] = useState<Textbook | null>(null)
   const [loading, setLoading] = useState(false)
+  const nav = useNavigate()
 
   useEffect(() => {
     api.getTextbooks().then(d => setBooks(d.items)).catch(() => {})
@@ -53,7 +55,9 @@ export default function Textbooks() {
                   <div className="font-medium text-[#2c2c2c] mb-3">{unit.name}</div>
                   <div className="grid grid-cols-2 gap-2">
                     {unit.lessons.map((lesson, j) => (
-                      <div key={j} className="flex items-center gap-2 text-sm text-[#5b6abf] px-3 py-2 rounded-lg bg-[#fafaf9] hover:bg-[#f3f2f8] cursor-pointer transition-colors">
+                      <div key={j}
+                        onClick={() => nav(`/practice?topic=${encodeURIComponent(lesson)}&subject=${encodeURIComponent(selected.subject)}`)}
+                        className="flex items-center gap-2 text-sm text-[#5b6abf] px-3 py-2 rounded-lg bg-[#fafaf9] hover:bg-[#f3f2f8] cursor-pointer transition-colors">
                         <span className="text-xs text-[#8e8e8e]">📖</span>
                         {lesson}
                       </div>
