@@ -24,15 +24,13 @@ def setup_logging(level: int = logging.DEBUG) -> None:
                  "passlib", "passlib.handlers", "paddle", "paddlex"):
         logging.getLogger(name).setLevel(logging.WARNING)
 
-    # Suppress harmless third-party warnings
-    warnings.filterwarnings("ignore", message=".*protected namespace.*")
-    warnings.filterwarnings("ignore", message=".*urllib3.*")
-    warnings.filterwarnings("ignore", message=".*chardet.*")
-    warnings.filterwarnings("ignore", message=".*ccache.*")
-    warnings.filterwarnings("ignore", message=".*crypt.*deprecated.*")
-    warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
-    warnings.filterwarnings("ignore", category=DeprecationWarning, module="passlib")
-    warnings.filterwarnings("ignore", category=DeprecationWarning, module="jose")
+    # Suppress known-harmless third-party warnings (scoped to specific modules)
+    warnings.filterwarnings("ignore", message=".*protected namespace.*", module="pydantic")
+    warnings.filterwarnings("ignore", message=".*urllib3.*", module="requests")
+    warnings.filterwarnings("ignore", message=".*chardet.*", module="requests")
+    warnings.filterwarnings("ignore", message=".*ccache.*", module="paddle")
+    warnings.filterwarnings("ignore", message=".*crypt.*deprecated.*", module="crypt")
+    warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic._internal")
 
 
 def get_logger(name: str) -> logging.Logger:

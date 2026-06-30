@@ -275,17 +275,14 @@ async def ocr_structure(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
-    """Analyze document structure — PP-StructureV3 layout + chart + formula recognition.
+    """Analyze document/image structure using Qwen-VL multimodal AI.
 
-    Returns Markdown and structured elements (text, tables, formulas, figures).
+    Returns Markdown description of the document content.
     """
     file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(400, "文件为空")
 
-    result = await ocr_service.analyze_structure(file_bytes)
-
-    if result.get("error"):
-        raise HTTPException(500, result["error"])
-
-    return result
+    # Use Qwen-VL for document structure & image understanding
+    description = await ocr_service.understand_with_qwen(file_bytes)
+    return {"markdown": description, "elements": []}
