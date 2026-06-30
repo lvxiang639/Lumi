@@ -48,10 +48,8 @@ app.include_router(textbooks_router)
 async def startup():
     from app.api.seed import seed_defaults
     await seed_defaults()
-    # Pre-load OCR + BGE-M3 in background
+    # Pre-load OCR models in background
     asyncio.create_task(_warmup_ocr())
-    from app.services.memory_service import compute_missing_embeddings
-    asyncio.create_task(compute_missing_embeddings())
 
 
 async def _warmup_ocr():
