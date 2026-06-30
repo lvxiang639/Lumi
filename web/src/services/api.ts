@@ -72,6 +72,16 @@ export const api = {
       method: 'POST', body: JSON.stringify(params),
     }),
 
+  gradeAnswer: (params: { question: string; answer: string; correct_answer: string; subject?: string; child_id?: string; child_name?: string }) =>
+    request<{ is_correct: boolean; feedback: string; explanation: string; record_id: string }>('/api/study/grade', {
+      method: 'POST', body: JSON.stringify(params),
+    }),
+
+  getPracticeRecords: (params?: { child_id?: string; status?: string }) => {
+    const qs = new URLSearchParams(params as any).toString()
+    return request<{ items: any[] }>(`/api/study/practice-records${qs ? '?' + qs : ''}`)
+  },
+
   generatePractice: (child_id?: string) => {
     const form = new FormData()
     if (child_id) form.append('child_id', child_id)

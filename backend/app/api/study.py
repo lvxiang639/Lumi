@@ -1,5 +1,6 @@
 """Study tutor API — thin controller. Business logic in domain/study/service.py."""
 
+import json
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -296,6 +297,99 @@ async def generate_practice(
         except ValueError:
             pass
     return await StudyService.generate_practice(current_user.id, db, llm_router, child_uuid=child_uuid)
+
+
+# ── Grade Answer ──
+
+@router.post("/grade")
+async def grade_answer(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Grade a student's answer using LLM, save record."""
+    question = body.get("question", "")
+    user_answer = body.get("answer", "")
+    correct_answer = body.get("correct_answer", "")
+    subject = body.get("subject", "数学")
+    child_id = body.get("child_id", "")
+    child_name = body.get("child_name", "")
+
+    prompt = f"""批改以下学生的答题，返回JSON:
+
+题目: {question}
+学生答案: {user_answer}
+正确答案: {correct_answer}
+
+判断学生答案是否正确。如果是数学题，允许答案形式不同但结果相同。如果是语文题，只要意思对就算对。
+
+返回JSON: {{"is_correct": true/false, "feedback": "一句话点评（10字以内）", "explanation": "详细解析（30字以内）"}}"""
+
+    raw = await llm_router.chat([{"role": "user", "content": prompt}])
+    try:
+        clean = raw.strip()
+        if clean.startswith("```"): clean = clean.split("\n", 1)[-1].split("```")[0] if "```" in clean[3:] else clean[3:]
+        result = json.loads(clean)
+    except Exception:
+        result = {"is_correct": user_answer.strip() == correct_answer.strip(), "feedback": "已批改", "explanation": ""}
+
+    # Save record
+    child_uuid = None
+    if child_id:
+        try: child_uuid = UUID(child_id)
+        except ValueError: pass
+
+    record = StudyRecord(
+        user_id=current_user.id,
+        child_id=child_uuid,
+        child_name=child_name,
+        subject=subject,
+        tags="练习",
+        question=question,
+        answer=json.dumps({"student_answer": user_answer, "correct_answer": correct_answer, **result}, ensure_ascii=False),
+        status="已掌握" if result.get("is_correct") else "未掌握",
+    )
+    db.add(record)
+    await db.commit()
+
+    return {**result, "record_id": str(record.id)}
+
+
+# ── Practice Records ──
+
+@router.get("/practice-records")
+async def list_practice_records(
+    child_id: str = Query(""),
+    status: str = Query(""),
+    page: int = Query(1), limit: int = Query(20),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List practice records with grading results."""
+    q = select(StudyRecord).where(
+        StudyRecord.user_id == current_user.id,
+        StudyRecord.tags == "练习",
+    )
+    if child_id:
+        try: q = q.where(StudyRecord.child_id == UUID(child_id))
+        except ValueError: pass
+    if status: q = q.where(StudyRecord.status == status)
+    q = q.order_by(StudyRecord.created_at.desc()).offset((page-1)*limit).limit(limit)
+    r = await db.execute(q)
+    rows = r.scalars().all()
+
+    def parse_answer(raw: str):
+        try: return json.loads(raw)
+        except: return {}
+
+    return {"items": [
+        {
+            "id": str(rc.id), "child_name": rc.child_name, "subject": rc.subject,
+            "question": rc.question, "status": rc.status,
+            **parse_answer(rc.answer),
+            "created_at": rc.created_at.isoformat() if rc.created_at else "",
+        } for rc in rows
+    ]}
 
 
 # ── Generate Questions ──
