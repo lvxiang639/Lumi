@@ -10,6 +10,7 @@ export default function WrongBook() {
   const [subject, setSubject] = useState('')
   const [records, setRecords] = useState<Record[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     api.getChildren().then(d => {
@@ -24,8 +25,8 @@ export default function WrongBook() {
     const params: any = { child_id: childId, status: '未掌握' }
     if (subject) params.subject = subject
     api.getRecords(params)
-      .then(d => setRecords(d.items))
-      .catch(() => {})
+      .then(d => { setRecords(d.items); setError('') })
+      .catch(() => setError('加载失败，请确认后端已启动'))
       .finally(() => setLoading(false))
   }, [childId, subject])
 
@@ -70,7 +71,14 @@ export default function WrongBook() {
         </select>
       </div>
 
-      {loading ? (
+      {error ? (
+        <div className="text-center py-16">
+          <div className="text-4xl mb-4">⚠️</div>
+          <div className="text-sm text-[#8e8e8e]">{error}</div>
+          <button onClick={() => { setError(''); setLoading(true); api.getRecords({ child_id: childId, status: '未掌握' }).then(d => { setRecords(d.items); setError('') }).catch(() => setError('重试失败')).finally(() => setLoading(false)) }}
+            className="mt-4 px-4 py-2 rounded-xl border border-[#f0efed] text-sm text-[#5b6abf] hover:bg-[#fafafc]">重试</button>
+        </div>
+      ) : loading ? (
         <div className="text-center text-[#8e8e8e] py-16">加载中...</div>
       ) : Object.keys(grouped).length === 0 ? (
         <div className="text-center py-16">

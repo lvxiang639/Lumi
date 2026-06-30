@@ -12,6 +12,8 @@ export default function Growth() {
   const [children, setChildren] = useState<Child[]>([])
   const [childId, setChildId] = useState('')
   const [analysis, setAnalysis] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     api.getChildren().then(d => {
@@ -22,7 +24,12 @@ export default function Growth() {
 
   useEffect(() => {
     if (!childId) return
-    api.getAnalysis(childId).then(setAnalysis).catch(() => {})
+    setLoading(true)
+    setError('')
+    api.getAnalysis(childId)
+      .then(d => { setAnalysis(d); setError('') })
+      .catch(() => setError('加载失败，请确认后端已启动'))
+      .finally(() => setLoading(false))
   }, [childId])
 
   const childData: ChildAnalysis | null = analysis?.children?.[0] || null

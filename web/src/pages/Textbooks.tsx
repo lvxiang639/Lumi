@@ -12,7 +12,8 @@ export default function Textbooks() {
           { grade: '三年级上', subject: '语文', publisher: '苏教版', units: 8, emoji: '📖' },
           { grade: '三年级上', subject: '英语', publisher: '译林版', units: 8, emoji: '🔤' },
         ].map((book) => (
-          <div key={book.subject} className="bg-white rounded-2xl border border-[#f0efed] p-8 cursor-pointer hover:border-[#e0dff0] transition-all duration-200">
+          <div key={book.subject} className="bg-white rounded-2xl border border-[#f0efed] p-8 cursor-pointer hover:border-[#e0dff0] transition-all duration-200"
+            onClick={() => alert(`打开 ${book.grade}${book.subject} · ${book.publisher}\n\n课本内容加载中...\n（需后端 RAG 接口支持）`)}>
             <div className="text-3xl mb-6">{book.emoji}</div>
             <div className="text-xs text-[#8e8e8e] mb-2">{book.publisher} · {book.units} 单元</div>
             <div className="text-lg font-medium text-[#2c2c2c]">{book.grade}{book.subject}</div>
@@ -21,11 +22,15 @@ export default function Textbooks() {
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-dashed border-[#e0dff0] p-16 text-center cursor-pointer hover:bg-[#fafafc] transition-colors">
+      <label className="block bg-white rounded-2xl border border-dashed border-[#e0dff0] p-16 text-center cursor-pointer hover:bg-[#fafafc] transition-colors">
+        <input type="file" accept=".pdf" className="hidden" onChange={e => {
+          const f = e.target.files?.[0]
+          if (f) alert(`已选择: ${f.name}\n\n上传功能需要后端接口支持`)
+        }} />
         <div className="text-3xl mb-4">📤</div>
         <div className="text-lg font-medium text-[#2c2c2c] mb-2">上传课本 PDF</div>
         <div className="text-sm text-[#8e8e8e]">自动识别章节和知识点，支持拖拽上传</div>
-      </div>
+      </label>
     </div>
   )
 }
