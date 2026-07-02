@@ -1,6 +1,9 @@
 """Textbook API — pre-loaded 苏教版/译林版 curriculum."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.api.deps import get_current_user
+from app.models import User
+from app.services.llm_service import llm_router
 
 router = APIRouter(prefix="/api/textbooks", tags=["textbooks"])
 
@@ -96,3 +99,27 @@ async def get_textbook(book_id: str):
     book = TEXTBOOKS.get(book_id)
     if not book: return {"error": "Not found"}
     return book
+
+
+@router.post("/summary")
+async def get_lesson_summary(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Generate a brief summary of what a textbook lesson covers."""
+    lesson = body.get("lesson", "")
+    subject = body.get("subject", "数学")
+    grade = body.get("grade", 3)
+
+    prompt = f"""请用2-3句话介绍{grade}年级{subject}课本中「{lesson}」这一课主要讲什么内容。
+
+要求:
+- 简洁明了，家长看完就能知道这节课的重点
+- 可以提到1-2个核心概念或方法
+- 语气亲切，像老师在介绍
+- 不超过100字
+
+介绍:"""
+
+    summary = await llm_router.chat([{"role": "user", "content": prompt}], max_tokens=200, temperature=0.5)
+    return {"lesson": lesson, "summary": (summary or "").strip()}
