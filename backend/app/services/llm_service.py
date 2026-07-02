@@ -48,6 +48,9 @@ class LLMRouter:
                     logger.warning("LLM returned empty choices, model=%s", model)
                     return ""
                 content = choices[0].message.content or ""
+                if not content:
+                    logger.warning("LLM returned empty content, model=%s finish_reason=%s",
+                                   model, choices[0].finish_reason if choices[0].finish_reason else "unknown")
                 # Log request + response summary
                 last_msg = messages[-1]["content"] if messages else ""
                 logger.debug("LLM req(%s): %s", model, last_msg[:80].replace("\n", " "))

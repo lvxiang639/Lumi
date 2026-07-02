@@ -422,7 +422,13 @@ async def generate_questions(
 练习题:"""
 
     raw = await llm_router.chat([{"role": "user", "content": prompt}], max_tokens=1024, temperature=0.8)
-    questions = [q.strip() for q in (raw or "").strip().split("\n\n") if q.strip()]
+
+    # Retry with simpler prompt if first attempt returned empty
+    if not raw or not raw.strip():
+        prompt2 = f"生成{count}道{grade_hint}{subject}题。{topic_hint}\n每题格式: 题号. 题目\n答案: 答案"
+        raw = await llm_router.chat([{"role": "user", "content": prompt2}], max_tokens=1024, temperature=0.7)
+
+    questions = [q.strip() for q in (raw or "").strip().split("\n\n") if q.strip() and "答案" in q]
 
     return {"questions": questions[:count], "subject": subject, "topic": topic, "grade": grade}
 
