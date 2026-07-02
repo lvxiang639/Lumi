@@ -7,9 +7,6 @@ interface Textbook { id: string; title: string; publisher: string; grade: number
 export default function Textbooks() {
   const [books, setBooks] = useState<Textbook[]>([])
   const [selected, setSelected] = useState<Textbook | null>(null)
-  const [activeLesson, setActiveLesson] = useState<string | null>(null)
-  const [summary, setSummary] = useState('')
-  const [summaryLoading, setSummaryLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const nav = useNavigate()
 
@@ -17,22 +14,13 @@ export default function Textbooks() {
 
   async function openBook(book: Textbook) {
     setLoading(true)
-    try { const detail = await api.getTextbook(book.id); setSelected(detail); setActiveLesson(null); setSummary('') }
-    catch { }
+    try { const detail = await api.getTextbook(book.id); setSelected(detail) } catch { }
     setLoading(false)
   }
 
-  async function showSummary(lesson: string) {
+  function goDetail(lesson: string) {
     if (!selected) return
-    if (activeLesson === lesson) { setActiveLesson(null); return }
-    setActiveLesson(lesson)
-    setSummaryLoading(true)
-    setSummary('')
-    try {
-      const resp = await api.getLessonSummary({ lesson, subject: selected.subject, grade: selected.grade })
-      setSummary(resp.summary || '暂无内容')
-    } catch { setSummary('暂时无法获取内容') }
-    setSummaryLoading(false)
+    nav(`/textbooks/${selected.id}/lesson/${encodeURIComponent(lesson)}`)
   }
 
   function goPractice(lesson: string) {
@@ -46,7 +34,7 @@ export default function Textbooks() {
     <div className="space-y-12">
       <div>
         <h1 className="text-[28px] font-semibold text-[#2c2c2c] tracking-tight">课本管理</h1>
-        <p className="text-[#8e8e8e] text-base mt-2">苏教版 / 译林版教材 · 点击单元查看内容</p>
+        <p className="text-[#8e8e8e] text-base mt-2">苏教版 / 译林版教材 · 点击课时查看详情</p>
       </div>
 
       {selected ? (
@@ -66,32 +54,15 @@ export default function Textbooks() {
                   <div className="font-medium text-[#2c2c2c] bg-[#fafaf9] px-5 py-3 border-b border-[#f0efed]">{unit.name}</div>
                   <div className="p-3 space-y-1">
                     {unit.lessons.map((lesson, j) => (
-                      <div key={j}>
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => showSummary(lesson)}
-                            className="flex-1 text-left text-sm text-[#5b6abf] px-3 py-2.5 rounded-lg hover:bg-[#f3f2f8] transition-colors">
-                            📖 {lesson}
-                          </button>
-                          <button onClick={() => goPractice(lesson)}
-                            className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-[#5b6abf] text-white hover:bg-[#4f5cb0] transition-colors">
-                            出题
-                          </button>
-                        </div>
-                        {activeLesson === lesson && (
-                          <div className="ml-4 mt-2 mb-2 p-4 bg-[#fafaf9] rounded-xl border border-[#f0efed]">
-                            {summaryLoading ? (
-                              <div className="text-sm text-[#8e8e8e]">正在生成内容摘要...</div>
-                            ) : (
-                              <>
-                                <div className="text-sm text-[#2c2c2c] leading-relaxed">{summary}</div>
-                                <button onClick={() => goPractice(lesson)}
-                                  className="mt-3 px-4 py-2 rounded-xl bg-[#5b6abf] text-white text-sm font-medium hover:bg-[#4f5cb0] transition-colors">
-                                  出题练习 →
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
+                      <div key={j} className="flex items-center gap-2">
+                        <button onClick={() => goDetail(lesson)}
+                          className="flex-1 text-left text-sm text-[#5b6abf] px-3 py-2.5 rounded-lg hover:bg-[#f3f2f8] transition-colors">
+                          📖 {lesson}
+                        </button>
+                        <button onClick={() => goPractice(lesson)}
+                          className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-[#5b6abf] text-white hover:bg-[#4f5cb0] transition-colors">
+                          出题
+                        </button>
                       </div>
                     ))}
                   </div>

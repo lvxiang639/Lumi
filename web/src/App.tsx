@@ -4,6 +4,7 @@ import MainLayout from './layouts/MainLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Textbooks from './pages/Textbooks'
+import LessonDetail from './pages/LessonDetail'
 import Practice from './pages/Practice'
 import WrongBook from './pages/WrongBook'
 import Growth from './pages/Growth'
@@ -32,6 +33,7 @@ function AppRoutes() {
           <Route path="wrong-book" element={<WrongBook />} />
           <Route path="growth" element={<Growth />} />
         </Route>
+        <Route path="textbooks/:bookId/lesson/:lessonName" element={<LessonDetail />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <ChatFAB />

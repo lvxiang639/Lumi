@@ -101,6 +101,8 @@ export const api = {
   // Textbooks
   getTextbooks: () => request<{ items: any[] }>('/api/textbooks'),
   getTextbook: (id: string) => request<any>(`/api/textbooks/${id}`),
+  lessonDetail: (bookId: string, lessonName: string) =>
+    request<any>(`/api/textbooks/${bookId}/lesson/${encodeURIComponent(lessonName)}`),
   getLessonSummary: (params: { lesson: string; subject: string; grade: number }) =>
     request<{ summary: string }>('/api/textbooks/summary', { method: 'POST', body: JSON.stringify(params) }),
 }
