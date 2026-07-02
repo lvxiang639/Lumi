@@ -32,8 +32,15 @@ export default function Practice() {
       const resp = await api.generateQuestions({ subject, topic: topic || undefined, count: 5 })
       if (resp.questions?.length) {
         setQuizzes(resp.questions.map((q, i) => {
-          const parts = q.split('\n答案:')
-          return { id: i, question: parts[0]?.replace(/^\d+\.\s*/, '').trim() || q, answer: '', correct_answer: parts[1]?.trim() || '' }
+          // Split question from answer — handles multiple formats
+          let question = q, correct = ''
+          const sep = q.match(/\n答案[:：]/)
+          if (sep) {
+            const idx = q.indexOf(sep[0])
+            question = q.slice(0, idx).replace(/^\d+[\.\、]\s*/, '').trim()
+            correct = q.slice(idx + sep[0].length).trim()
+          }
+          return { id: i, question, answer: '', correct_answer: correct }
         }))
         setView('quiz')
       } else { setFeedback('生成失败') }
