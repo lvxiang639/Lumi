@@ -41,17 +41,33 @@ export default function Practice() {
     finally { setLoading(false) }
   }
 
-  async function handleGrade(item: QuizItem) {
-    if (!item.answer.trim()) return
+  async function gradeOne(item: QuizItem): Promise<QuizItem> {
     const child = children.find(c => c.id === childId)
     try {
       const result = await api.gradeAnswer({
         question: item.question, answer: item.answer, correct_answer: item.correct_answer,
         subject, child_id: childId || undefined, child_name: child?.name || '',
       })
-      setQuizzes(prev => prev.map(q => q.id === item.id ? { ...q, ...result } : q))
-    } catch { }
+      return { ...item, ...result }
+    } catch { return item }
   }
+
+  async function handleGradeOne(item: QuizItem) {
+    if (!item.answer.trim()) return
+    const updated = await gradeOne(item)
+    setQuizzes(prev => prev.map(q => q.id === item.id ? updated : q))
+  }
+
+  async function handleSubmitAll() {
+    setLoading(true)
+    const pending = quizzes.filter(q => q.is_correct === undefined && q.answer.trim())
+    if (pending.length === 0) { setLoading(false); return }
+    const results = await Promise.all(pending.map(q => gradeOne(q)))
+    setQuizzes(prev => prev.map(q => results.find(r => r.id === q.id) || q))
+    setLoading(false)
+  }
+
+  const pendingCount = quizzes.filter(q => q.is_correct === undefined).length
 
   async function loadHistory() {
     try {
@@ -119,7 +135,14 @@ export default function Practice() {
       {/* ── Quiz ── */}
       {view === 'quiz' && (
         <div className="space-y-4">
-          <button onClick={() => setView('menu')} className="text-sm text-[#5b6abf] hover:underline mb-4">← 返回</button>
+          <div className="flex items-center justify-between">
+            <button onClick={() => setView('menu')} className="text-sm text-[#5b6abf] hover:underline">← 返回</button>
+            {pendingCount > 0 && (
+              <button onClick={handleSubmitAll} disabled={loading}
+                className="px-6 py-2.5 bg-[#5b6abf] text-white rounded-xl text-sm font-medium hover:bg-[#4f5cb0] disabled:opacity-40"
+              >{loading ? '批改中...' : `提交全部 (${pendingCount}题)`}</button>
+            )}
+          </div>
           {quizzes.map((q) => (
             <div key={q.id} className={`bg-white rounded-2xl border p-6 ${q.is_correct === true ? 'border-emerald-200 bg-emerald-50/30' : q.is_correct === false ? 'border-rose-200 bg-rose-50/30' : 'border-[#f0efed]'}`}>
               <div className="flex items-start gap-2 mb-3">
@@ -132,17 +155,11 @@ export default function Practice() {
               <div className="flex gap-2 items-center">
                 <input value={q.answer}
                   onChange={e => setQuizzes(prev => prev.map(x => x.id === q.id ? { ...x, answer: e.target.value } : x))}
-                  onKeyDown={e => e.key === 'Enter' && handleGrade(q)}
                   disabled={q.is_correct !== undefined}
                   placeholder="输入你的答案..."
                   className="flex-1 px-4 py-2.5 bg-[#fafaf9] border border-[#f0efed] rounded-xl text-sm outline-none focus:bg-white disabled:opacity-60" />
-                {q.is_correct === undefined && (
-                  <button onClick={() => handleGrade(q)} disabled={!q.answer.trim()}
-                    className="px-5 py-2.5 bg-[#5b6abf] text-white rounded-xl text-sm font-medium hover:bg-[#4f5cb0] disabled:opacity-40"
-                  >批改</button>
-                )}
-                {q.correct_answer && (
-                  <span className="text-xs text-[#8e8e8e] shrink-0">答案: {q.correct_answer}</span>
+                {q.is_correct !== undefined && q.correct_answer && (
+                  <span className="text-xs text-[#8e8e8e] shrink-0">正确答案: {q.correct_answer}</span>
                 )}
               </div>
               {(q.feedback || q.explanation) && (
